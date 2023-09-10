@@ -27,6 +27,10 @@ class LaserStudio(QMainWindow):
         if config is None:
             config = {}
 
+        # Creation of Viewer as the central widget
+        self.viewer = Viewer()
+        self.setCentralWidget(self.viewer)
+
         toolbar = QToolBar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
         assert toolbar
@@ -68,7 +72,3 @@ class LaserStudio(QMainWindow):
         group.idClicked.connect(
             lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
         )
-
-        # Creation of Viewer as the central widget
-        self.viewer = Viewer()
-        self.setCentralWidget(self.viewer)
