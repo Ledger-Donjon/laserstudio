@@ -4,6 +4,7 @@ from PyQt6.QtGui import QBrush, QColorConstants, QWheelEvent, QMouseEvent
 from enum import IntEnum, auto
 from typing import Optional, Tuple
 from .stagesight import StageSight
+import logging
 
 
 class Viewer(QGraphicsView):
@@ -55,6 +56,7 @@ class Viewer(QGraphicsView):
     @mode.setter
     def mode(self, new_mode: Mode):
         self.__mode = new_mode
+        logging.debug(f"Viewer mode selection: {new_mode}")
 
     def wheelEvent(self, event: QWheelEvent):
         """
