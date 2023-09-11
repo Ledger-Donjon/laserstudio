@@ -13,6 +13,7 @@ from PyQt6.QtGui import QPixmap, QIcon
 from typing import Optional
 from .util import resource_path
 from .widgets.viewer import Viewer
+from .instruments.instruments import Instruments
 
 
 class LaserStudio(QMainWindow):
@@ -26,6 +27,9 @@ class LaserStudio(QMainWindow):
 
         if config is None:
             config = {}
+
+        # Instantiate all instruments
+        self.instruments = Instruments(config)
 
         # Creation of Viewer as the central widget
         self.viewer = Viewer()
@@ -42,6 +46,7 @@ class LaserStudio(QMainWindow):
                 64, 64, transformMode=Qt.TransformationMode.SmoothTransformation
             )
         )
+        w.setAlignment(Qt.AlignmentFlag.AlignCenter)
         toolbar.addWidget(w)
 
         group = QButtonGroup(toolbar)

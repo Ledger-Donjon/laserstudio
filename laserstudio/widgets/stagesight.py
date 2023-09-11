@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QGraphicsLineItem,
 )
 from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
-from PyQt6.QtCore import QSizeF, QLineF, QRectF
+from PyQt6.QtCore import QSizeF, QLineF, QRectF, QPointF
 
 
 class StageSight(QGraphicsItemGroup):
@@ -115,3 +115,7 @@ class StageSight(QGraphicsItemGroup):
     @show_image.setter
     def show_image(self, value: bool):
         self.image.setVisible(value)
+
+    def move_to(self, position: QPointF):
+        print("Move to position", position)
+        self.setPos(position)

@@ -67,6 +67,8 @@ class Viewer(QGraphicsView):
         logging.debug(f"Viewer mode selection: {new_mode}")
         if new_mode == Viewer.Mode.NONE:
             self.setDragMode(Viewer.DragMode.NoDrag)
+        elif new_mode == Viewer.Mode.STAGE:
+            self.setDragMode(Viewer.DragMode.NoDrag)
 
     def wheelEvent(self, event: QWheelEvent):
         """
