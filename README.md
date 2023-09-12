@@ -15,6 +15,14 @@ It requires following packages to run:
 - [PyQt6]
 - [Pillow]
 - [opencv-python]
+- [pystages]
+- [PyYAML]
+
+You can install those by using the `requirements.txt` file.
+
+```shell
+python3 -m pip install --upgrade -r requirements.txt
+```
 
 ## Licensing
 
@@ -23,3 +31,5 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [PyQt6]: https://pypi.org/project/PyQt6/
 [Pillow]: https://pillow.readthedocs.io/en/stable/index.html
 [opencv-python]: https://github.com/opencv/opencv-python
+[PyYAML]: https://pypi.org/project/PyYAML/
+[pystages]: https://github.com/Ledger-Donjon/pystages
