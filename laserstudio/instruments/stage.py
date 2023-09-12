@@ -1,11 +1,15 @@
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QCoreApplication
 from .list_serials import get_serial_device
 import logging
-from pystages import Corvus, Stage
+from pystages import Corvus, Stage, Vector
+from pystages.exceptions import ProtocolError
+from typing import Optional
 
 
 class StageInstrument(QObject):
     """Class to regroup stage instrument operations"""
+
+    position_changed = pyqtSignal(Vector)
 
     def __init__(self, config: dict):
         """
@@ -29,3 +33,46 @@ class StageInstrument(QObject):
         else:
             logging.error(f"Unknown stage type {device_type}")
             return
+
+        # To refresh stage position in the view, in real-time
+        self._timer = QTimer()
+        self._timer.timeout.connect(self.refresh_stage)
+        self._timer.start(1000)
+
+    @property
+    def position(self) -> Vector:
+        return self.stage.position
+
+    @position.setter
+    def position(self, value: Vector):
+        """
+        Moves associated stage to a specific position, without waiting for move to be completely done.
+
+        :param value: destination as a Vector
+
+        .. note::
+            If there is a configuration of z-offsetting for each move, it will be done and
+            intermediates moves are blocking (eg, waiting to be done).
+        """
+        self.move_to(value, wait=False)
+    def refresh_stage(self):
+        """Called regularly to get stage position, and emits a pyQtSignal"""
+        try:
+            self.position_changed.emit(position := self.position)
+            logging.debug(f"Position refreshed: {position}")
+        except ProtocolError as e:
+            logging.warning(f"Warning: Bad response!: {repr(e)}")
+
+    def move_to(self, position: Vector, wait: bool):
+        """
+        Moves associated stage to a specific position, optionally waits for stage to stop moving.
+
+        :param position: destination as a Vector
+        :param wait: True if the stage must wait for move to be completely done
+
+        .. note::
+            If there is a configuration of z-offsetting for each move, it will be done and
+            intermediates moves are blocking (eg, waiting to be done).
+        """
+        # Move to actual destination
+        self.stage.move_to(position, wait=wait)
