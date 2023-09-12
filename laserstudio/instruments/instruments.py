@@ -19,7 +19,9 @@ class Instruments:
             try:
                 self.stage = StageInstrument(stage_config)
             except DeviceSearchError as e:
-                print(f"Stage is enabled but device {str(e)} is not found... Skipping.")
+                logging.warning(
+                    f"Stage is enabled but device {str(e)} is not found... Skipping."
+                )
 
         # Main camera
         self.camera = None

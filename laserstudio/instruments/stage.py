@@ -9,7 +9,8 @@ from typing import Optional
 class StageInstrument(QObject):
     """Class to regroup stage instrument operations"""
 
-    position_changed = pyqtSignal(Vector)
+    # Signal emitted when a new position is fetched
+    position_changed = pyqtSignal(Vector, name="positionChanged")
 
     def __init__(self, config: dict):
         """

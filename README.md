@@ -24,6 +24,14 @@ You can install those by using the `requirements.txt` file.
 python3 -m pip install --upgrade -r requirements.txt
 ```
 
+## Usage
+
+To run Laser Studio, open a terminal and run it as a module.
+
+```shell
+python3 -m laserstudio
+``````
+
 ## Licensing
 
 LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv3). See LICENSE and LICENSE.LESSER for license detail
