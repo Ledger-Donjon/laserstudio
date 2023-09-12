@@ -95,6 +95,16 @@ class LaserStudio(QMainWindow):
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.STAGE))
 
+        # Button to select zoning mode.
+        w = QPushButton(toolbar)
+        w.setToolTip("Define scanning regions")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        layout.addWidget(w, 2, 1)
+        group.addButton(w)
+        group.setId(w, int(Viewer.Mode.ZONE))
+
         # Button to reset the zoom.
         w = QPushButton(toolbar)
         w.setToolTip("Reset Viewer to see all elements")

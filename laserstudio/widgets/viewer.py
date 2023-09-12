@@ -2,10 +2,13 @@ from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
     QBrush,
+    QColor,
     QColorConstants,
     QWheelEvent,
     QMouseEvent,
+    QKeyEvent,
     QGuiApplication,
+    QPalette,
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
@@ -24,6 +27,7 @@ class Viewer(QGraphicsView):
 
         NONE = auto()
         STAGE = auto()
+        ZONE = auto()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -54,6 +58,9 @@ class Viewer(QGraphicsView):
 
         self.setInteractive(True)
 
+        self._default_highlight_color = QGuiApplication.palette().color(
+            QPalette.ColorRole.Highlight
+        )
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
         self.cam_pos_zoom = (
@@ -79,13 +86,24 @@ class Viewer(QGraphicsView):
         :return: Current selected mode."""
         return self.__mode
 
+    def _change_highlight_color(self, color: Optional[QColor]):
+        p = QGuiApplication.palette()
+        p.setColor(QPalette.ColorRole.Highlight, color or self._default_highlight_color)
+        QGuiApplication.setPalette(p)
+
     @mode.setter
     def mode(self, new_mode: Mode):
+        if self.__mode == Viewer.Mode.ZONE:
+            # Restore the highlight color
+            self._change_highlight_color(None)
+
         self.__mode = new_mode
         logging.debug(f"Viewer mode selection: {new_mode}")
-        if new_mode == Viewer.Mode.NONE:
-            self.setDragMode(Viewer.DragMode.NoDrag)
-        elif new_mode == Viewer.Mode.STAGE:
+
+        if new_mode == Viewer.Mode.ZONE:
+            self._change_highlight_color(QColor(QColorConstants.Green))
+            self.setDragMode(Viewer.DragMode.RubberBandDrag)
+        else:
             self.setDragMode(Viewer.DragMode.NoDrag)
 
     def wheelEvent(self, event: QWheelEvent):
@@ -161,7 +179,7 @@ class Viewer(QGraphicsView):
         if event.button() == Qt.MouseButton.RightButton:
             # Scroll gesture mode
             self.setDragMode(Viewer.DragMode.ScrollHandDrag)
-            # Transform as left press button event
+            # Transform as left press button event, to make the scroll by dragging actually effective.
             event = QMouseEvent(
                 event.type(),
                 event.position(),
@@ -186,4 +204,21 @@ class Viewer(QGraphicsView):
         """
         if event.button() == Qt.MouseButton.RightButton:
             self.setDragMode(Viewer.DragMode.NoDrag)
+
+        if self.mode == Viewer.Mode.ZONE:
+            rect = self.rubberBandRect()
+            logging.debug(f"Zone: {self.mapToScene(rect)}")
+            modifiers = QGuiApplication.queryKeyboardModifiers()
+            if Qt.KeyboardModifier.ShiftModifier in modifiers:
+                logging.debug("Zone removal")
         super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
+            self._change_highlight_color(QColor(QColorConstants.Red))
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event: QKeyEvent):
+        super().keyReleaseEvent(event)
+        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
+            self._change_highlight_color(QColor(QColorConstants.Green))
