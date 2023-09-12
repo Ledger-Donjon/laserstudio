@@ -27,6 +27,7 @@ if __name__ == "__main__":
         yaml_config = None
 
     app.setApplicationName("Laser Studio")
+    app.setApplicationDisplayName("Laser Studio")
     app.setWindowIcon(QIcon(resource_path(":/icons/logo.png")))
     app.setStyle(QStyleFactory.create("Fusion"))
     palette = QPalette()
@@ -54,5 +55,6 @@ if __name__ == "__main__":
     app.setPalette(palette)
 
     win = LaserStudio(yaml_config)
+    win.setWindowTitle(app.applicationDisplayName())
     win.show()
     sys.exit(app.exec())
