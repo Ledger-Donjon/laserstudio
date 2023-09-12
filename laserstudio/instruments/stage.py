@@ -55,6 +55,19 @@ class StageInstrument(QObject):
             intermediates moves are blocking (eg, waiting to be done).
         """
         self.move_to(value, wait=False)
+
+    @property
+    def auto_refresh_interval(self) -> Optional[int]:
+        """The poll interval of the timer dedicated to get the position regularly, in milliseconds"""
+        return self._timer.interval() if self._timer.isActive() else None
+
+    @auto_refresh_interval.setter
+    def auto_refresh_interval(self, value: Optional[int]):
+        if value is None:
+            self._timer.stop()
+        else:
+            self._timer.start(value)
+
     def refresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal"""
         try:
