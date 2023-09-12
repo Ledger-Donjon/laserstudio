@@ -1,4 +1,7 @@
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItemGroup
+from PyQt6.QtWidgets import (
+    QGraphicsView,
+    QGraphicsScene,
+)
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
     QBrush,
@@ -13,9 +16,9 @@ from PyQt6.QtGui import (
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
-from .stagesight import StageSight, StageInstrument, CameraInstrument, Vector
+from .stagesight import StageSight, StageInstrument, CameraInstrument
 import logging
-from .scanpath import ScanPath
+from .scangeometry import ScanGeometry
 
 
 class Viewer(QGraphicsView):
@@ -62,10 +65,11 @@ class Viewer(QGraphicsView):
         self.stage_sight = None
 
         # Scanning geometry object and its representative item in the view.
-        self.scan_geometry_item = item = QGraphicsItemGroup()
-        self.__scan_path = ScanPath(diameter=10.0)
-        self.scan_geometry_item.addToGroup(self.__scan_path)
-        self.__scene.addItem(item)
+        # Also includes the scan path
+        self.scan_geometry = ScanGeometry()
+        self.__scene.addItem(self.scan_geometry)
+
+        # Permits to activate tools
         self.setInteractive(True)
 
         self._default_highlight_color = QGuiApplication.palette().color(
@@ -215,12 +219,17 @@ class Viewer(QGraphicsView):
         if event.button() == Qt.MouseButton.RightButton:
             self.setDragMode(Viewer.DragMode.NoDrag)
 
-        if self.mode == Viewer.Mode.ZONE:
+        if self.mode == Viewer.Mode.ZONE and is_left:
+            # Get the corresponding Polygon within the scene
             rect = self.rubberBandRect()
-            logging.debug(f"Zone: {self.mapToScene(rect)}")
+            zone = self.mapToScene(rect)
+            # Add or remove the new rectangle to/from the current zone geometry
             modifiers = QGuiApplication.queryKeyboardModifiers()
             if Qt.KeyboardModifier.ShiftModifier in modifiers:
-                logging.debug("Zone removal")
+                # Remove the zone to all the polygons
+                self.scan_geometry.remove(zone)
+            else:
+                self.scan_geometry.add(zone)
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
