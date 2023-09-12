@@ -9,7 +9,7 @@ from PyQt6.QtGui import (
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
-from .stagesight import StageSight
+from .stagesight import StageSight, StageInstrument, Vector
 import logging
 
 
@@ -45,14 +45,24 @@ class Viewer(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        # Add StageSight item
-        item = self.stage_sight = StageSight()
-        self.__scene.addItem(item)
 
         # Current camera position and zoom factor
         self.__cam_pos_zoom = QPointF(), 1.0
+        self.scale(1, -1)
+
+        # By default, there is no StageSight
+        self.stage_sight = None
 
         self.setInteractive(True)
+
+    def add_stage_sight(self, stage: StageInstrument):
+        """Instantiate a stage sight associated with given stage.
+
+        :param stage: The stage instrument to be associated with the stage sight
+        """
+        # Add StageSight item
+        item = self.stage_sight = StageSight(stage)
+        self.__scene.addItem(item)
 
     @property
     def mode(self) -> Mode:
@@ -122,7 +132,7 @@ class Viewer(QGraphicsView):
         self.__cam_pos_zoom = pos, zoom = new_value
         logging.debug(self.cam_pos_zoom)
         self.resetTransform()
-        self.scale(zoom, zoom)
+        self.scale(zoom, -zoom)
         self.centerOn(pos)
 
     # User interactions
@@ -132,9 +142,10 @@ class Viewer(QGraphicsView):
         """
         is_left = event.button() == Qt.MouseButton.LeftButton
 
-        if self.mode == Viewer.Mode.STAGE and is_left:
+        if self.mode == Viewer.Mode.STAGE and is_left and self.stage_sight is not None:
+            # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
-            self.stage_sight.move_to(scene_pos)
+            self.stage_sight.move_to(Vector(scene_pos.x(), scene_pos.y()))
             event.accept()
             return
 

@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
 from PyQt6.QtCore import QSizeF, QLineF, QRectF, QPointF
+from ..instruments.stage import StageInstrument, Vector
+from typing import Optional
+import logging
 
 
 class StageSight(QGraphicsItemGroup):
@@ -13,7 +16,7 @@ class StageSight(QGraphicsItemGroup):
     Item representing the stage position in the scene and the observation area.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, stage: Optional[StageInstrument], parent=None):
         super().__init__(parent)
         pen = QPen(QColor(0, 100, 255, 150))
         pen.setCosmetic(True)
@@ -38,6 +41,12 @@ class StageSight(QGraphicsItemGroup):
 
         self.__update_size(QSizeF(1000.0, 1000.0))
         self.setPos(0.0, 0.0)
+
+        # Associate the StageInstrument
+        self.stage = stage
+
+        if stage is not None:
+            stage.position_changed.connect(lambda pos: self.setPos(*(pos.xy.data)))
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -116,6 +125,12 @@ class StageSight(QGraphicsItemGroup):
     def show_image(self, value: bool):
         self.image.setVisible(value)
 
-    def move_to(self, position: QPointF):
-        print("Move to position", position)
-        self.setPos(position)
+    def move_to(self, position: Vector):
+        """Perform a move operation on associated stage.
+
+        :param position: The position to aim.
+        """
+        logging.info(f"Move to position {position.data}")
+
+        if self.stage is not None:
+            self.stage.move_to(position, wait=True)
