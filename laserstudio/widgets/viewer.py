@@ -120,6 +120,27 @@ class Viewer(QGraphicsView):
         else:
             self.setDragMode(Viewer.DragMode.NoDrag)
 
+    @property
+    def cam_pos_zoom(self) -> Tuple[QPointF, float]:
+        """'Camera' position and zoom of the Viewer: The first element is
+        the position in the stage where the viewer is centered on.
+        The second element is the zoom factor, which must be strictly positive.
+
+        :return: A tuple containing the point where the viewer is centered
+            on and a float indicating the zoom factor.
+        """
+        return self.__cam_pos_zoom
+
+    @cam_pos_zoom.setter
+    def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
+        assert new_value[1] > 0
+        self.__cam_pos_zoom = pos, zoom = new_value
+        logging.debug(self.cam_pos_zoom)
+        self.resetTransform()
+        self.scale(zoom, -zoom)
+        self.centerOn(pos)
+
+    # User interactions
     def wheelEvent(self, event: QWheelEvent):
         """
         Handle mouse wheel events to manage zoom.
@@ -155,30 +176,10 @@ class Viewer(QGraphicsView):
 
         super().wheelEvent(event)
 
-    @property
-    def cam_pos_zoom(self) -> Tuple[QPointF, float]:
-        """'Camera' position and zoom of the Viewer: The first element is
-        the position in the stage where the viewer is centered on.
-        The second element is the zoom factor, which must be strictly positive.
-
-        :return: A tuple containing the point where the viewer is centered
-            on and a float indicating the zoom factor.
-        """
-        return self.__cam_pos_zoom
-
-    @cam_pos_zoom.setter
-    def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
-        assert new_value[1] > 0
-        self.__cam_pos_zoom = pos, zoom = new_value
-        logging.debug(self.cam_pos_zoom)
-        self.resetTransform()
-        self.scale(zoom, -zoom)
-        self.centerOn(pos)
-
-    # User interactions
     def mousePressEvent(self, event: QMouseEvent):
         """
         Called when mouse button is pressed.
+        In case of Mode being STAGE, triggers a move of the stage's StageSight.
         """
         is_left = event.button() == Qt.MouseButton.LeftButton
 
@@ -193,7 +194,8 @@ class Viewer(QGraphicsView):
         if event.button() == Qt.MouseButton.RightButton:
             # Scroll gesture mode
             self.setDragMode(Viewer.DragMode.ScrollHandDrag)
-            # Transform as left press button event, to make the scroll by dragging actually effective.
+            # Transform as left press button event,
+            # to make the scroll by dragging actually effective.
             event = QMouseEvent(
                 event.type(),
                 event.position(),
@@ -208,13 +210,14 @@ class Viewer(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         """
         Called when mouse moves.
-        In the case where the right button is pressed, moves the position.
         """
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         """
         Called when mouse button is released.
+        Used to get out the panning, when Right button is released.
+        Used to detect the end of the Zone selection.
         """
         if event.button() == Qt.MouseButton.RightButton:
             self.setDragMode(Viewer.DragMode.NoDrag)
@@ -233,11 +236,25 @@ class Viewer(QGraphicsView):
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
+        """
+        Called when key button is released.
+        Used when the user hits the SHIFT key in ZONE mode to change
+        the color of the rectangle.
+        """
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
             self._change_highlight_color(QColor(QColorConstants.Red))
+            # In Zone Mode, a release of the Shift key makes the highlight
+            # color to be changed to red (remove)
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event: QKeyEvent):
+        """
+        Called when key button is released.
+        Used when the user hits the SHIFT key in ZONE mode to change
+        the color of the rectangle.
+        """
         super().keyReleaseEvent(event)
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
             self._change_highlight_color(QColor(QColorConstants.Green))
+            # In Zone Mode, a release of the Shift key makes the highlight
+            # color to be changed to green (add)
