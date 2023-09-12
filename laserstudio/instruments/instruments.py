@@ -1,5 +1,8 @@
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
+from .camera import CameraUSBInstrument, CameraInstrument
+from typing import Optional
+import logging
 
 
 class Instruments:
@@ -17,3 +20,12 @@ class Instruments:
                 self.stage = StageInstrument(stage_config)
             except DeviceSearchError as e:
                 print(f"Stage is enabled but device {str(e)} is not found... Skipping.")
+
+        # Main camera
+        self.camera = None
+        camera_config = config.get("camera", None)
+        if camera_config is not None and camera_config.get("enable", False):
+            if camera_config.get("type") == "USB":
+                self.camera: Optional[CameraInstrument] = CameraUSBInstrument(
+                    camera_config
+                )

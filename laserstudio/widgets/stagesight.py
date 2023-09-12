@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
 from PyQt6.QtCore import QSizeF, QLineF, QRectF, QPointF
 from ..instruments.stage import StageInstrument, Vector
+from ..instruments.camera import CameraInstrument
 from typing import Optional
 import logging
 
@@ -16,7 +17,12 @@ class StageSight(QGraphicsItemGroup):
     Item representing the stage position in the scene and the observation area.
     """
 
-    def __init__(self, stage: Optional[StageInstrument], parent=None):
+    def __init__(
+        self,
+        stage: Optional[StageInstrument],
+        camera: Optional[CameraInstrument],
+        parent=None,
+    ):
         super().__init__(parent)
         pen = QPen(QColor(0, 100, 255, 150))
         pen.setCosmetic(True)
@@ -39,14 +45,20 @@ class StageSight(QGraphicsItemGroup):
         item.setPen(pen)
         self.addToGroup(item)
 
-        self.__update_size(QSizeF(1000.0, 1000.0))
         self.setPos(0.0, 0.0)
 
         # Associate the StageInstrument
         self.stage = stage
-
         if stage is not None:
             stage.position_changed.connect(lambda pos: self.setPos(*(pos.xy.data)))
+
+        # Associate the CameraInstrument
+        self.camera = camera
+        if camera is not None:
+            camera.new_image.connect(self.set_image)
+            self.__update_size(QSizeF(camera.width, camera.height))
+        else:
+            self.__update_size(QSizeF(500.0, 500.0))
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -88,11 +100,13 @@ class StageSight(QGraphicsItemGroup):
 
         image = self.image
         image.resetTransform()
-        rect = image.boundingRect()
+        image_size = self.image.pixmap().size()
 
         transform = QTransform()
         transform.translate(-w2, h2)
-        transform.scale(rect.width() / width, rect.height() / height)
+        transform.scale(
+            width / (image_size.width() or 1.0), -height / (image_size.height() or 1.0)
+        )
         image.setTransform(transform)
 
     def set_image(self, image: QImage):
@@ -134,3 +148,5 @@ class StageSight(QGraphicsItemGroup):
 
         if self.stage is not None:
             self.stage.move_to(position, wait=True)
+        else:
+            self.setPos(*position.xy.data)

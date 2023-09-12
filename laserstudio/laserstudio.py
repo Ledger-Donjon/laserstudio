@@ -36,9 +36,9 @@ class LaserStudio(QMainWindow):
         self.viewer = Viewer()
         self.setCentralWidget(self.viewer)
 
-        # Add StageSight if there is a Stage instrument
-        if self.instruments.stage is not None:
-            self.viewer.add_stage_sight(self.instruments.stage)
+        # Add StageSight if there is a Stage instrument or a camera
+        if self.instruments.stage is not None or self.instruments.camera is not None:
+            self.viewer.add_stage_sight(self.instruments.stage, self.instruments.camera)
 
         toolbar = QToolBar(self)
         toolbar.setAllowedAreas(

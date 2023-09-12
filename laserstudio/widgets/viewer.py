@@ -9,7 +9,7 @@ from PyQt6.QtGui import (
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
-from .stagesight import StageSight, StageInstrument, Vector
+from .stagesight import StageSight, StageInstrument, CameraInstrument, Vector
 import logging
 
 
@@ -61,13 +61,15 @@ class Viewer(QGraphicsView):
             self.cam_pos_zoom[1],
         )
 
-    def add_stage_sight(self, stage: StageInstrument):
+    def add_stage_sight(
+        self, stage: Optional[StageInstrument], camera: Optional[CameraInstrument]
+    ):
         """Instantiate a stage sight associated with given stage.
 
         :param stage: The stage instrument to be associated with the stage sight
         """
         # Add StageSight item
-        item = self.stage_sight = StageSight(stage)
+        item = self.stage_sight = StageSight(stage, camera)
         self.__scene.addItem(item)
 
     @property
