@@ -11,6 +11,15 @@ import logging
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
+    for arg in sys.argv:
+        if arg.startswith("--log="):
+            level = arg[len("--log=") :]
+            try:
+                logging.basicConfig(level=level)
+            except ValueError as e:
+                print("Warning, error during setting log level:", e)
+                pass
+
     # Get existing configuration file
     if os.path.exists("config.yaml"):
         yaml_config = yaml.load(open("config.yaml", "r"), yaml.FullLoader)
@@ -43,15 +52,6 @@ if __name__ == "__main__":
     palette.setColor(QPalette.ColorRole.Highlight, QColor(40, 120, 233))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
-
-    for arg in sys.argv:
-        if arg.startswith("--log="):
-            level = arg[len("--log=") :]
-            try:
-                logging.basicConfig(level=level)
-            except ValueError as e:
-                print("Warning, error during setting log level:", e)
-                pass
 
     win = LaserStudio(yaml_config)
     win.show()
