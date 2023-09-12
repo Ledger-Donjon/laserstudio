@@ -3,3 +3,5 @@ pystages>=1.1.0
 Pillow
 opencv-python
 PyYAML
+shapely
+triangle

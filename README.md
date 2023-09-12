@@ -17,6 +17,8 @@ It requires following packages to run:
 - [opencv-python]
 - [pystages]
 - [PyYAML]
+- [shapely]
+- [triangle]
 
 You can install those by using the `requirements.txt` file.
 
@@ -30,7 +32,7 @@ To run Laser Studio, open a terminal and run it as a module.
 
 ```shell
 python3 -m laserstudio
-``````
+```
 
 ## Licensing
 
@@ -41,3 +43,5 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [opencv-python]: https://github.com/opencv/opencv-python
 [PyYAML]: https://pypi.org/project/PyYAML/
 [pystages]: https://github.com/Ledger-Donjon/pystages
+[shapely]: https://shapely.readthedocs.io/en/stable/manual.html
+[triangle]: https://rufat.be/triangle/
