@@ -3,6 +3,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
     QMainWindow,
     QHBoxLayout,
+    QGridLayout,
     QLabel,
     QToolBar,
     QWidget,
@@ -36,6 +37,10 @@ class LaserStudio(QMainWindow):
         self.setCentralWidget(self.viewer)
 
         toolbar = QToolBar(self)
+        toolbar.setAllowedAreas(
+            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+        )
+        toolbar.setFloatable(False)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
         assert toolbar
 
@@ -49,7 +54,19 @@ class LaserStudio(QMainWindow):
         w.setAlignment(Qt.AlignmentFlag.AlignCenter)
         toolbar.addWidget(w)
 
+        # Create a grid for Viewer mode selection buttons
+        layout = QGridLayout()
+        w = QWidget()
+        w.setLayout(layout)
+        layout.setHorizontalSpacing(0)
+        layout.setVerticalSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        toolbar.addWidget(w)
+
         group = QButtonGroup(toolbar)
+        group.idClicked.connect(
+            lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
+        )
 
         # Button to unselect any viewer mode.
         w = QPushButton(toolbar)
@@ -58,7 +75,7 @@ class LaserStudio(QMainWindow):
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(True)
-        toolbar.addWidget(w)
+        layout.addWidget(w, 1, 1)
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.NONE))
 
@@ -70,10 +87,7 @@ class LaserStudio(QMainWindow):
         )
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
-        toolbar.addWidget(w)
+        layout.addWidget(w, 1, 2)
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.STAGE))
 
-        group.idClicked.connect(
-            lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
-        )
