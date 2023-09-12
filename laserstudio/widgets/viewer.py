@@ -41,10 +41,9 @@ class Viewer(QGraphicsView):
         # Selection of mode
         self.__mode = Viewer.Mode.NONE
 
-        # Hide scrollbars
+        # Hide ScrollBars
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
 
         # Current camera position and zoom factor
         self.__cam_pos_zoom = QPointF(), 1.0

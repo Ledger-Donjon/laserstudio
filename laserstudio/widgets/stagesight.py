@@ -88,11 +88,11 @@ class StageSight(QGraphicsItemGroup):
 
         image = self.image
         image.resetTransform()
-        brect = image.boundingRect()
+        rect = image.boundingRect()
 
         transform = QTransform()
         transform.translate(-w2, h2)
-        transform.scale(brect.width() / width, brect.height() / height)
+        transform.scale(rect.width() / width, rect.height() / height)
         image.setTransform(transform)
 
     def set_image(self, image: QImage):

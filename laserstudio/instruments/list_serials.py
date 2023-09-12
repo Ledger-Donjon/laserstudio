@@ -45,19 +45,19 @@ def get_serial_device(config):
         vid, pid = None, None
         location = None
         for port in serial.tools.list_ports.comports():
-            match_sn = match_vidpid = match_location = None
+            match_sn = match_vid_pid = match_location = None
             if "sn" in config:
                 sn = config["sn"]
                 match_sn = (sn == port.serial_number) or (port.device.endswith(sn))
             if "vid_pid" in config:
                 vid, pid = config["vid_pid"].split("_")
-                match_vidpid = (vid == f"{port.vid or 0:04X}") and (
+                match_vid_pid = (vid == f"{port.vid or 0:04X}") and (
                     pid == f"{port.pid or 0:04X}"
                 )
             if "location" in config:
                 location = config["location"]
                 match_location = (port.location or "").startswith(location)
-            matches = [match_sn, match_vidpid, match_location]
+            matches = [match_sn, match_vid_pid, match_location]
             # There should be at least one match, and only matches.
             if True in matches and False not in matches:
                 possible_matches.append(port.device)
