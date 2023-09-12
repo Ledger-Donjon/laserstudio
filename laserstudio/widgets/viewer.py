@@ -100,22 +100,33 @@ class Viewer(QGraphicsView):
         :return: Current selected mode."""
         return self.__mode
 
-    def _change_highlight_color(self, color: Optional[QColor]):
-        p = QGuiApplication.palette()
-        p.setColor(QPalette.ColorRole.Highlight, color or self._default_highlight_color)
-        QGuiApplication.setPalette(p)
-
     @mode.setter
     def mode(self, new_mode: Mode):
-        if self.__mode == Viewer.Mode.ZONE:
-            # Restore the highlight color
-            self._change_highlight_color(None)
-
         self.__mode = new_mode
+        self.__update_drag_mode()
+        self.__update_highlight_color()
         logging.debug(f"Viewer mode selection: {new_mode}")
 
-        if new_mode == Viewer.Mode.ZONE:
-            self._change_highlight_color(QColor(QColorConstants.Green))
+    def __update_highlight_color(self, has_shift: Optional[bool] = None):
+        """Convenience function to change the current Application Palette to modify
+        the highlight color. It permits to the Zone creation tool to have green / red
+        colors
+        """
+        if self.mode != Viewer.Mode.ZONE:
+            color = self._default_highlight_color
+        else:
+            if has_shift is None:
+                has_shift = (
+                    Qt.KeyboardModifier.ShiftModifier
+                    in QGuiApplication.queryKeyboardModifiers()
+                )
+            color = QColorConstants.Red if has_shift else QColorConstants.Green
+        p = QGuiApplication.palette()
+        p.setColor(QPalette.ColorRole.Highlight, color)
+        QGuiApplication.setPalette(p)
+
+    def __update_drag_mode(self):
+        if self.mode == Viewer.Mode.ZONE:
             self.setDragMode(Viewer.DragMode.RubberBandDrag)
         else:
             self.setDragMode(Viewer.DragMode.NoDrag)
@@ -219,7 +230,10 @@ class Viewer(QGraphicsView):
         Used to get out the panning, when Right button is released.
         Used to detect the end of the Zone selection.
         """
-        if event.button() == Qt.MouseButton.RightButton:
+        is_left = event.button() == Qt.MouseButton.LeftButton
+        is_right = event.button() == Qt.MouseButton.RightButton
+
+        if is_right and self.mode != Viewer.Mode.ZONE:
             self.setDragMode(Viewer.DragMode.NoDrag)
 
         if self.mode == Viewer.Mode.ZONE and is_left:
@@ -242,9 +256,9 @@ class Viewer(QGraphicsView):
         the color of the rectangle.
         """
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            self._change_highlight_color(QColor(QColorConstants.Red))
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
+            self.__update_highlight_color()
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event: QKeyEvent):
@@ -255,6 +269,6 @@ class Viewer(QGraphicsView):
         """
         super().keyReleaseEvent(event)
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            self._change_highlight_color(QColor(QColorConstants.Green))
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to green (add)
+            self.__update_highlight_color()
