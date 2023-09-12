@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
-from PyQt6.QtCore import Qt, QPointF, QRectF, QPoint
+from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
