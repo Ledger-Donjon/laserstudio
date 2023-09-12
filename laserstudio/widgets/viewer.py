@@ -197,7 +197,7 @@ class Viewer(QGraphicsView):
         if self.mode == Viewer.Mode.STAGE and is_left and self.stage_sight is not None:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
-            self.stage_sight.move_to(Vector(scene_pos.x(), scene_pos.y()))
+            self.stage_sight.move_to(scene_pos)
             event.accept()
             return
 

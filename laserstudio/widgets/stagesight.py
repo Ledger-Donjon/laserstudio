@@ -139,14 +139,24 @@ class StageSight(QGraphicsItemGroup):
     def show_image(self, value: bool):
         self.image.setVisible(value)
 
-    def move_to(self, position: Vector):
+    def stage_coords_from_scene_coords(self, position: QPointF) -> Vector:
+        """Gives the coordinates to apply to the stage in order
+        that the StageSight aims the given point in Viewer scene.
+
+        :param position: the position to aim in the Viewer scene
+        :return: The coordinates to apply to the stage.
+        """
+        return Vector(position.x(), position.y())
+
+    def move_to(self, position: QPointF):
         """Perform a move operation on associated stage.
 
-        :param position: The position to aim.
+        :param position: The position to aim, in the viewer's scene.
         """
-        logging.info(f"Move to position {position.data}")
+        x, y = position.x(), position.y()
+        logging.info(f"Move to position {x, y}")
 
         if self.stage is not None:
-            self.stage.move_to(position, wait=True)
+            self.stage.move_to(Vector(x, y), wait=True)
         else:
-            self.setPos(*position.xy.data)
+            self.setPos(position)
