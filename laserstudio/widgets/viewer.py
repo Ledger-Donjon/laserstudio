@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItemGroup
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
     QBrush,
@@ -9,11 +9,13 @@ from PyQt6.QtGui import (
     QKeyEvent,
     QGuiApplication,
     QPalette,
+    QPainter,
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
 from .stagesight import StageSight, StageInstrument, CameraInstrument, Vector
 import logging
+from .scanpath import ScanPath
 
 
 class Viewer(QGraphicsView):
@@ -49,6 +51,9 @@ class Viewer(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
+        # Enable anti-aliasing
+        self.setRenderHints(QPainter.RenderHint.Antialiasing)
+
         # Current camera position and zoom factor
         self.__cam_pos_zoom = QPointF(), 1.0
         self.scale(1, -1)
@@ -56,6 +61,11 @@ class Viewer(QGraphicsView):
         # By default, there is no StageSight
         self.stage_sight = None
 
+        # Scanning geometry object and its representative item in the view.
+        self.scan_geometry_item = item = QGraphicsItemGroup()
+        self.__scan_path = ScanPath(diameter=10.0)
+        self.scan_geometry_item.addToGroup(self.__scan_path)
+        self.__scene.addItem(item)
         self.setInteractive(True)
 
         self._default_highlight_color = QGuiApplication.palette().color(
