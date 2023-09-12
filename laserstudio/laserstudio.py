@@ -95,3 +95,10 @@ class LaserStudio(QMainWindow):
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.STAGE))
 
+        # Button to reset the zoom.
+        w = QPushButton(toolbar)
+        w.setToolTip("Reset Viewer to see all elements")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/zoom-reset.png")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(self.viewer.reset_camera)
+        toolbar.addWidget(w)

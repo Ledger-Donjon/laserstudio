@@ -55,6 +55,13 @@ class Viewer(QGraphicsView):
 
         self.setInteractive(True)
 
+    def reset_camera(self):
+        """Resets the camera to show all elements of the scene"""
+        self.cam_pos_zoom = (
+            self.__scene.itemsBoundingRect().center(),
+            self.cam_pos_zoom[1],
+        )
+
     def add_stage_sight(self, stage: StageInstrument):
         """Instantiate a stage sight associated with given stage.
 
