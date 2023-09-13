@@ -56,7 +56,7 @@ class StageSight(QGraphicsItemGroup):
         self.camera = camera
         if camera is not None:
             camera.new_image.connect(self.set_image)
-            self.__update_size(QSizeF(camera.width, camera.height))
+            self.__update_size(QSizeF(camera.width_um, camera.height_um))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
 

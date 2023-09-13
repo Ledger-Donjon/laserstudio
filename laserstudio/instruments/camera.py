@@ -25,6 +25,12 @@ class CameraInstrument(QObject):
         self.width = 640
         self.height = 512
 
+        # Unit factor to apply in order to get coordinates in micrometers
+        self.pixel_size_in_um = config.get("pixel_size_in_um", [1.0, 1.0])
+
+        self.width_um = self.width * self.pixel_size_in_um[0]
+        self.height_um = self.height * self.pixel_size_in_um[1]
+
     def get_last_qImage(self) -> QImage:
         width, height, mode, data = self.get_last_image()
         size = (width, height)
@@ -67,7 +73,14 @@ class CameraUSBInstrument(CameraInstrument):
         self.height = int(
             config.get("height", self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         )
-        logging.info(f"{self.width}; {self.height}")
+
+        self.width_um = self.width * self.pixel_size_in_um[0]
+        self.height_um = self.height * self.pixel_size_in_um[1]
+
+        logging.info(f"Camera's resolution {self.width}px; {self.height}px")
+        logging.info(
+            f"Image's dimension {self.width_um}um; {self.height_um}um (without considering any magnifier)"
+        )
 
     def __del__(self):
         self.__video_capture.release()
