@@ -5,8 +5,13 @@
 
 from shapely.geometry import MultiPolygon, Polygon
 import random
-from typing import Union, Tuple, List, cast
+from typing import Union, Optional, cast
 from triangle import triangulate
+
+Point = tuple[float, float]
+Path = list[Point]
+# Triangle is the area and three points
+Triangle = tuple[float, Point, Point, Point]
 
 
 class EmptyGeometryError(Exception):
@@ -23,7 +28,7 @@ class RandomPointGenerator:
 
     def __init__(self):
         self.__geometry = MultiPolygon()
-        # List of triangles and weight. Each element of this list is a tuple.
+        # list of triangles and weight. Each element of this list is a tuple.
         # First element of tuple is triangle area.
         # Next three elements are the points of the triangle.
         self.__triangles = []
@@ -34,15 +39,11 @@ class RandomPointGenerator:
         ready to generate random points.
         """
         self.__triangles = self.__triangulate(self.__geometry)
-        self.__total_area = 0
-        for area, a, b, c in self.__triangles:
+        self.__total_area = 0.0
+        for area, _, _, _ in self.__triangles:
             self.__total_area += area
 
-    def __triangulate(
-        self, geometry: Union[MultiPolygon, Polygon]
-    ) -> List[
-        Tuple[float, Tuple[float, float], Tuple[float, float], Tuple[float, float]]
-    ]:
+    def __triangulate(self, geometry: Union[MultiPolygon, Polygon]) -> list[Triangle]:
         """
         Triangulate a geometry using Constrained Delaunay Triangulation.
         :param geometry: A shapely geometry.
@@ -62,12 +63,12 @@ class RandomPointGenerator:
                 # Empty shape
                 return []
 
-            # List of vertices
+            # list of vertices
             # With shapely, last vertex is also the first one. Skip it
             # otherwise Triangle may crash.
             vertices = list(geometry.exterior.coords[:-1])
 
-            # List of edges which are forced in the triangulation. Add the edges
+            # list of edges which are forced in the triangulation. Add the edges
             # of the exterior and interior rings.
             segments = []
             holes = []
@@ -95,19 +96,12 @@ class RandomPointGenerator:
                     area = polygon.area
                     coords = tuple(polygon.exterior.coords[:-1])
                     assert len(coords) == 3
-                    c = cast(
-                        Tuple[
-                            Tuple[float, float],
-                            Tuple[float, float],
-                            Tuple[float, float],
-                        ],
-                        coords,
-                    )
+                    c = cast(tuple[Point, Point, Point], coords)
                     t = area, *c
                     result.append(t)
         return result
 
-    def random(self):
+    def random(self) -> Point:
         """
         Generate a random point in the geometry.
         :return: (x, y) tuple.
@@ -118,28 +112,28 @@ class RandomPointGenerator:
         # Pick a random triangle
         # Polygon area must be take into account.
         r = random.random() * self.__total_area
-        choosen_triangle = None
+        chosen_triangle = None
         area_acc = 0
         for triangle in self.__triangles:
             area_acc += triangle[0]
             if r <= area_acc:
-                choosen_triangle = triangle
+                chosen_triangle = triangle
                 break
-        assert choosen_triangle is not None  # This should not happen
+        assert chosen_triangle is not None  # This should not happen
         # Pick a random point in the triangle
-        a, b, c = choosen_triangle[1:]
-        randa = random.random()
-        randb = random.random()
+        a, b, c = chosen_triangle[1:]
+        rand_a = random.random()
+        rand_b = random.random()
         # Random is picked in a rectangle. Fold coordinates to pick in a
         # triangle.
-        if randa + randb > 1:
-            randa = 1 - randa
-            randb = 1 - randb
-        x = a[0] + (b[0] - a[0]) * randa + (c[0] - a[0]) * randb
-        y = a[1] + (b[1] - a[1]) * randa + (c[1] - a[1]) * randb
+        if rand_a + rand_b > 1:
+            rand_a = 1 - rand_a
+            rand_b = 1 - rand_b
+        x = a[0] + (b[0] - a[0]) * rand_a + (c[0] - a[0]) * rand_b
+        y = a[1] + (b[1] - a[1]) * rand_a + (c[1] - a[1]) * rand_b
         return x, y
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         """:return: True if geometry is empty."""
         return len(self.__triangles) == 0
 
@@ -157,7 +151,7 @@ class RandomPointGenerator:
         self.__geometry = value
         self.__update()
 
-    def debug_get_triangles(self):
+    def debug_get_triangles(self) -> list[Triangle]:
         return self.__triangles
 
 
@@ -178,15 +172,15 @@ class ScanPathGenerator(RandomPointGenerator):
         # Number of old scanning points to be memorized in the history.
         self.__history_size = 10
         # History of scanned points
-        self.__history = []
+        self.__history: Path = []
         # Generated paths
         # We may need to know the next paths if the user wants to display the
         # next points to be scanned when end of current path is reached.
-        self.__paths = []
+        self.__paths: list[Path] = []
         # Index of the next point in the first path.
-        self.__next_index = 0
+        self.__next_index: int = 0
         # Total number of points in all paths.
-        self.__total = 0
+        self.__total: int = 0
 
     @RandomPointGenerator.geometry.setter
     def geometry(self, value):
@@ -219,7 +213,7 @@ class ScanPathGenerator(RandomPointGenerator):
             self.__paths.append(path)
             self.__total = len(path)
 
-    def __generate_path(self, length, start=None):
+    def __generate_path(self, length: int, start: Optional[Point] = None) -> Path:
         """
         Generate a new scan path.
 
@@ -228,11 +222,11 @@ class ScanPathGenerator(RandomPointGenerator):
         start as the first point in the path.
         """
         # Pick the random points.
-        points = []
+        points: list[Point] = []
         for _ in range(length):
             points.append(self.random())
         # Get the first points
-        result = []
+        result: Path = []
         if start is None:
             result.append(points.pop())
         else:
@@ -243,12 +237,12 @@ class ScanPathGenerator(RandomPointGenerator):
         return result
 
     @staticmethod
-    def __nearest(point: Tuple[float, float], points: List[Tuple[float, float]]) -> int:
+    def __nearest(point: Point, points: list[Point]) -> int:
         """
         Find the nearest point in a list.
 
         :param point: Interest point.
-        :param points: List of points.
+        :param points: list of points.
         :return: Index of the nearest point in the list. 0 if the list is empty
         """
         nearest_dist_sqr = float("inf")
@@ -260,7 +254,7 @@ class ScanPathGenerator(RandomPointGenerator):
                 nearest_index = i
         return nearest_index
 
-    def __require_n(self, n):
+    def __require_n(self, n: int):
         """
         Build new paths until n next points are available.
 
@@ -278,9 +272,10 @@ class ScanPathGenerator(RandomPointGenerator):
             self.__paths.append(new_path)
             self.__total += len(new_path)
 
-    def pop(self):
+    def pop(self) -> Point:
         """
         Pop and return the next scan point.
+
         :return: Next point to be scanned.
         """
         self.__require_n(1)
@@ -295,15 +290,15 @@ class ScanPathGenerator(RandomPointGenerator):
             self.__history = self.__history[-self.__history_size :]
         return p
 
-    def next(self):
+    def next(self) -> Point:
         """
         :return: Next point to be scanned.
         """
         return self.next_list(1)[0]
 
-    def next_list(self, n):
+    def next_list(self, n) -> Path:
         """
-        :return: List of next points to be scanned.
+        :return: list of next points to be scanned.
         :param n: Number of points to be returned.
         """
         if self.is_empty():
@@ -320,7 +315,7 @@ class ScanPathGenerator(RandomPointGenerator):
                 j = 0
         return result
 
-    def hist_list(self, n):
+    def hist_list(self, n: int) -> Path:
         """
         :return: Last n scanned points. The size of the result may be smaller
         than n if there are not enough points in the history.
@@ -334,7 +329,7 @@ class ScanPathGenerator(RandomPointGenerator):
         return self.__history[-n:]
 
     @property
-    def density(self):
+    def density(self) -> int:
         """
         Number of points generated randomly in the scan shape. The bigger it
         is, the smaller average distance between consecutive points is.
@@ -343,7 +338,7 @@ class ScanPathGenerator(RandomPointGenerator):
         return self.__density
 
     @density.setter
-    def density(self, value):
+    def density(self, value: int):
         if value < 1:
             raise ValueError("Invalid density")
         self.__density = value
