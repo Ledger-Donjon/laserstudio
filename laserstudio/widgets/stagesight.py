@@ -139,6 +139,16 @@ class StageSight(QGraphicsItemGroup):
     def show_image(self, value: bool):
         self.image.setVisible(value)
 
+    def scene_coords_from_stage_coords(self, position: Vector) -> QPointF:
+        """Gives the coordinates to apply to the position of the StageSight
+        when the stage has the position given in parameters.
+
+        :param position: the coordinates of the stage
+        :return: The coordinates to set to the widget to represent the stage
+            positioning
+        """
+        return QPointF(*position.xy.data)
+
     def stage_coords_from_scene_coords(self, position: QPointF) -> Vector:
         """Gives the coordinates to apply to the stage in order
         that the StageSight aims the given point in Viewer scene.
@@ -160,3 +170,10 @@ class StageSight(QGraphicsItemGroup):
             self.stage.move_to(Vector(x, y), wait=True)
         else:
             self.setPos(position)
+
+    def update_pos(self, position: Vector):
+        """Update Widget position according to the stage's position, received in parameter
+
+        :param position: The stage's current position.
+        """
+        self.setPos(self.scene_coords_from_stage_coords(position))
