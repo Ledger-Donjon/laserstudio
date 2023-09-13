@@ -1,6 +1,8 @@
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
-from .camera import CameraUSBInstrument, CameraInstrument
+from .camera import CameraInstrument
+from .camera_rest import CameraRESTInstrument
+from .camera_usb import CameraUSBInstrument
 from typing import Optional
 import logging
 
