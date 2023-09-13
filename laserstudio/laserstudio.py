@@ -111,3 +111,29 @@ class LaserStudio(QMainWindow):
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(self.viewer.reset_camera)
         toolbar.addWidget(w)
+
+        if self.viewer.stage_sight is not None:
+            # Button to toggle off or on the video
+            w = QPushButton(toolbar)
+            w.setToolTip("Show/Hide Image")
+            w.setCheckable(True)
+            w.setChecked(True)
+            icon = QIcon()
+            icon.addPixmap(
+                QPixmap(resource_path(":/icons/fontawesome-free/eye-solid-24.png")),
+                QIcon.Mode.Normal,
+                QIcon.State.On,
+            )
+            icon.addPixmap(
+                QPixmap(
+                    resource_path(":/icons/fontawesome-free/eye-slash-solid-24.png")
+                ),
+                QIcon.Mode.Normal,
+                QIcon.State.Off,
+            )
+            w.setIcon(icon)
+            w.setIconSize(QSize(24, 24))
+            w.toggled.connect(
+                lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
+            )
+            toolbar.addWidget(w)
