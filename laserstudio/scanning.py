@@ -296,7 +296,7 @@ class ScanPathGenerator(RandomPointGenerator):
         """
         return self.next_list(1)[0]
 
-    def next_list(self, n) -> Path:
+    def next_list(self, n: int) -> Path:
         """
         :return: list of next points to be scanned.
         :param n: Number of points to be returned.

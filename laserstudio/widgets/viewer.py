@@ -130,7 +130,7 @@ class Viewer(QGraphicsView):
         """
         if self.scan_geometry:
             next_point = self.scan_geometry.next_point()
-            if self.stage_sight is not None:
+            if next_point is not None and self.stage_sight is not None:
                 self.stage_sight.move_to(QPointF(*next_point))
 
     def __update_highlight_color(self, has_shift: Optional[bool] = None):

@@ -31,3 +31,11 @@ class Instruments:
                 self.camera: Optional[CameraInstrument] = CameraUSBInstrument(
                     camera_config
                 )
+
+            if camera_config.get("type") == "REST":
+                self.camera: Optional[CameraInstrument] = CameraRESTInstrument(
+                    camera_config
+                )
+
+    def go_next(self):
+        pass

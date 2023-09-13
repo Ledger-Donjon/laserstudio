@@ -73,13 +73,11 @@ class ScanGeometry(QGraphicsItemGroup):
         self.addToGroup(self.__scan_zones_group)
 
         # Also, update the scan path with the new geometry
+        self.scan_path_generator.geometry = self.__scan_geometry
         self.__update_scan_path()
 
     def __update_scan_path(self):
         """Update scanning path display."""
-
-        self.scan_path_generator.geometry = self.__scan_geometry
-
         try:
             points_hist = self.scan_path_generator.hist_list(10)
             points_next = self.scan_path_generator.next_list(10)
@@ -110,7 +108,13 @@ class ScanGeometry(QGraphicsItemGroup):
     def add(self, zone: QPolygonF):
         self.__add_remove(zone)
 
-    def next_point(self) -> tuple[float, float]:
-        next_point = self.scan_path_generator.pop()
-        self.__update_scan_path()
-        return next_point
+    def next_point(self) -> Optional[tuple[float, float]]:
+        if self.scan_path_generator.is_empty():
+            logging.error("Cannot get next point, the scan geometry is empty.")
+            return None
+        try:
+            self.__update_scan_path()
+            next_point = self.scan_path_generator.pop()
+            return next_point
+        except EmptyGeometryError:
+            logging.error("Cannot generate a point.")
