@@ -137,3 +137,19 @@ class LaserStudio(QMainWindow):
                 lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
             )
             toolbar.addWidget(w)
+
+        # Button to trigger a Go Next
+        w = QPushButton(toolbar)
+        w.setToolTip("Go Next Scan")
+        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/forward-next.png")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(self.handle_go_next)
+        toolbar.addWidget(w)
+
+    def handle_go_next(self):
+        """Go Next operation.
+        Triggers the instruments to perform changes to go to next step of scan.
+        Triggers the viewer to perform changes to go to next step of scan.
+        """
+        self.instruments.go_next()
+        self.viewer.go_next()

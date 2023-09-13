@@ -123,6 +123,16 @@ class Viewer(QGraphicsView):
         self.__update_highlight_color()
         logging.debug(f"Viewer mode selection: {new_mode}")
 
+    def go_next(self):
+        """Actions to perform when Laser Studio receive a Go Next command.
+        Retrieve the next point position from Scan Geometry
+        Inform the StageSight to go to the retrieved position
+        """
+        if self.scan_geometry:
+            next_point = self.scan_geometry.next_point()
+            if self.stage_sight is not None:
+                self.stage_sight.move_to(QPointF(*next_point))
+
     def __update_highlight_color(self, has_shift: Optional[bool] = None):
         """Convenience function to change the current Application Palette to modify
         the highlight color. It permits to the Zone creation tool to have green / red

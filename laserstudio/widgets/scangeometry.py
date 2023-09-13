@@ -109,3 +109,8 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def add(self, zone: QPolygonF):
         self.__add_remove(zone)
+
+    def next_point(self) -> tuple[float, float]:
+        next_point = self.scan_path_generator.pop()
+        self.__update_scan_path()
+        return next_point
