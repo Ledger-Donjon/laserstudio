@@ -28,8 +28,18 @@ class CameraInstrument(QObject):
         # Unit factor to apply in order to get coordinates in micrometers
         self.pixel_size_in_um = config.get("pixel_size_in_um", [1.0, 1.0])
 
-        self.width_um = self.width * self.pixel_size_in_um[0]
-        self.height_um = self.height * self.pixel_size_in_um[1]
+        # Objective
+        objective = config.get("objective", 1.0)
+
+        self.select_objective(objective)
+
+    def select_objective(self, factor: float):
+        """Select an objective with a magnifying factor.
+
+        :param factor: The magnifying factor of the objective (5x, 10x, 20x, 50x...)
+        """
+        self.width_um = self.width * self.pixel_size_in_um[0] / factor
+        self.height_um = self.height * self.pixel_size_in_um[1] / factor
 
     def get_last_qImage(self) -> QImage:
         width, height, mode, data = self.get_last_image()
