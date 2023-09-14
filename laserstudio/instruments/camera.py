@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal
+from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QImage
 from PIL import Image, ImageQt
 from typing import Optional, Literal
@@ -18,8 +18,13 @@ class CameraInstrument(QObject):
 
         # To refresh image regularly, in real-time
         self._timer = QTimer()
+        self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.get_last_qImage)
-        self._timer.start(50)
+        self.refresh_interval = config.get("refresh_interval_ms", 200)
+
+        QTimer.singleShot(
+            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
+        )
 
         self.width = 640
         self.height = 512
@@ -50,6 +55,10 @@ class CameraInstrument(QObject):
             im = Image.frombytes(mode=mode, data=data, size=size)
         qImage = ImageQt.ImageQt(im)
         self.new_image.emit(qImage)
+
+        QTimer.singleShot(
+            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
+        )
         return qImage
 
     def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
