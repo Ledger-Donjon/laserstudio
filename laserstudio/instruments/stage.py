@@ -40,6 +40,9 @@ class StageInstrument(QObject):
         self._timer.timeout.connect(self.refresh_stage)
         self._timer.start(1000)
 
+        # Unit factor to apply in order to get coordinates in micrometers
+        self.unit_factors = config.get("unit_factors", [1.0] * self.stage.num_axis)
+
     @property
     def position(self) -> Vector:
         return self.stage.position
