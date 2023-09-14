@@ -5,11 +5,27 @@ from PyQt6.QtWidgets import (
     QGraphicsLineItem,
 )
 from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
-from PyQt6.QtCore import QSizeF, QLineF, QRectF, QPointF
+from PyQt6.QtCore import (
+    pyqtSignal,
+    pyqtBoundSignal,
+    QSizeF,
+    QLineF,
+    QRectF,
+    QPointF,
+    QObject,
+)
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from typing import Optional
 import logging
+
+
+class StageSightObject(QObject):
+    # Signal emitted when a new position is set
+    position_changed = pyqtSignal(QPointF, name="positionChanged")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
 
 class StageSight(QGraphicsItemGroup):
@@ -17,13 +33,16 @@ class StageSight(QGraphicsItemGroup):
     Item representing the stage position in the scene and the observation area.
     """
 
+    # Signal emitted when a new position is set
+    # position_changed = pyqtSignal(Vector, name="positionChanged")
+
     def __init__(
         self,
         stage: Optional[StageInstrument],
         camera: Optional[CameraInstrument],
         parent=None,
     ):
-        super().__init__(parent)
+        super(QGraphicsItemGroup, self).__init__(parent)
         pen = QPen(QColor(0, 100, 255, 150))
         pen.setCosmetic(True)
 
@@ -45,12 +64,14 @@ class StageSight(QGraphicsItemGroup):
         item.setPen(pen)
         self.addToGroup(item)
 
-        self.setPos(0.0, 0.0)
+        self.__object = StageSightObject()
+
+        self.setPos(QPointF(0.0, 0.0))
 
         # Associate the StageInstrument
         self.stage = stage
         if stage is not None:
-            stage.position_changed.connect(lambda pos: self.setPos(*(pos.xy.data)))
+            stage.position_changed.connect(self.update_pos)
 
         # Associate the CameraInstrument
         self.camera = camera
@@ -156,7 +177,13 @@ class StageSight(QGraphicsItemGroup):
         :param position: the position to aim in the Viewer scene
         :return: The coordinates to apply to the stage.
         """
-        return Vector(position.x(), position.y())
+        if self.stage is None or self.stage.stage.num_axis == 2:
+            return Vector(position.x(), position.y())
+        v = self.stage.position
+        v[0] = position.x()
+        if self.stage.stage.num_axis > 1:
+            v[1] = position.y()
+        return v
 
     def move_to(self, position: QPointF):
         """Perform a move operation on associated stage.
@@ -167,7 +194,7 @@ class StageSight(QGraphicsItemGroup):
         logging.info(f"Move to position {x, y}")
 
         if self.stage is not None:
-            self.stage.move_to(Vector(x, y), wait=True)
+            self.stage.move_to(self.stage_coords_from_scene_coords(position), wait=True)
         else:
             self.setPos(position)
 
@@ -176,4 +203,14 @@ class StageSight(QGraphicsItemGroup):
 
         :param position: The stage's current position.
         """
-        self.setPos(self.scene_coords_from_stage_coords(position))
+        scene_pos = self.scene_coords_from_stage_coords(position)
+        self.setPos(scene_pos)
+        self.position_changed.emit(scene_pos)
+
+    def setPos(self, value: QPointF):
+        self.__object.position_changed.emit(value)
+        super(QGraphicsItemGroup, self).setPos(value)
+
+    @property
+    def position_changed(self) -> pyqtBoundSignal:
+        return self.__object.position_changed

@@ -146,6 +146,16 @@ class LaserStudio(QMainWindow):
         w.clicked.connect(self.handle_go_next)
         toolbar.addWidget(w)
 
+        # Button to enable/disable StageSight position tracking.
+        w = QPushButton(toolbar)
+        w.setToolTip("Follow stage")
+        w.setCheckable(True)
+        w.setIcon(QIcon(resource_path(":/icons/icon8/follow-stage.png")))
+        w.setIconSize(QSize(24, 24))
+        w.toggled.connect(self.viewer.follow_stagesight)
+        w.setChecked(True)
+        toolbar.addWidget(w)
+
     def handle_go_next(self):
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.

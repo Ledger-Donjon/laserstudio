@@ -76,19 +76,20 @@ class Viewer(QGraphicsView):
             QPalette.ColorRole.Highlight
         )
 
-        # If true, for each move of stagesight
-        self._follow_stagesight = True
-
-    @property
-    def follow_stagesight(self) -> bool:
-        return self._follow_stagesight
-
-    @follow_stagesight.setter
     def follow_stagesight(self, value: bool):
         if self.stage_sight is None or self.stage_sight.stage is None:
             return
+        try:
+            self.stage_sight.position_changed.disconnect()
+        except:
+            pass
+
         if value:
-            self.stage_sight.stage.position_changed.connect(self.stage_sight.update_pos)
+            self.stage_sight.position_changed.connect(
+                lambda pos: self.__setattr__(
+                    "cam_pos_zoom", (pos, self.cam_pos_zoom[1])
+                )
+            )
 
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
