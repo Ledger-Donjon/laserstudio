@@ -96,10 +96,16 @@ class Viewer(QGraphicsView):
 
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
-        # TODO: Update also the zoom
+        all_elements_rect = self.__scene.itemsBoundingRect()
+        viewport = self.viewport()
+        viewport_size = (
+            viewport.size() if viewport is not None else all_elements_rect.size()
+        )
+        w_ratio = viewport_size.width() / (all_elements_rect.width() * 1.2)
+        h_ratio = viewport_size.height() / (all_elements_rect.height() * 1.2)
         self.cam_pos_zoom = (
-            self.__scene.itemsBoundingRect().center(),
-            self.cam_pos_zoom[1],
+            all_elements_rect.center(),
+            min(w_ratio, h_ratio),
         )
 
     def add_stage_sight(
