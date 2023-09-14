@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
     QBrush,
-    QColor,
     QColorConstants,
     QWheelEvent,
     QMouseEvent,
@@ -68,6 +67,7 @@ class Viewer(QGraphicsView):
         # Also includes the scan path
         self.scan_geometry = ScanGeometry()
         self.__scene.addItem(self.scan_geometry)
+        self.scan_geometry.setZValue(3)
 
         # Permits to activate tools
         self.setInteractive(True)
@@ -107,8 +107,9 @@ class Viewer(QGraphicsView):
         :param stage: The stage instrument to be associated with the stage sight
         """
         # Add StageSight item
-        item = self.stage_sight = StageSight(stage, camera)
-        self.__scene.addItem(item)
+        self.stage_sight = StageSight(stage, camera)
+        self.stage_sight.setZValue(1)
+        self.__scene.addItem(self.stage_sight)
 
     @property
     def mode(self) -> Mode:

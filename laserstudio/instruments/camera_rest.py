@@ -47,7 +47,10 @@ class CameraRESTInstrument(CameraInstrument):
 
     def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
         url = f"http://{self.host}:{self.port}/{self.api_command}"
-        response = self.session.get(url)
+        try:
+            response = self.session.get(url)
+        except:
+            return 0, 0, "L", None
         im = Image.open(io.BytesIO(response.content))
         im_rgb = im.convert("RGB")
         return *im_rgb.size, "RGB", im.tobytes()
