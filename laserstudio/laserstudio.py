@@ -113,7 +113,7 @@ class LaserStudio(QMainWindow):
         toolbar.addWidget(w)
 
         if self.viewer.stage_sight is not None:
-            # Button to toggle off or on the video
+            # Button to toggle off or on the camera image presentation
             w = QPushButton(toolbar)
             w.setToolTip("Show/Hide Image")
             w.setCheckable(True)
@@ -140,8 +140,10 @@ class LaserStudio(QMainWindow):
 
         # Button to trigger a Go Next
         w = QPushButton(toolbar)
-        w.setToolTip("Go Next Scan")
-        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/forward-next.png")))
+        w.setToolTip("Go Next Scan Point")
+        w.setIcon(
+            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid-24.png"))
+        )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(self.handle_go_next)
         toolbar.addWidget(w)

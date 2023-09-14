@@ -72,6 +72,9 @@ class Viewer(QGraphicsView):
         # Permits to activate tools
         self.setInteractive(True)
 
+        # Augment the scene rect to a very big size.
+        self.setSceneRect(-1e6, -1e6, 2e6, 2e6)
+
         self._default_highlight_color = QGuiApplication.palette().color(
             QPalette.ColorRole.Highlight
         )
