@@ -1,18 +1,18 @@
-.. Laser Studio documentation master file, created by
-   sphinx-quickstart on Thu Sep  7 10:01:26 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Welcome to Laser Studio's documentation!
 ========================================
 
-Laser Studio is a tool developed by the Product Security Team of Ledger, the Donjon.
+Laser Studio is an open source tool developed by the Product Security Team of Ledger, the Donjon.
 
-Its main usage is to control the instruments of a hardware evaluation test bench, to 
-perform automatic scanning operations.
+Its main usage is to have a visual representation of a spatial environment,
+define zones of interest, and launch an automated scanning process by 
+controlling instruments of a hardware evaluation test bench.
 
-Camera and stages are used to synchronize the spatial positioning of 
+This scanning process permits to move physically and randomly through these zones,
+by controlling motion devices.
+
+Camera and stages (or actuators) are used to synchronize the spatial positioning of 
 elements permitting to conduct the hardware evaluation: injection probes, laser beam...
+on devices under test.
 
 .. toctree::
    :maxdepth: 2

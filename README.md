@@ -39,7 +39,7 @@ python3 -m laserstudio
 
 # Documentation
 
-Advanced documentation of Laser Studio is available on Read The Docs.
+Advanced documentation of Laser Studio is available on [Read The Docs].
 
 ## Licensing
 
@@ -52,3 +52,4 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [pystages]: https://github.com/Ledger-Donjon/pystages
 [shapely]: https://shapely.readthedocs.io/en/stable/manual.html
 [triangle]: https://rufat.be/triangle/
+[Read the Docs]: https://laserstudio.readthedocs.io/
