@@ -152,7 +152,9 @@ class LaserStudio(QMainWindow):
         w = QPushButton(toolbar)
         w.setToolTip("Follow stage")
         w.setCheckable(True)
-        w.setIcon(QIcon(resource_path(":/icons/icon8/follow-stage.png")))
+        w.setIcon(
+            QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid-24.png"))
+        )
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(self.viewer.follow_stagesight)
         w.setChecked(True)
