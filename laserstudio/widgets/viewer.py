@@ -79,6 +79,10 @@ class Viewer(QGraphicsView):
             QPalette.ColorRole.Highlight
         )
 
+        # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
+        if (vp := self.viewport()) is not None:
+            vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
+
     def follow_stagesight(self, value: bool):
         if self.stage_sight is None or self.stage_sight.stage is None:
             return
