@@ -19,10 +19,20 @@ def get_info(info: str, rel_path: str):
 
 
 setup(
-    name="Laser Studio",
+    name="laserstudio",
     version=get_info("__version__", "laserstudio/__init__.py"),
     author=get_info("__author__", "laserstudio/__init__.py"),
-    description="",
+    description="Python3 software for hardware evaluation",
+    long_description="""
+# Laser Studio
+
+An open source python3 software designed to control hardware evaluation benches
+to conduct automatized evaluations.
+
+Laser Studio permits to have a visual representation of a spatial environment,
+define zones of interests, and launch an automated scanning process to physically
+and randomly go through these zones, by controlling motion devices.""",
+    long_description_content_type="text/markdown",
     url="https://github.com/Ledger-Donjon/laserstudio/",
     python_requires=">=3.9",
     license="LGPLv3",
@@ -46,4 +56,14 @@ setup(
     project_urls={
         "Documentation": "https://laserstudio.readthedocs.org/",
     },
+    install_requires=[
+        "pyqt6",
+        "pystages>=1.1.0",
+        "Pillow",
+        "opencv-python",
+        "PyYAML",
+        "shapely",
+        "triangle",
+        "requests",
+    ],
 )
