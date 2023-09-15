@@ -11,8 +11,8 @@ Laser Studio is a tool developed by the Product Security Team of Ledger, the Don
 Its main usage is to control the instruments of a hardware evaluation test bench, to 
 perform automatic scanning operations.
 
-Its support the usage of camera and stages to synchronize the spatial positioning of 
-elements permitting to conduct the test (injection probes, laser beam...).
+Camera and stages are used to synchronize the spatial positioning of 
+elements permitting to conduct the hardware evaluation: injection probes, laser beam...
 
 .. toctree::
    :maxdepth: 2

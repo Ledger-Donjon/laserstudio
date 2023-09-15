@@ -1,10 +1,11 @@
 # Laser Studio
 
-Hardware evaluation bench control software running on Python.
+An open source python3 software designed to control hardware evaluation benches
+to conduct automatized evaluations.
 
 Laser Studio permits to have a visual representation of a spatial environment,
-define zones of interests, and launch an automated to physically and randomly
-go through these zones, by controlling motion devices.
+define zones of interests, and launch an automated scanning process to physically
+and randomly go through these zones, by controlling motion devices.
 
 ## Installation
 
@@ -20,19 +21,25 @@ It requires following packages to run:
 - [shapely]
 - [triangle]
 
-You can install those by using the `requirements.txt` file.
+After cloning the repository, you can install those by using the `requirements.txt` file.
 
 ```shell
+git clone https://github.com/Ledger-Donjon/laserstudio.git
 python3 -m pip install --upgrade -r requirements.txt
 ```
 
 ## Usage
 
-To run Laser Studio, open a terminal and run it as a module.
+To run Laser Studio, tune your configuration file `config.yaml` with appropriate
+information about your hardware instruments, then a terminal and run Laser Studio as a module.
 
 ```shell
 python3 -m laserstudio
 ```
+
+# Documentation
+
+Advanced documentation of Laser Studio is available on Read The Docs.
 
 ## Licensing
 
