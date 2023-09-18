@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--log", choices=list(logging._nameToLevel.keys()), required=False
     )
+    parser.add_argument("--conf_file", type=open, required=False)
     args = parser.parse_args()
 
     if args.log is not None:

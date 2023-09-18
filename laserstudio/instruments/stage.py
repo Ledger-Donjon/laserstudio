@@ -2,6 +2,7 @@ from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QCoreApplication
 from .list_serials import get_serial_device
 import logging
 from pystages import Corvus, Stage, Vector
+from .stage_rest import StageRest
 from pystages.exceptions import ProtocolError
 from typing import Optional
 
@@ -18,33 +19,43 @@ class StageInstrument(QObject):
         """
         super().__init__()
 
-        dev = get_serial_device(config.get("dev"))
         device_type = config.get("type")
-
-        if dev is None or device_type is None:
-            logging.getLogger("laserstudio").error(
-                "In configuration file, 'dev' and 'type' fields are mandatory for Stages"
-            )
-            return
-
-        logging.getLogger("laserstudio").info(f"Connecting to {device_type} {dev}... ")
-
-        if device_type == "Corvus":
-            self.stage: Stage = Corvus(dev)
-        else:
-            logging.getLogger("laserstudio").error(f"Unknown stage type {device_type}")
-            return
-
         # To refresh stage position in the view, in real-time
         self._timer = QTimer()
         self._timer.timeout.connect(self.refresh_stage)
-        self._timer.start(1000)
+
+        dev = None
+        if device_type in ["Corvus"]:
+            dev = get_serial_device(config.get("dev"))
+            if dev is None or device_type is None:
+                logging.getLogger("laserstudio").error(
+                    "In configuration file, 'dev' and 'type' fields are mandatory for Stages"
+                )
+                return
+
+        if device_type == "Corvus":
+            logging.getLogger("laserstudio").info(
+                f"Connecting to {device_type} {dev}... "
+            )
+            self.stage: Stage = Corvus(dev)
+            self._timer.start(1000)
+        elif device_type == "REST":
+            logging.getLogger("laserstudio").info(f"Connecting to {device_type}... ")
+            self.stage: Stage = StageRest(config)
+            self._timer.start(2000)
+        else:
+            logging.getLogger("laserstudio").error(f"Unknown stage type {device_type}")
+            return
 
         # Unit factor to apply in order to get coordinates in micrometers
         self.unit_factors = config.get("unit_factors", [1.0] * self.stage.num_axis)
 
     @property
     def position(self) -> Vector:
+        """Get the position of the stage instrument
+
+        :return: Get the position of the stage
+        """
         return self.stage.position
 
     @position.setter
