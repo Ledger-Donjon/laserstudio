@@ -27,8 +27,10 @@ class CameraUSBInstrument(CameraInstrument):
         self.width_um = self.width * self.pixel_size_in_um[0]
         self.height_um = self.height * self.pixel_size_in_um[1]
 
-        logging.info(f"Camera's resolution {self.width}px; {self.height}px")
-        logging.info(
+        logging.getLogger("laserstudio").info(
+            f"Camera's resolution {self.width}px; {self.height}px"
+        )
+        logging.getLogger("laserstudio").info(
             f"Image's dimension {self.width_um}um; {self.height_um}um (without considering any magnifier)"
         )
 

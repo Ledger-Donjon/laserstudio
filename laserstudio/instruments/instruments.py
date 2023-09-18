@@ -21,7 +21,7 @@ class Instruments:
             try:
                 self.stage = StageInstrument(stage_config)
             except DeviceSearchError as e:
-                logging.warning(
+                logging.getLogger("laserstudio").warning(
                     f"Stage is enabled but device {str(e)} is not found... Skipping."
                 )
 

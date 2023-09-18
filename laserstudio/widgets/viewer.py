@@ -136,7 +136,7 @@ class Viewer(QGraphicsView):
         self.__mode = new_mode
         self.__update_drag_mode()
         self.__update_highlight_color()
-        logging.debug(f"Viewer mode selection: {new_mode}")
+        logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
 
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
@@ -187,7 +187,7 @@ class Viewer(QGraphicsView):
     def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
         assert new_value[1] > 0
         self.__cam_pos_zoom = pos, zoom = new_value
-        logging.debug(self.cam_pos_zoom)
+        logging.getLogger("laserstudio").debug(self.cam_pos_zoom)
         self.resetTransform()
         self.scale(zoom, -zoom)
         self.centerOn(pos)

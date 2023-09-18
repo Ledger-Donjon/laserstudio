@@ -95,7 +95,7 @@ class ScanGeometry(QGraphicsItemGroup):
         else:
             self.__scan_geometry -= g
         # In case that shapely converts it to a Polygon, we stick at a MultiPolygon
-        logging.debug(self.__scan_geometry)
+        logging.getLogger("laserstudio").debug(self.__scan_geometry)
         if isinstance(self.__scan_geometry, geo.Polygon):
             self.__scan_geometry = geo.MultiPolygon([self.__scan_geometry])
 
@@ -110,11 +110,13 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def next_point(self) -> Optional[tuple[float, float]]:
         if self.scan_path_generator.is_empty():
-            logging.error("Cannot get next point, the scan geometry is empty.")
+            logging.getLogger("laserstudio").error(
+                "Cannot get next point, the scan geometry is empty."
+            )
             return None
         try:
             self.__update_scan_path()
             next_point = self.scan_path_generator.pop()
             return next_point
         except EmptyGeometryError:
-            logging.error("Cannot generate a point.")
+            logging.getLogger("laserstudio").error("Cannot generate a point.")

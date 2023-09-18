@@ -7,18 +7,25 @@ import yaml
 import os.path
 from .util import resource_path
 import logging
+import argparse
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    for arg in sys.argv:
-        if arg.startswith("--log="):
-            level = arg[len("--log=") :]
-            try:
-                logging.basicConfig(level=level)
-            except ValueError as e:
-                print("Warning, error during setting log level:", e)
-                pass
+    parser = argparse.ArgumentParser(prog="laserstudio")
+    parser.add_argument(
+        "--log", choices=list(logging._nameToLevel.keys()), required=False
+    )
+    args = parser.parse_args()
+
+    if args.log is not None:
+        try:
+            logging.basicConfig(level=logging.NOTSET)
+            l = logging.getLogger("laserstudio")
+            l.setLevel(args.log)
+        except ValueError as e:
+            print("Warning, error during setting log level:", e)
+            pass
 
     # Get existing configuration file
     if os.path.exists("config.yaml"):

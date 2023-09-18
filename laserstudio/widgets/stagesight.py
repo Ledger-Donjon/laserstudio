@@ -191,7 +191,7 @@ class StageSight(QGraphicsItemGroup):
         :param position: The position to aim, in the viewer's scene.
         """
         x, y = position.x(), position.y()
-        logging.info(f"Move to position {x, y}")
+        logging.getLogger("laserstudio").info(f"Move to position {x, y}")
 
         if self.stage is not None:
             self.stage.move_to(self.stage_coords_from_scene_coords(position), wait=True)

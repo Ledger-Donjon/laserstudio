@@ -22,17 +22,17 @@ class StageInstrument(QObject):
         device_type = config.get("type")
 
         if dev is None or device_type is None:
-            logging.error(
+            logging.getLogger("laserstudio").error(
                 "In configuration file, 'dev' and 'type' fields are mandatory for Stages"
             )
             return
 
-        logging.info(f"Connecting to {device_type} {dev}... ")
+        logging.getLogger("laserstudio").info(f"Connecting to {device_type} {dev}... ")
 
         if device_type == "Corvus":
             self.stage: Stage = Corvus(dev)
         else:
-            logging.error(f"Unknown stage type {device_type}")
+            logging.getLogger("laserstudio").error(f"Unknown stage type {device_type}")
             return
 
         # To refresh stage position in the view, in real-time
@@ -76,9 +76,11 @@ class StageInstrument(QObject):
         """Called regularly to get stage position, and emits a pyQtSignal"""
         try:
             self.position_changed.emit(position := self.position)
-            logging.debug(f"Position refreshed: {position}")
+            logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
         except ProtocolError as e:
-            logging.warning(f"Warning: Bad response!: {repr(e)}")
+            logging.getLogger("laserstudio").warning(
+                f"Warning: Bad response!: {repr(e)}"
+            )
 
     def move_to(self, position: Vector, wait: bool):
         """
