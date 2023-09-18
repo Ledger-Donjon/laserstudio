@@ -120,13 +120,13 @@ class LaserStudio(QMainWindow):
             w.setChecked(True)
             icon = QIcon()
             icon.addPixmap(
-                QPixmap(resource_path(":/icons/fontawesome-free/eye-solid-24.png")),
+                QPixmap(resource_path(":/icons/fontawesome-free/video-solid-24.png")),
                 QIcon.Mode.Normal,
                 QIcon.State.On,
             )
             icon.addPixmap(
                 QPixmap(
-                    resource_path(":/icons/fontawesome-free/eye-slash-solid-24.png")
+                    resource_path(":/icons/fontawesome-free/video-slash-solid-24.png")
                 ),
                 QIcon.Mode.Normal,
                 QIcon.State.Off,
