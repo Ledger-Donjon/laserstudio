@@ -104,6 +104,14 @@ class LaserStudio(QMainWindow):
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.ZONE))
 
+        # Button to load background picture.
+        w = QPushButton(toolbar)
+        w.setToolTip("Load background picture from file")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/picture.png")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(self.viewer.load_picture)
+        toolbar.addWidget(w)
+
         # Button to reset the zoom.
         w = QPushButton(toolbar)
         w.setToolTip("Reset Viewer to see all elements")

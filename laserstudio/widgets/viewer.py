@@ -1,6 +1,8 @@
 from PyQt6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
+    QFileDialog,
+    QGraphicsPixmapItem,
 )
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import (
@@ -12,6 +14,8 @@ from PyQt6.QtGui import (
     QGuiApplication,
     QPalette,
     QPainter,
+    QPixmap,
+    QTransform,
 )
 from enum import IntEnum, auto
 from typing import Optional, Tuple
@@ -79,6 +83,10 @@ class Viewer(QGraphicsView):
             QPalette.ColorRole.Highlight
         )
 
+        # Background picture
+        self.__picture_item = None
+        self.background_picture_path = None
+
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
@@ -111,6 +119,31 @@ class Viewer(QGraphicsView):
             all_elements_rect.center(),
             min(w_ratio, h_ratio),
         )
+
+    def load_picture(self):
+        """Requests from the user"""
+        filename = QFileDialog.getOpenFileName(self, "Open picture")[0]
+        if len(filename):
+            # Remove previous picture if defined
+            if self.__picture_item is not None:
+                self.__scene.removeItem(self.__picture_item)
+            item = self.__picture_item = QGraphicsPixmapItem(QPixmap(filename))
+            item.setZValue(-10)
+            transform = QTransform()
+            # We place the image at current camera position
+            pos = self.__cam_pos_zoom[0]
+            transform.translate(pos.x(), pos.y())
+            # Scene Y-axis is up, while for images it shall be down. We flip the
+            # image over the Y-axis to show it in the right orientation.
+            transform.scale(1, -1)
+            transform.translate(
+                -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
+            )
+            item.setTransform(transform)
+            self.__scene.addItem(item)
+
+            # Save picture path for when transform is saved.
+            self.background_picture_path = filename
 
     def add_stage_sight(
         self, stage: Optional[StageInstrument], camera: Optional[CameraInstrument]
