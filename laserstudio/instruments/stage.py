@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QCoreApplication
-from .list_serials import get_serial_device
+from PyQt6.QtCore import QTimer, pyqtSignal, QObject
+from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, Stage, Vector
 from .stage_rest import StageRest
@@ -24,14 +24,21 @@ class StageInstrument(QObject):
         self._timer = QTimer()
         self._timer.timeout.connect(self.refresh_stage)
 
-        dev = None
+        dev = config.get("dev")
         if device_type in ["Corvus"]:
-            dev = get_serial_device(config.get("dev"))
-            if dev is None or device_type is None:
+            if dev is None:
                 logging.getLogger("laserstudio").error(
-                    "In configuration file, 'dev' and 'type' fields are mandatory for Stages"
+                    f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
                 )
-                return
+                raise
+
+            try:
+                dev = get_serial_device(dev)
+            except DeviceSearchError as e:
+                logging.getLogger("laserstudio").error(
+                    f"Stage is enabled but device is not found: {str(e)}...  Skipping."
+                )
+                raise
 
         if device_type == "Corvus":
             logging.getLogger("laserstudio").info(
@@ -40,12 +47,20 @@ class StageInstrument(QObject):
             self.stage: Stage = Corvus(dev)
             self._timer.start(1000)
         elif device_type == "REST":
-            logging.getLogger("laserstudio").info(f"Connecting to {device_type}... ")
-            self.stage: Stage = StageRest(config)
+            logging.getLogger("laserstudio").info(f"Connecting to {device_type}...")
+            try:
+                self.stage: Stage = StageRest(config)
+            except Exception as e:
+                logging.getLogger("laserstudio").error(
+                    f"Connection to {device_type} stage failed: {str(e)}. Skipping device."
+                )
+                raise
             self._timer.start(2000)
         else:
-            logging.getLogger("laserstudio").error(f"Unknown stage type {device_type}")
-            return
+            logging.getLogger("laserstudio").error(
+                f"Unknown stage type {device_type}. Skipping device."
+            )
+            raise
 
         # Unit factor to apply in order to get coordinates in micrometers
         self.unit_factors = config.get("unit_factors", [1.0] * self.stage.num_axis)

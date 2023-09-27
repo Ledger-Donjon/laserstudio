@@ -44,11 +44,13 @@ class RestInstrument:
         self, command: str, params: Optional[dict] = None, is_put=False
     ) -> requests.Response:
         """
-        Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
+        Sends to the session a HTTP GET, POST or PUT command according to the 
+        dict given in params.
 
         :param command: The REST command to be executed (eg, the path part of the URL)
         :param params: The payload to be sent in the body of the request, as a JSON
-        :param is_put: To force to send a PUT command instead of a POST, when params is not None
+        :param is_put: To force to send a PUT command instead of a POST, 
+            when params is not None
         :return: The response from the server.
         """
         url = f"http://{self.host}:{self.port}/{command}"

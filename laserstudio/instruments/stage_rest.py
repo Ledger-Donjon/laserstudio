@@ -10,8 +10,10 @@ class StageRest(RestInstrument, Stage):
         :param config: YAML configuration object
         """
         super().__init__(config)
-        # Stage.__init__(self)
         RestInstrument.__init__(self, config)
+
+        # Try a communication, will raise if the connection cannot be
+        # done
         self._num_axis = len(self.position.data)
 
     @property
