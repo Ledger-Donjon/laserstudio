@@ -24,6 +24,11 @@ class Instruments:
                 logging.getLogger("laserstudio").warning(
                     f"Stage is enabled but device {str(e)} is not found... Skipping."
                 )
+            except Exception as e:
+                logging.getLogger("laserstudio").warning(
+                    f"Stage is enabled but device could not be created: {str(e)}... Skipping."
+                )
+                self.stage = None
 
         # Main camera
         self.camera = None
@@ -43,6 +48,7 @@ class Instruments:
                 logging.getLogger("laserstudio").warning(
                     f"Camera is enabled but device could not be created: {str(e)}... Skipping."
                 )
+                self.camera = None
 
     def go_next(self):
         pass
