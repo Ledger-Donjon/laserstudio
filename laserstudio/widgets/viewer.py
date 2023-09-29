@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 from .stagesight import StageSight, StageInstrument, CameraInstrument
 import logging
 from .scangeometry import ScanGeometry
+import numpy as np
 
 
 class Viewer(QGraphicsView):
@@ -36,6 +37,7 @@ class Viewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
         ZONE = auto()
+        PIN = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int, name="modeChanged")
@@ -90,6 +92,9 @@ class Viewer(QGraphicsView):
         self.__picture_item = None
         self.background_picture_path = None
 
+        # Pin points for background picture
+        self.pins = []
+
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
@@ -124,7 +129,7 @@ class Viewer(QGraphicsView):
         )
 
     def load_picture(self):
-        """Requests from the user"""
+        """Requests loading a backgound picture from the user"""
         filename = QFileDialog.getOpenFileName(self, "Open picture")[0]
         if len(filename):
             # Remove previous picture if defined
@@ -270,14 +275,17 @@ class Viewer(QGraphicsView):
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
         """
-        is_left = event.button() == Qt.MouseButton.LeftButton
-
-        if self.mode == Viewer.Mode.STAGE and is_left and self.stage_sight is not None:
+        if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
-            self.stage_sight.move_to(scene_pos)
-            event.accept()
-            return
+
+            if self.mode == Viewer.Mode.STAGE and self.stage_sight is not None:
+                self.stage_sight.move_to(scene_pos)
+                event.accept()
+                return
+
+            if self.mode == Viewer.Mode.PIN:
+                self.pin(scene_pos.x(), scene_pos.y())
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
@@ -350,3 +358,79 @@ class Viewer(QGraphicsView):
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to green (add)
             self.__update_highlight_color()
+
+    def pin(self, x: float, y: float):
+        """
+        Called when the user clicks in the viewer, in PIN mode.
+
+        :param x: New position abscissa.
+        :param y: New position ordinate.
+        """
+
+        if (pic := self.__picture_item) is None:
+            return
+        if self.stage_sight is None:
+            return
+        if self.stage_sight.stage is None:
+            stage_pos = self.stage_sight.pos()
+        else:
+            stage_pos = self.stage_sight.scene_coords_from_stage_coords(
+                self.stage_sight.stage.position
+            )
+        stage_pos = stage_pos.x(), stage_pos.y()
+
+        if len(self.pins) == 0:
+            # We are pinning the first point.
+            # Apply simple translation as first step
+            tx = stage_pos[0] - x
+            ty = stage_pos[1] - y
+            t = QTransform()
+            t.translate(tx, ty)
+            pic.setTransform(pic.sceneTransform() * t)
+            x += tx
+            y += ty
+        # Now pin the point, after initial translation.
+        # If we remove the translation code above, the algorithm will still
+        # work.
+        pix_pos = pic.sceneTransform().inverted()[0].map(x, y)
+
+        self.pins.append((stage_pos, pix_pos))
+        logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
+        if len(self.pins) == 3:
+            # Time to recalculate the picture transformation matrix!
+            #
+            # We have three sets of two points A and B where:
+            # - A is a spatial position (from stage)
+            # - B is the corresponding position in the picture (in pixels,
+            #   picked by the user)
+            # To each point we add a third coordinate, set to 1, which will
+            # allow us to work with translations.
+            #
+            # We want to find the 3x3 matrix T such as:
+            # T * B1 = A1
+            # T * B2 = A2
+            # T * B3 = A3
+            #
+            # Written differently, this gives:
+            # T * [B1, B2, B3] = [A1, A2, A3]
+            #
+            # Thus we have:
+            # T = [A1, A2, A3] * Inv([B1, B2, B3])
+            points_a = list(p[0] + (1,) for p in self.pins)
+            points_b = list(p[1] + (1,) for p in self.pins)
+            mat_a = np.matrix(points_a).transpose()
+            mat_b = np.matrix(points_b).transpose()
+            mat = mat_a * np.linalg.inv(mat_b)
+            # Convert to QTransform
+            # QTransform uses m31, m32 and m33 for translation, and not
+            # m13, m23 and m33. Using the transposed version of mat seems
+            # to fix the compatibility.
+            qtrans = QTransform(*mat.flatten().tolist()[0]).transposed()
+            pic.resetTransform()
+            pic.setTransform(qtrans)
+            # Clear pin points for future pinning, and leave pin mode.
+            self.pins.clear()
+            self.mode = self.Mode.NONE
+        else:
+            # Go to stage mode.
+            self.mode = self.Mode.STAGE

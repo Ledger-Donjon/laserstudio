@@ -6,3 +6,4 @@ PyYAML
 shapely
 triangle
 requests 
+numpy
