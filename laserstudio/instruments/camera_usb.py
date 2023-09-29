@@ -15,7 +15,7 @@ class CameraUSBInstrument(CameraInstrument):
 
         self.cv2 = cv2
 
-        self.__video_capture = cv2.VideoCapture(config.get("num", 0))
+        self.__video_capture = cv2.VideoCapture(config.get("index", 0))
 
         self.width = int(
             config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
