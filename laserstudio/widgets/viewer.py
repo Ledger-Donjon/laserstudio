@@ -109,9 +109,7 @@ class Viewer(QGraphicsView):
 
         if value:
             self.stage_sight.position_changed.connect(
-                lambda pos: self.__setattr__(
-                    "cam_pos_zoom", (pos, self.cam_pos_zoom[1])
-                )
+                lambda pos: self.__setattr__("cam_pos_zoom", (pos, self.zoom))
             )
 
     def reset_camera(self):
@@ -233,6 +231,24 @@ class Viewer(QGraphicsView):
         self.resetTransform()
         self.scale(zoom, -zoom)
         self.centerOn(pos)
+
+    @property
+    def zoom(self) -> float:
+        """Zoom factor of the viewer"""
+        return self.cam_pos_zoom[1]
+
+    @zoom.setter
+    def zoom(self, factor: float):
+        """Change the zoom by applying the zoom factor given in parameter
+
+        :param factor: the zoom factor given in parameter.
+        """
+        self.cam_pos_zoom = self.cam_pos_zoom[0], factor
+
+    @zoom.deleter
+    def zoom(self):
+        """Resets the zoom"""
+        self.zoom = 1.0
 
     # User interactions
     def wheelEvent(self, event: QWheelEvent):
