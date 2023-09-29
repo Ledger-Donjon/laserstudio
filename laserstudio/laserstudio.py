@@ -66,7 +66,7 @@ class LaserStudio(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         toolbar.addWidget(w)
 
-        group = QButtonGroup(toolbar)
+        self.viewer_buttons_group = group = QButtonGroup(toolbar)
         group.idClicked.connect(
             lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
         )
@@ -103,6 +103,9 @@ class LaserStudio(QMainWindow):
         layout.addWidget(w, 2, 1)
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.ZONE))
+
+
+        self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Button to load background picture.
         w = QPushButton(toolbar)
@@ -175,3 +178,11 @@ class LaserStudio(QMainWindow):
         """
         self.instruments.go_next()
         self.viewer.go_next()
+
+    def update_buttons_mode(self, id: int):
+        """Updates the button group according to the selected Viewer mode"""
+        if id == self.viewer_buttons_group.checkedId():
+            return
+        for b in self.viewer_buttons_group.buttons():
+            if id == self.viewer_buttons_group.id(b):
+                b.setChecked(True)

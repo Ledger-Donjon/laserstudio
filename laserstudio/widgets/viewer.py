@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QGraphicsPixmapItem,
 )
-from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -36,6 +36,9 @@ class Viewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
         ZONE = auto()
+
+    # Signal emitted when a new mode is set
+    mode_changed = pyqtSignal(int, name="modeChanged")
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -170,6 +173,7 @@ class Viewer(QGraphicsView):
         self.__update_drag_mode()
         self.__update_highlight_color()
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
+        self.mode_changed.emit(int(new_mode))
 
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
