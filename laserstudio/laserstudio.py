@@ -45,7 +45,6 @@ class LaserStudio(QMainWindow):
         )
         toolbar.setFloatable(False)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
-        assert toolbar
 
         # Icon Logo
         w = QLabel()
@@ -104,6 +103,15 @@ class LaserStudio(QMainWindow):
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.ZONE))
 
+        # Button to select Pining mode.
+        w = QPushButton(toolbar)
+        w.setToolTip("Pin mode")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/pin.png")))
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        layout.addWidget(w, 2, 2)
+        group.addButton(w)
+        group.setId(w, int(Viewer.Mode.PIN))
 
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
