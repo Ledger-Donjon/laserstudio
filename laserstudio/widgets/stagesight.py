@@ -33,7 +33,10 @@ class StageSight(QGraphicsItemGroup):
     Item representing the stage position in the scene and the observation area.
     """
 
-    # Signal emitted when a new position is set
+    # Signal emitted when a new position is set.
+    # This has been placed in a proxy object (StageSightObject)
+    # Because QGraphicsItemGroup does not inherit from QObject.
+    # A convenient property is defined to access to the proxy's signal
     # position_changed = pyqtSignal(Vector, name="positionChanged")
 
     def __init__(
@@ -205,12 +208,16 @@ class StageSight(QGraphicsItemGroup):
         """
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
-        self.position_changed.emit(scene_pos)
 
     def setPos(self, value: QPointF):
-        self.__object.position_changed.emit(value)
+        """To make sure that the position of the stagesight is signaled
+        at each change we override the setPos function.
+
+        :param value: the final position of the widget"""
         super(QGraphicsItemGroup, self).setPos(value)
+        self.position_changed.emit(value)
 
     @property
     def position_changed(self) -> pyqtBoundSignal:
+        """Convenient access to the position_changed signal from proxy object"""
         return self.__object.position_changed
