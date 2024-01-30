@@ -45,6 +45,10 @@ class Viewer(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        # # Align objects to the center
+        # self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+
         # The main scene of the graphic view
         self.__scene = QGraphicsScene()
         self.setScene(self.__scene)
@@ -66,7 +70,7 @@ class Viewer(QGraphicsView):
         self.setRenderHints(QPainter.RenderHint.Antialiasing)
 
         # Current camera position and zoom factor
-        self.__cam_pos_zoom = QPointF(), 1.0
+        # self.__cam_pos_zoom = QPointF(), 1.0
         self.scale(1, -1)
 
         # By default, there is no StageSight
@@ -100,7 +104,7 @@ class Viewer(QGraphicsView):
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
     def follow_stagesight(self, value: bool):
-        if self.stage_sight is None or self.stage_sight.stage is None:
+        if self.stage_sight is None:
             return
         try:
             self.stage_sight.position_changed.disconnect()
@@ -137,7 +141,7 @@ class Viewer(QGraphicsView):
             item.setZValue(-10)
             transform = QTransform()
             # We place the image at current camera position
-            pos = self.__cam_pos_zoom[0]
+            pos = self.cam_pos_zoom[0]
             transform.translate(pos.x(), pos.y())
             # Scene Y-axis is up, while for images it shall be down. We flip the
             # image over the Y-axis to show it in the right orientation.
@@ -221,16 +225,14 @@ class Viewer(QGraphicsView):
         :return: A tuple containing the point where the viewer is centered
             on and a float indicating the zoom factor.
         """
-        return self.__cam_pos_zoom
+        return self.__compute_pos_zoom()
 
     @cam_pos_zoom.setter
     def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
         assert new_value[1] > 0
-        self.__cam_pos_zoom = pos, zoom = new_value
-        logging.getLogger("laserstudio").debug(self.cam_pos_zoom)
         self.resetTransform()
-        self.scale(zoom, -zoom)
-        self.centerOn(pos)
+        self.scale(new_value[1], -new_value[1])
+        self.centerOn(new_value[0])
 
     @property
     def zoom(self) -> float:
@@ -255,36 +257,32 @@ class Viewer(QGraphicsView):
         """
         Handle mouse wheel events to manage zoom.
         """
-        if Qt.KeyboardModifier.AltModifier in QGuiApplication.queryKeyboardModifiers():
-            # We want to zoom relative to the current cursor position, not relative
-            # to the center of the widget. This involves some math...
-            # p is the pointed position in the scene, and we want to keep p at the
-            # same screen position after changing the zoom. If c1 and c2 are the
-            # camera positions before and after the zoom changes,
-            # z1 and z2 the zoom levels, then we want:
-            # z1 * (p - c1) = z2 * (p - c2)
-            # which gives:
-            # c2 = c1 * (z1/z2) + p * (1 - z1/z2)
-            # we can use zr = z2/z1, the zoom factor to apply.
+        # We want to zoom relative to the current cursor position, not relative
+        # to the center of the widget. This involves some math...
+        # p is the pointed position in the scene, and we want to keep p at the
+        # same screen position after changing the zoom. If c1 and c2 are the
+        # camera positions before and after the zoom changes,
+        # z1 and z2 the zoom levels, then we want:
+        # z1 * (p - c1) = z2 * (p - c2)
+        # which gives:
+        # c2 = c1 * (z1/z2) + p * (1 - z1/z2)
+        # we can use zr = z2/z1, the zoom factor to apply.
 
-            # The pointed position
-            p = self.mapToScene(event.position().toPoint())
+        # The pointed position
+        p = self.mapToScene(event.position().toPoint())
 
-            # The zoom factor to apply
-            zr = 2 ** (event.angleDelta().y() / (8 * 120))
+        # The zoom factor to apply
+        zr = 2 ** (event.angleDelta().y() / (8 * 120))
 
-            # Get current position and zoom factor of camera
-            pos, zoom = self.cam_pos_zoom
+        # Get current position and zoom factor of camera
+        pos, zoom = self.cam_pos_zoom
 
-            pos = (pos / zr) + (p * (1 - (1 / zr)))
-            zoom *= zr
+        pos = (pos / zr) + (p * (1 - (1 / zr)))
+        zoom *= zr
 
-            # Update the position and zoom factors
-            self.cam_pos_zoom = pos, zoom
-            event.accept()
-            return
-
-        super().wheelEvent(event)
+        # Update the position and zoom factors
+        self.cam_pos_zoom = pos, zoom
+        event.accept()
 
     def mousePressEvent(self, event: QMouseEvent):
         """
@@ -335,8 +333,9 @@ class Viewer(QGraphicsView):
         is_left = event.button() == Qt.MouseButton.LeftButton
         is_right = event.button() == Qt.MouseButton.RightButton
 
-        if is_right and self.mode != Viewer.Mode.ZONE:
-            self.setDragMode(Viewer.DragMode.NoDrag)
+        if is_right:
+            # Go back to regular drag mode.
+            self.__update_drag_mode()
 
         if self.mode == Viewer.Mode.ZONE and is_left:
             # Get the corresponding Polygon within the scene
@@ -450,3 +449,26 @@ class Viewer(QGraphicsView):
         else:
             # Go to stage mode.
             self.mode = self.Mode.STAGE
+
+    def __compute_pos_zoom(self):
+        hsb, vsb = self.horizontalScrollBar(), self.verticalScrollBar()
+        assert vsb and hsb
+        # Get scene positioning in the Viewport thanks to the scrollbars' value
+        doc_left = hsb.minimum()
+        doc_width = hsb.maximum() + hsb.pageStep() - doc_left
+        doc_x = hsb.value() + hsb.pageStep() / 2
+        doc_top = vsb.minimum()
+        doc_height = vsb.maximum() + vsb.pageStep() - doc_top
+        doc_y = vsb.value() + vsb.pageStep() / 2
+
+        # Get scene sizing
+        sr = self.sceneRect()
+
+        # Get doc to scene scale factors (invert of zoom)
+        scale_x, scale_y = sr.width() / doc_width, sr.height() / doc_height
+
+        # Converts previous positioning
+        scene_x = sr.left() + (doc_x - doc_left) * scale_x
+        scene_y = sr.bottom() - (doc_y - doc_top) * scale_y
+
+        return QPointF(scene_x, scene_y), 1 / scale_x
