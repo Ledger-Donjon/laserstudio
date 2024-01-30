@@ -115,14 +115,6 @@ class LaserStudio(QMainWindow):
         w.clicked.connect(self.viewer.load_picture)
         toolbar.addWidget(w)
 
-        # Button to reset the zoom.
-        w = QPushButton(toolbar)
-        w.setToolTip("Reset Viewer to see all elements")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/zoom-reset.png")))
-        w.setIconSize(QSize(24, 24))
-        w.clicked.connect(self.viewer.reset_camera)
-        toolbar.addWidget(w)
-
         if self.viewer.stage_sight is not None:
             # Button to toggle off or on the camera image presentation
             w = QPushButton(toolbar)
@@ -157,6 +149,46 @@ class LaserStudio(QMainWindow):
         )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(self.handle_go_next)
+        toolbar.addWidget(w)
+
+        toolbar = QToolBar(self)
+        toolbar.setAllowedAreas(
+            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+        )
+        toolbar.setFloatable(False)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+
+        # Zoom in.
+        w = QPushButton(toolbar)
+        w.setText("Z+")
+        w.setToolTip("Zoom in")
+        w.clicked.connect(
+            lambda: self.viewer.__setattr__("zoom", self.viewer.zoom * 2.0)
+        )
+        toolbar.addWidget(w)
+
+        # Zoom out.
+        w = QPushButton(toolbar)
+        w.setText("Z-")
+        w.setToolTip("Zoom out")
+        w.clicked.connect(
+            lambda: self.viewer.__setattr__("zoom", self.viewer.zoom * 0.5)
+        )
+        toolbar.addWidget(w)
+
+        # Zoom 1.
+        w = QPushButton(toolbar)
+        w.setText("Z:1x")
+        w.setToolTip("Reset zoom")
+        w.clicked.connect(lambda: self.viewer.__delattr__("zoom"))
+        toolbar.addWidget(w)
+
+        # Button to reset the zoom.
+        w = QPushButton(toolbar)
+        w.setToolTip("Reset Viewer to see all elements")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/zoom-reset.png")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(self.viewer.reset_camera)
         toolbar.addWidget(w)
 
         # Button to enable/disable StageSight position tracking.
