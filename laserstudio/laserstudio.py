@@ -15,6 +15,7 @@ from .util import resource_path
 from .widgets.viewer import Viewer
 from .widgets.keyboardbox import KeyboardBox
 from .instruments.instruments import Instruments
+from .widgets.stagesight import StageSightViewer, StageSight
 
 
 class LaserStudio(QMainWindow):
@@ -124,31 +125,6 @@ class LaserStudio(QMainWindow):
         w.clicked.connect(self.viewer.load_picture)
         toolbar.addWidget(w)
 
-        if self.viewer.stage_sight is not None:
-            # Button to toggle off or on the camera image presentation
-            w = QPushButton(toolbar)
-            w.setToolTip("Show/Hide Image")
-            w.setCheckable(True)
-            w.setChecked(True)
-            icon = QIcon()
-            icon.addPixmap(
-                QPixmap(resource_path(":/icons/fontawesome-free/video-solid-24.png")),
-                QIcon.Mode.Normal,
-                QIcon.State.On,
-            )
-            icon.addPixmap(
-                QPixmap(
-                    resource_path(":/icons/fontawesome-free/video-slash-solid-24.png")
-                ),
-                QIcon.Mode.Normal,
-                QIcon.State.Off,
-            )
-            w.setIcon(icon)
-            w.setIconSize(QSize(24, 24))
-            w.toggled.connect(
-                lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
-            )
-            toolbar.addWidget(w)
 
         # Button to trigger a Go Next
         w = QPushButton(toolbar)
@@ -220,6 +196,42 @@ class LaserStudio(QMainWindow):
             )
             toolbar.setFloatable(True)
             w = KeyboardBox(self.viewer.stage_sight)
+            toolbar.addWidget(w)
+            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+
+        # Camera Image toolbar
+        if self.instruments.camera is not None:
+            toolbar = QToolBar(self)
+            toolbar.setAllowedAreas(
+                Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            )
+            toolbar.setFloatable(True)
+            stage_sight = StageSight(None, self.instruments.camera)
+            toolbar.addWidget(StageSightViewer(stage_sight))
+
+            # Button to toggle off or on the camera image presentation in main viewer
+            w = QPushButton(toolbar)
+            w.setToolTip("Show/Hide Image")
+            w.setCheckable(True)
+            w.setChecked(True)
+            icon = QIcon()
+            icon.addPixmap(
+                QPixmap(resource_path(":/icons/fontawesome-free/video-solid-24.png")),
+                QIcon.Mode.Normal,
+                QIcon.State.On,
+            )
+            icon.addPixmap(
+                QPixmap(
+                    resource_path(":/icons/fontawesome-free/video-slash-solid-24.png")
+                ),
+                QIcon.Mode.Normal,
+                QIcon.State.Off,
+            )
+            w.setIcon(icon)
+            w.setIconSize(QSize(24, 24))
+            w.toggled.connect(
+                lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
+            )
             toolbar.addWidget(w)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 

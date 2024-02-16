@@ -74,7 +74,7 @@ class Viewer(QGraphicsView):
         self.scale(1, -1)
 
         # By default, there is no StageSight
-        self.stage_sight = None
+        self.stage_sight: Optional[StageSight] = None
 
         # Scanning geometry object and its representative item in the view.
         # Also includes the scan path

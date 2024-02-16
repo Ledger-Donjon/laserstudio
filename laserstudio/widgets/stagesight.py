@@ -3,6 +3,8 @@ from PyQt6.QtWidgets import (
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsLineItem,
+    QGraphicsView,
+    QGraphicsScene,
 )
 from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
 from PyQt6.QtCore import (
@@ -18,6 +20,17 @@ from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from typing import Optional
 import logging
+
+
+class StageSightViewer(QGraphicsView):
+    """Simple version of Viewer, containing a StageSight"""
+
+    def __init__(self, stage_sight: "StageSight", parent=None):
+        super().__init__(parent)
+        s = QGraphicsScene()
+        self.scale(1, -1)
+        self.setScene(s)
+        s.addItem(stage_sight)
 
 
 class StageSightObject(QObject):
