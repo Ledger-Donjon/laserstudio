@@ -13,6 +13,7 @@ from PyQt6.QtGui import QPixmap, QIcon
 from typing import Optional
 from .util import resource_path
 from .widgets.viewer import Viewer
+from .widgets.keyboardbox import KeyboardBox
 from .instruments.instruments import Instruments
 
 
@@ -210,6 +211,17 @@ class LaserStudio(QMainWindow):
         w.toggled.connect(self.viewer.follow_stagesight)
         w.setChecked(True)
         toolbar.addWidget(w)
+
+        # Stage positioning toolbar
+        if self.viewer.stage_sight is not None:
+            toolbar = QToolBar(self)
+            toolbar.setAllowedAreas(
+                Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            )
+            toolbar.setFloatable(True)
+            w = KeyboardBox(self.viewer.stage_sight)
+            toolbar.addWidget(w)
+            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
     def handle_go_next(self):
         """Go Next operation.
