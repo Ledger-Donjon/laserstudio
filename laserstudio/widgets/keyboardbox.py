@@ -75,7 +75,8 @@ class KeyboardBox(QGroupBox):
 
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
-    def move_stage(self, direction: Direction):
+
+    def move_stage(self, direction: Direction, move_factor=1.0):
         if direction in [Direction.left, Direction.right]:
             axe = 0
         elif direction in [Direction.up, Direction.down]:
@@ -91,6 +92,8 @@ class KeyboardBox(QGroupBox):
             displacement *= 1
         elif direction in [Direction.down, Direction.left, Direction.zdown]:
             displacement *= -1
+
+        displacement *= move_factor
 
         if self.stage is not None:
             position = self.stage.position
@@ -135,19 +138,22 @@ class KeyboardBox(QGroupBox):
         Detects a key press event and redispatch to the correct
         movement.
         """
+        if Qt.KeyboardModifier.ShiftModifier in event.modifiers():
+            factor = 10.0
+        else:
+            factor = 1.0
+
         if event.key() == Qt.Key.Key_Up:
-            if Qt.KeyboardModifier.ControlModifier in event.modifiers():
-                self.move_stage(direction=Direction.zup)
-            else:
-                self.move_stage(direction=Direction.up)
+            self.move_stage(direction=Direction.up, move_factor=factor)
         elif event.key() == Qt.Key.Key_Down:
-            if Qt.KeyboardModifier.ControlModifier in event.modifiers():
-                self.move_stage(direction=Direction.zdown)
-            else:
-                self.move_stage(direction=Direction.down)
+            self.move_stage(direction=Direction.down, move_factor=factor)
         elif event.key() == Qt.Key.Key_Left:
-            self.move_stage(direction=Direction.left)
+            self.move_stage(direction=Direction.left, move_factor=factor)
         elif event.key() == Qt.Key.Key_Right:
-            self.move_stage(direction=Direction.right)
+            self.move_stage(direction=Direction.right, move_factor=factor)
+        elif event.key() == Qt.Key.Key_PageUp:
+            self.move_stage(direction=Direction.zup, move_factor=factor)
+        elif event.key() == Qt.Key.Key_PageDown:
+            self.move_stage(direction=Direction.zdown, move_factor=factor)
         else:
             super().keyPressEvent(event)

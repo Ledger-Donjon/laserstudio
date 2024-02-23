@@ -42,10 +42,11 @@ class LaserStudio(QMainWindow):
             self.viewer.add_stage_sight(self.instruments.stage, self.instruments.camera)
 
         toolbar = QToolBar(self)
+        toolbar.setWindowTitle("Main")
         toolbar.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
-        toolbar.setFloatable(False)
+        toolbar.setFloatable(True)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Icon Logo
@@ -58,19 +59,12 @@ class LaserStudio(QMainWindow):
         w.setAlignment(Qt.AlignmentFlag.AlignCenter)
         toolbar.addWidget(w)
 
-        # Create a grid for Viewer mode selection buttons
-        layout = QGridLayout()
-        w = QWidget()
-        w.setLayout(layout)
-        layout.setHorizontalSpacing(0)
-        layout.setVerticalSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-        toolbar.addWidget(w)
-
+        # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(toolbar)
         group.idClicked.connect(
             lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
         )
+        self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Button to unselect any viewer mode.
         w = QPushButton(toolbar)
@@ -79,31 +73,18 @@ class LaserStudio(QMainWindow):
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(True)
-        layout.addWidget(w, 1, 1)
+        toolbar.addWidget(w)
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.NONE))
 
-        # Button to select stage move mode.
-        w = QPushButton(toolbar)
-        w.setToolTip("Move stage mode")
-        w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/directions-solid-24.png"))
+        # Toolbar: Background picture
+        toolbar = QToolBar(self)
+        toolbar.setWindowTitle("Background picture")
+        toolbar.setAllowedAreas(
+            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
-        w.setIconSize(QSize(24, 24))
-        w.setCheckable(True)
-        layout.addWidget(w, 1, 2)
-        group.addButton(w)
-        group.setId(w, int(Viewer.Mode.STAGE))
-
-        # Button to select zoning mode.
-        w = QPushButton(toolbar)
-        w.setToolTip("Define scanning regions")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
-        w.setIconSize(QSize(24, 24))
-        w.setCheckable(True)
-        layout.addWidget(w, 2, 1)
-        group.addButton(w)
-        group.setId(w, int(Viewer.Mode.ZONE))
+        toolbar.setFloatable(True)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Button to select Pining mode.
         w = QPushButton(toolbar)
@@ -111,11 +92,9 @@ class LaserStudio(QMainWindow):
         w.setIcon(QIcon(resource_path(":/icons/icons8/pin.png")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
-        layout.addWidget(w, 2, 2)
+        toolbar.addWidget(w)
         group.addButton(w)
         group.setId(w, int(Viewer.Mode.PIN))
-
-        self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Button to load background picture.
         w = QPushButton(toolbar)
@@ -125,25 +104,16 @@ class LaserStudio(QMainWindow):
         w.clicked.connect(self.viewer.load_picture)
         toolbar.addWidget(w)
 
-
-        # Button to trigger a Go Next
-        w = QPushButton(toolbar)
-        w.setToolTip("Go Next Scan Point")
-        w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid-24.png"))
-        )
-        w.setIconSize(QSize(24, 24))
-        w.clicked.connect(self.handle_go_next)
-        toolbar.addWidget(w)
-
+        # Zoom toolbar
         toolbar = QToolBar(self)
+        toolbar.setWindowTitle("Zoom control")
         toolbar.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
-        toolbar.setFloatable(False)
+        toolbar.setFloatable(True)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
-        # Zoom in.
+        # Zoom in (*2).
         w = QPushButton(toolbar)
         w.setText("Z+")
         w.setToolTip("Zoom in")
@@ -152,7 +122,7 @@ class LaserStudio(QMainWindow):
         )
         toolbar.addWidget(w)
 
-        # Zoom out.
+        # Zoom out (/2).
         w = QPushButton(toolbar)
         w.setText("Z-")
         w.setToolTip("Zoom out")
@@ -161,14 +131,14 @@ class LaserStudio(QMainWindow):
         )
         toolbar.addWidget(w)
 
-        # Zoom 1.
+        # Zoom reset (1:1).
         w = QPushButton(toolbar)
         w.setText("Z:1x")
         w.setToolTip("Reset zoom")
         w.clicked.connect(lambda: self.viewer.__delattr__("zoom"))
         toolbar.addWidget(w)
 
-        # Button to reset the zoom.
+        # Zoom to all.
         w = QPushButton(toolbar)
         w.setToolTip("Reset Viewer to see all elements")
         w.setIcon(QIcon(resource_path(":/icons/icons8/zoom-reset.png")))
@@ -188,26 +158,70 @@ class LaserStudio(QMainWindow):
         w.setChecked(True)
         toolbar.addWidget(w)
 
-        # Stage positioning toolbar
+        # Toolbar: Stage positioning
         if self.viewer.stage_sight is not None:
             toolbar = QToolBar(self)
+            toolbar.setWindowTitle("Stage control")
             toolbar.setAllowedAreas(
                 Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
             )
             toolbar.setFloatable(True)
-            w = KeyboardBox(self.viewer.stage_sight)
-            toolbar.addWidget(w)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
-        # Camera Image toolbar
+            # Activate stage-move mode
+            w = QPushButton(toolbar)
+            w.setToolTip("Move stage mode")
+            w.setIcon(
+                QIcon(resource_path(":/icons/fontawesome-free/directions-solid-24.png"))
+            )
+            w.setIconSize(QSize(24, 24))
+            w.setCheckable(True)
+            toolbar.addWidget(w)
+            group.addButton(w)
+            group.setId(w, int(Viewer.Mode.STAGE))
+
+            # Keyboard box
+            w = KeyboardBox(self.viewer.stage_sight)
+            toolbar.addWidget(w)
+
+        # Toolbar: Scanning zone definition and usage
+        toolbar = QToolBar(self)
+        toolbar.setWindowTitle("Scanning Zones")
+        toolbar.setAllowedAreas(
+            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+        )
+        toolbar.setFloatable(True)
+        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+
+        # Activate scan-zone definition mode
+        w = QPushButton(toolbar)
+        w.setToolTip("Define scanning regions")
+        w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        group.addButton(w)
+        group.setId(w, int(Viewer.Mode.ZONE))
+        toolbar.addWidget(w)
+
+        # Go-to-next position button
+        w = QPushButton(toolbar)
+        w.setToolTip("Go Next Scan Point")
+        w.setIcon(
+            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid-24.png"))
+        )
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(self.handle_go_next)
+        toolbar.addWidget(w)
+
+        # Toolbar: Camera Image control
         if self.instruments.camera is not None:
             toolbar = QToolBar(self)
+            toolbar.setWindowTitle("Camera parameters")
             toolbar.setAllowedAreas(
                 Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
             )
             toolbar.setFloatable(True)
-            stage_sight = StageSight(None, self.instruments.camera)
-            toolbar.addWidget(StageSightViewer(stage_sight))
+            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
             # Button to toggle off or on the camera image presentation in main viewer
             w = QPushButton(toolbar)
@@ -233,7 +247,10 @@ class LaserStudio(QMainWindow):
                 lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
             )
             toolbar.addWidget(w)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+
+            # Second representation of the camera image
+            stage_sight = StageSight(None, self.instruments.camera)
+            toolbar.addWidget(StageSightViewer(stage_sight))
 
     def handle_go_next(self):
         """Go Next operation.
