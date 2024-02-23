@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
     QPixmap,
     QTransform,
 )
-from enum import IntEnum, auto
+from enum import Enum, auto
 from typing import Optional, Tuple
 from .stagesight import StageSight, StageInstrument, CameraInstrument
 import logging
@@ -31,7 +31,7 @@ class Viewer(QGraphicsView):
     results...
     """
 
-    class Mode(IntEnum):
+    class Mode(int, Enum):
         """Viewer modes."""
 
         NONE = auto()
