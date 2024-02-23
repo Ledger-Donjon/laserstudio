@@ -75,6 +75,7 @@ class KeyboardBox(QGroupBox):
 
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
+        self._set_background_color()
 
     def move_stage(self, direction: Direction, move_factor=1.0):
         if direction in [Direction.left, Direction.right]:
