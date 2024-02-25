@@ -16,6 +16,7 @@ from .widgets.viewer import Viewer
 from .widgets.keyboardbox import KeyboardBox
 from .instruments.instruments import Instruments
 from .widgets.stagesight import StageSightViewer, StageSight
+from .widgets.camerawizard import CameraWizard
 
 
 class LaserStudio(QMainWindow):
@@ -246,6 +247,12 @@ class LaserStudio(QMainWindow):
             w.toggled.connect(
                 lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
             )
+            toolbar.addWidget(w)
+
+            self.camera_wizard = CameraWizard(self.instruments, self, self)
+            w = QPushButton(toolbar)
+            w.setText("Wizard")
+            w.clicked.connect(lambda: self.camera_wizard.show())
             toolbar.addWidget(w)
 
             # Second representation of the camera image

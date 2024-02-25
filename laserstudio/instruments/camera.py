@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
 from typing import Optional, Literal
 
@@ -34,8 +34,10 @@ class CameraInstrument(QObject):
 
         # Objective
         objective = config.get("objective", 1.0)
-
         self.select_objective(objective)
+
+        # Correction matrix
+        self.correction_matrix: Optional[QTransform] = None
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.

@@ -27,6 +27,7 @@ class StageSightViewer(QGraphicsView):
 
     def __init__(self, stage_sight: "StageSight", parent=None):
         super().__init__(parent)
+        self.stage_sight = stage_sight
         s = QGraphicsScene()
         self.scale(1, -1)
         self.setScene(s)
@@ -34,6 +35,9 @@ class StageSightViewer(QGraphicsView):
 
 
 class StageSightObject(QObject):
+    """Proxy object for signal emission, StageSight, as
+    inheriting QGraphicsItemGroup, cannot inherit from QObject."""
+
     # Signal emitted when a new position is set
     position_changed = pyqtSignal(QPointF, name="positionChanged")
 
@@ -92,10 +96,26 @@ class StageSight(QGraphicsItemGroup):
         # Associate the CameraInstrument
         self.camera = camera
         if camera is not None:
+            self._pause_update = False
             camera.new_image.connect(self.set_image)
             self.__update_size(QSizeF(camera.width_um, camera.height_um))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
+
+    @property
+    def pause_image_update(self) -> bool:
+        return self._pause_update
+
+    @pause_image_update.setter
+    def pause_image_update(self, value: bool):
+        if self.camera is None:
+            return
+        if self._pause_update != value:
+            if value:
+                self.camera.new_image.disconnect(self.set_image)
+            else:
+                self.camera.new_image.connect(self.set_image)
+        self._pause_update = value
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -146,17 +166,25 @@ class StageSight(QGraphicsItemGroup):
         )
         image.setTransform(transform)
 
-    def set_image(self, image: QImage):
+    def set_pixmap(self, pixmap: QPixmap):
         """
         Set the PixMap item's image.
 
         :param image: The image to show
         """
-        pixmap = QPixmap.fromImage(image.copy())
         self.image.setPixmap(pixmap)
 
         # The original image size may have changed
         self.__update_image_size()
+
+    def set_image(self, image: QImage):
+        """
+        Set the item's image.
+
+        :param image: The image to show
+        """
+        pixmap = QPixmap.fromImage(image.copy())
+        self.set_pixmap(pixmap)
 
     @property
     def size(self) -> QSizeF:
@@ -222,15 +250,33 @@ class StageSight(QGraphicsItemGroup):
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 
-    def setPos(self, value: QPointF):
+    def setPos(self, pos: QPointF):
         """To make sure that the position of the stagesight is signaled
         at each change we override the setPos function.
 
         :param value: the final position of the widget"""
-        super(QGraphicsItemGroup, self).setPos(value)
-        self.position_changed.emit(value)
+        super(QGraphicsItemGroup, self).setPos(pos)
+        self.position_changed.emit(pos)
 
     @property
     def position_changed(self) -> pyqtBoundSignal:
         """Convenient access to the position_changed signal from proxy object"""
         return self.__object.position_changed
+
+    @property
+    def distortion(self) -> QTransform:
+        return self.image_group.transform()
+
+    @distortion.setter
+    def distortion(self, transform: Optional[QTransform]):
+        self.resetTransform()
+        self.image_group.resetTransform()
+        if transform is not None:
+            self.image_group.setTransform(transform)
+            # The transform may induce a final translation
+            # which can be measured by mapping the origin
+            # and corrected by setting the image_group's position.
+            mapped_origin = transform.map(QPointF(0.0, 0.0))
+            dx, dy = mapped_origin.x(), mapped_origin.y()
+            self.image_group.setPos(-dx, -dy)
+        self.__update_size(self.size)
