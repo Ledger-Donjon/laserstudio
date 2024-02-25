@@ -3,6 +3,7 @@ from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, Stage, Vector
 from .stage_rest import StageRest
+from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
 from typing import Optional
 
@@ -46,6 +47,9 @@ class StageInstrument(QObject):
             )
             self.stage: Stage = Corvus(dev)
             self._timer.start(1000)
+        elif device_type == "Dummy":
+            logging.getLogger("laserstudio").info("Creating a dummy stage... ")
+            self.stage: Stage = StageDummy(config=config, stage_instrument=self)
         elif device_type == "REST":
             logging.getLogger("laserstudio").info(f"Connecting to {device_type}...")
             try:
@@ -63,7 +67,7 @@ class StageInstrument(QObject):
             raise
 
         # Unit factor to apply in order to get coordinates in micrometers
-        self.unit_factors = config.get("unit_factors", [1.0] * self.stage.num_axis)
+        self.unit_factor = config.get("unit_factor", 1.0)
 
     @property
     def position(self) -> Vector:
@@ -71,7 +75,7 @@ class StageInstrument(QObject):
 
         :return: Get the position of the stage
         """
-        return self.stage.position
+        return self.stage.position * self.unit_factor
 
     @position.setter
     def position(self, value: Vector):
@@ -120,4 +124,4 @@ class StageInstrument(QObject):
             intermediates moves are blocking (eg, waiting to be done).
         """
         # Move to actual destination
-        self.stage.move_to(position, wait=wait)
+        self.stage.move_to(position / self.unit_factor, wait=wait)

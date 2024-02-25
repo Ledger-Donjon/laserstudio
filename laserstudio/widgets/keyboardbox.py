@@ -1,8 +1,7 @@
-from typing import Union, Optional
+from typing import Optional
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QGridLayout, QPushButton, QWidget
 from PyQt6.QtCore import Qt
 from ..instruments.instruments import StageInstrument
-from ..widgets.stagesight import StageSight
 from enum import Enum
 
 
@@ -24,17 +23,11 @@ class KeyboardBox(QGroupBox):
     for each press of button or keys.
     """
 
-    def __init__(self, stage: Union[StageSight, StageInstrument], *__args):
+    def __init__(self, stage: StageInstrument, *__args):
         super().__init__(*__args)
 
-        if isinstance(stage, StageInstrument):
-            self.stage_sight = None
-            self.stage = stage.stage
-            num_axis = stage.stage.num_axis
-        else:
-            self.stage_sight = stage
-            self.stage = None
-            num_axis = 2
+        self.stage = stage.stage
+        num_axis = stage.stage.num_axis
 
         vbox = QVBoxLayout()
         self.setLayout(vbox)
@@ -96,17 +89,9 @@ class KeyboardBox(QGroupBox):
 
         displacement *= move_factor
 
-        if self.stage is not None:
-            position = self.stage.position
-            position[axe] += displacement
-            self.stage.move_to(position)
-        elif self.stage_sight is not None:
-            position = self.stage_sight.pos()
-            if axe == 0:
-                position.setX(position.x() + displacement)
-            elif axe == 1:
-                position.setY(position.y() + displacement)
-            self.stage_sight.move_to(position)
+        position = self.stage.position
+        position[axe] += displacement
+        self.stage.move_to(position)
 
     def _set_background_color(self, color: Optional[str] = None):
         """
@@ -120,41 +105,43 @@ class KeyboardBox(QGroupBox):
             + "}"
         )
 
-    def focusInEvent(self, event) -> None:
+    def focusInEvent(self, a0) -> None:
         """
         Changes the background to gray to show the box has focused.
         """
-        super().focusInEvent(event)
+        super().focusInEvent(a0)
         self._set_background_color(color="gray")
 
-    def focusOutEvent(self, event) -> None:
+    def focusOutEvent(self, a0) -> None:
         """
         Removes the background color to show the box has focused out.
         """
-        super().focusOutEvent(event)
+        super().focusOutEvent(a0)
         self._set_background_color()
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, a0):
         """
         Detects a key press event and redispatch to the correct
         movement.
         """
-        if Qt.KeyboardModifier.ShiftModifier in event.modifiers():
+        if a0 is None:
+            return
+        if Qt.KeyboardModifier.ShiftModifier in a0.modifiers():
             factor = 10.0
         else:
             factor = 1.0
 
-        if event.key() == Qt.Key.Key_Up:
+        if a0.key() == Qt.Key.Key_Up:
             self.move_stage(direction=Direction.up, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Down:
+        elif a0.key() == Qt.Key.Key_Down:
             self.move_stage(direction=Direction.down, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Left:
+        elif a0.key() == Qt.Key.Key_Left:
             self.move_stage(direction=Direction.left, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Right:
+        elif a0.key() == Qt.Key.Key_Right:
             self.move_stage(direction=Direction.right, move_factor=factor)
-        elif event.key() == Qt.Key.Key_PageUp:
+        elif a0.key() == Qt.Key.Key_PageUp:
             self.move_stage(direction=Direction.zup, move_factor=factor)
-        elif event.key() == Qt.Key.Key_PageDown:
+        elif a0.key() == Qt.Key.Key_PageDown:
             self.move_stage(direction=Direction.zdown, move_factor=factor)
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)

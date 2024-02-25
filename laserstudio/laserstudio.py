@@ -160,7 +160,7 @@ class LaserStudio(QMainWindow):
         toolbar.addWidget(w)
 
         # Toolbar: Stage positioning
-        if self.viewer.stage_sight is not None:
+        if self.instruments.stage is not None:
             toolbar = QToolBar(self)
             toolbar.setWindowTitle("Stage control")
             toolbar.setAllowedAreas(
@@ -182,7 +182,7 @@ class LaserStudio(QMainWindow):
             group.setId(w, int(Viewer.Mode.STAGE))
 
             # Keyboard box
-            w = KeyboardBox(self.viewer.stage_sight)
+            w = KeyboardBox(self.instruments.stage)
             toolbar.addWidget(w)
 
         # Toolbar: Scanning zone definition and usage
@@ -192,7 +192,7 @@ class LaserStudio(QMainWindow):
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
         toolbar.setFloatable(True)
-        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Activate scan-zone definition mode
         w = QPushButton(toolbar)
