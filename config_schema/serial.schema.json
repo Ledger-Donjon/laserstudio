@@ -1,0 +1,64 @@
+{
+    "oneOf": [
+        {
+            "properties": {
+                "dev": {
+                    "type": "string",
+                    "description": "Direct path to the serial device (on unix system) or COM port name (on Windows system)."
+                }
+            }
+        },
+        {
+            "properties": {
+                "dev": {
+                    "type": "object",
+                    "description": "Filters to get a serial device.",
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "sn": {
+                                    "type": "string",
+                                    "description": "Serial number of the serial device"
+                                }
+                            },
+                            "required": [
+                                "sn"
+                            ]
+                        },
+                        {
+                            "properties": {
+                                "vid": {
+                                    "type": "string",
+                                    "pattern": "^[A-Fa-f0-9]{4}$",
+                                    "description": "VID of the serial device, in hexadecimal"
+                                },
+                                "pid": {
+                                    "type": "string",
+                                    "pattern": "^[A-Fa-f0-9]{4}$",
+                                    "description": "PID of the serial device, in hexadecimal"
+                                }
+                            },
+                            "required": [
+                                "vid",
+                                "pid"
+                            ]
+                        },
+                        {
+                            "properties": {
+                                "location": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "location"
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "required": [
+        "dev"
+    ]
+}

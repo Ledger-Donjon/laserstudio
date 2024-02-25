@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
-from typing import Optional, Literal
+from typing import Optional, Literal, cast
 
 
 class CameraInstrument(QObject):
@@ -20,20 +20,22 @@ class CameraInstrument(QObject):
         self._timer = QTimer()
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.get_last_qImage)
-        self.refresh_interval = config.get("refresh_interval_ms", 200)
+        self.refresh_interval = cast(int, config.get("refresh_interval_ms", 200))
 
         QTimer.singleShot(
             self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
         )
 
-        self.width = 640
-        self.height = 512
+        self.width = cast(int, config.get("width", 640))
+        self.height = cast(int, config.get("height", 512))
 
         # Unit factor to apply in order to get coordinates in micrometers
-        self.pixel_size_in_um = config.get("pixel_size_in_um", [1.0, 1.0])
+        self.pixel_size_in_um = cast(
+            list[float], config.get("pixel_size_in_um", [1.0, 1.0])
+        )
 
         # Objective
-        objective = config.get("objective", 1.0)
+        objective = cast(float, config.get("objective", 1.0))
         self.select_objective(objective)
 
         # Correction matrix

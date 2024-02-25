@@ -1,0 +1,14 @@
+{
+    "$id": "config.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Laser Studio Configuration File",
+    "type": "object",
+    "properties": {
+        "camera": {
+            "$ref": "camera.schema.json"
+        },
+        "stage": {
+            "$ref": "stage.schema.json"
+        }
+    }
+}
