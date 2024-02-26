@@ -45,6 +45,18 @@ def main_toolbar(laser_studio: "LaserStudio") -> QToolBar:
     toolbar.addWidget(w)
     group.addButton(w)
     group.setId(w, laser_studio.viewer.Mode.NONE)
+
+    w = QPushButton(toolbar)
+    w.setText("Save")
+    w.setToolTip("Save settings to settings.yaml")
+    w.clicked.connect(laser_studio.save_settings)
+    toolbar.addWidget(w)
+    w = QPushButton(toolbar)
+    w.setText("Restore")
+    w.setToolTip("Restore settings from settings.yaml")
+    w.clicked.connect(laser_studio.reload_settings)
+    toolbar.addWidget(w)
+
     return toolbar
 
 

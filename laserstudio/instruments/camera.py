@@ -2,6 +2,7 @@ from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
+from ..util import yaml_to_qtransform, qtransform_to_yaml
 
 
 class CameraInstrument(QObject):
@@ -73,3 +74,17 @@ class CameraInstrument(QObject):
             color_mode is data from PIL.Image module.
         """
         return self.width, self.height, "L", None
+
+    @property
+    def yaml(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        if self.correction_matrix is not None:
+            return {"transform": qtransform_to_yaml(self.correction_matrix)}
+        else:
+            return {}
+
+    @yaml.setter
+    def yaml(self, data: dict):
+        """Import settings from a dict."""
+        if "transform" in data:
+            self.correction_matrix = yaml_to_qtransform(data["transform"])

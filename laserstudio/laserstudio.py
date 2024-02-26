@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QButtonGroup,
 )
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Any
 from .widgets.viewer import Viewer
 from .instruments.instruments import Instruments
 from .widgets.toolbars import (
@@ -15,6 +15,7 @@ from .widgets.toolbars import (
     camera_toolbar,
     main_toolbar,
 )
+import yaml
 
 if TYPE_CHECKING:
     from .widgets.camerawizard import CameraWizard
@@ -93,3 +94,28 @@ class LaserStudio(QMainWindow):
         for b in self.viewer_buttons_group.buttons():
             if id == self.viewer_buttons_group.id(b):
                 b.setChecked(True)
+
+    def save_settings(self):
+        """
+        Save some settings in the settings.yaml file.
+        """
+        data: dict[str, Any] = {}
+
+        # Camera settings
+        if self.instruments.camera is not None:
+            data["camera"] = self.instruments.camera.yaml
+        yaml.dump(data, open("settings.yaml", "w"))
+
+    def reload_settings(self):
+        """
+        Restore settings in the settings.yaml file.
+        """
+        data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        # Camera settings (maybe missing from settings)
+        camera = data.get("camera")
+        if (self.instruments.camera is not None) and (camera is not None):
+            self.instruments.camera.yaml = camera
+            if self.viewer.stage_sight is not None:
+                self.viewer.stage_sight.distortion = (
+                    self.instruments.camera.correction_matrix
+                )
