@@ -2,10 +2,8 @@
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
     QMainWindow,
-    QGridLayout,
     QLabel,
     QToolBar,
-    QWidget,
     QPushButton,
     QButtonGroup,
 )
@@ -76,7 +74,7 @@ class LaserStudio(QMainWindow):
         w.setChecked(True)
         toolbar.addWidget(w)
         group.addButton(w)
-        group.setId(w, int(Viewer.Mode.NONE))
+        group.setId(w, Viewer.Mode.NONE)
 
         # Toolbar: Background picture
         toolbar = QToolBar(self)
@@ -95,7 +93,7 @@ class LaserStudio(QMainWindow):
         w.setCheckable(True)
         toolbar.addWidget(w)
         group.addButton(w)
-        group.setId(w, int(Viewer.Mode.PIN))
+        group.setId(w, Viewer.Mode.PIN)
 
         # Button to load background picture.
         w = QPushButton(toolbar)
@@ -179,7 +177,7 @@ class LaserStudio(QMainWindow):
             w.setCheckable(True)
             toolbar.addWidget(w)
             group.addButton(w)
-            group.setId(w, int(Viewer.Mode.STAGE))
+            group.setId(w, Viewer.Mode.STAGE)
 
             # Keyboard box
             w = KeyboardBox(self.instruments.stage)
@@ -201,7 +199,7 @@ class LaserStudio(QMainWindow):
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         group.addButton(w)
-        group.setId(w, int(Viewer.Mode.ZONE))
+        group.setId(w, Viewer.Mode.ZONE)
         toolbar.addWidget(w)
 
         # Go-to-next position button
@@ -251,13 +249,15 @@ class LaserStudio(QMainWindow):
 
             self.camera_wizard = CameraWizard(self.instruments, self, self)
             w = QPushButton(toolbar)
-            w.setText("Wizard")
+            w.setText("Distortion Wizard")
             w.clicked.connect(lambda: self.camera_wizard.show())
             toolbar.addWidget(w)
 
             # Second representation of the camera image
             stage_sight = StageSight(None, self.instruments.camera)
-            toolbar.addWidget(StageSightViewer(stage_sight))
+            w = StageSightViewer(stage_sight)
+            w.setHidden(True)
+            toolbar.addWidget(w)
 
     def handle_go_next(self):
         """Go Next operation.
