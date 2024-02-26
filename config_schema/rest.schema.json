@@ -12,5 +12,6 @@
             "type": "string",
             "description": "Default API command."
         }
-    }
+    },
+    "required": ["api_command"]
 }
