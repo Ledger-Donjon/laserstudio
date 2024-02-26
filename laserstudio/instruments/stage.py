@@ -75,6 +75,7 @@ class StageInstrument(QObject):
 
         # Unit factor to apply in order to get coordinates in micrometers
         self.unit_factor = config.get("unit_factor", 1.0)
+        self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
     @property
     def position(self) -> Vector:

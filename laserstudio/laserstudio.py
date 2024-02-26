@@ -8,12 +8,13 @@ from typing import Optional, TYPE_CHECKING, Any
 from .widgets.viewer import Viewer
 from .instruments.instruments import Instruments
 from .widgets.toolbars import (
-    picture_toolbar,
-    zoom_toolbar,
-    scan_toolbar,
-    stage_toolbar,
-    camera_toolbar,
-    main_toolbar,
+    PictureToolbar,
+    ZoomToolbar,
+    ScanToolbar,
+    StageToolbar,
+    CameraToolbar,
+    MainToolbar,
+    LaserToolbar,
 )
 import yaml
 
@@ -53,30 +54,30 @@ class LaserStudio(QMainWindow):
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Toolbar: Main
-        toolbar = main_toolbar(self)
+        toolbar = MainToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Background picture
-        toolbar = picture_toolbar(self)
+        toolbar = PictureToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Zoom
-        toolbar = zoom_toolbar(self)
+        toolbar = ZoomToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
         if self.instruments.stage is not None:
-            toolbar = stage_toolbar(self)
+            toolbar = StageToolbar(self)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Toolbar: Scanning zone definition and usage
-        toolbar = scan_toolbar(self)
+        toolbar = ScanToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Camera Image control
         if self.instruments.camera is not None:
             self.camera_wizard: Optional[CameraWizard] = None
-            toolbar = camera_toolbar(self)
+            toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
     def handle_go_next(self):
