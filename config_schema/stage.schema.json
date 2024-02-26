@@ -32,6 +32,14 @@
         {
             "properties": {
                 "type": {
+                    "const": "CNC",
+                    "description": "CNC Stage."
+                }
+            }
+        },
+        {
+            "properties": {
+                "type": {
                     "const": "Dummy",
                     "description": "A Dummy Stage."
                 }
