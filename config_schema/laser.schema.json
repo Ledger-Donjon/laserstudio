@@ -1,0 +1,18 @@
+{
+    "$id": "laser.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Laser",
+    "type": "object",
+    "description": "A Laser device.",
+    "properties": {
+        "enable": {
+            "type": "boolean",
+            "description": "If the device is enabled or not."
+        },
+        "num": {
+            "type": "integer",
+            "description": "The number"
+        }
+    },
+    "required":["num"]
+}

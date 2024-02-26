@@ -3,7 +3,9 @@ from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
-from typing import Optional
+from .laser import LaserInstrument
+from .pdm import PDMInstrument
+from typing import Optional, cast
 import logging
 
 
@@ -49,6 +51,27 @@ class Instruments:
                     f"Camera is enabled but device could not be created: {str(e)}... Skipping."
                 )
                 self.camera = None
+
+        # Laser modules
+        self.lasers: list[LaserInstrument] = []
+        lasers_config = cast(list[dict], config.get("lasers", None))
+        if lasers_config is not None:
+            for laser_config in lasers_config:
+                if not laser_config.get("enable", False):
+                    continue
+                device_type = laser_config.get("type")
+                try:
+                    if device_type == "PDM":
+                        self.lasers.append(PDMInstrument(config=laser_config))
+                    else:
+                        logging.getLogger("laserstudio").error(
+                            f"Unknown laser type {device_type}. Skipping device."
+                        )
+                        raise
+                except Exception as e:
+                    logging.getLogger("laserstudio").warning(
+                        f"Laser is enabled but device could not be created: {str(e)}... Skipping."
+                    )
 
     def go_next(self):
         pass

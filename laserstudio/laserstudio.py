@@ -80,6 +80,11 @@ class LaserStudio(QMainWindow):
             toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
+        # Laser toolbars
+        for i in range(len(self.instruments.lasers)):
+            toolbar = LaserToolbar(self, i)
+            self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+
     def handle_go_next(self):
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.

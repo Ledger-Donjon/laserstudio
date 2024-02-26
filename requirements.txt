@@ -7,3 +7,4 @@ shapely
 triangle
 requests 
 numpy
+pypdm

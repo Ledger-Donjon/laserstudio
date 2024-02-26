@@ -12,6 +12,7 @@ from ...util import resource_path
 from ..keyboardbox import KeyboardBox
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizard import CameraWizard
+from .lasertoolbar import LaserToolbar
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio

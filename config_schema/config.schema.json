@@ -9,6 +9,12 @@
         },
         "stage": {
             "$ref": "stage.schema.json"
+        },
+        "lasers": {
+            "type":"array",
+            "items": {
+                "$ref": "laser.schema.json"
+            }
         }
     }
 }
