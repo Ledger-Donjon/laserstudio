@@ -8,3 +8,5 @@ triangle
 requests 
 numpy
 pypdm
+flask
+flask_restx

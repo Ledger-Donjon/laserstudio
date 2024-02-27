@@ -17,6 +17,7 @@ from .widgets.toolbars import (
     LaserToolbar,
 )
 import yaml
+from .restserver.server import RestProxy
 
 if TYPE_CHECKING:
     from .widgets.camerawizard import CameraWizard
@@ -84,6 +85,9 @@ class LaserStudio(QMainWindow):
         for i in range(len(self.instruments.lasers)):
             toolbar = LaserToolbar(self, i)
             self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+
+        # Instantiate proxy for REST command reception
+        self.rest_proxy = RestProxy(self)
 
     def handle_go_next(self):
         """Go Next operation.
