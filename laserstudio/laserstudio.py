@@ -84,7 +84,7 @@ class LaserStudio(QMainWindow):
         # Laser toolbars
         for i in range(len(self.instruments.lasers)):
             toolbar = LaserToolbar(self, i)
-            self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
         self.rest_proxy = RestProxy(self)
