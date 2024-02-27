@@ -22,8 +22,8 @@ if __name__ == "__main__":
     if args.log is not None:
         try:
             logging.basicConfig(level=logging.NOTSET)
-            l = logging.getLogger("laserstudio")
-            l.setLevel(args.log)
+            logger = logging.getLogger("laserstudio")
+            logger.setLevel(args.log)
         except ValueError as e:
             print("Warning, error during setting log level:", e)
             pass

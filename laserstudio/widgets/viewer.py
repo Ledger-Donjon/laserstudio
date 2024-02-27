@@ -253,10 +253,12 @@ class Viewer(QGraphicsView):
         self.zoom = 1.0
 
     # User interactions
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event: Optional[QWheelEvent]):
         """
         Handle mouse wheel events to manage zoom.
         """
+        if event is None:
+            return
         # We want to zoom relative to the current cursor position, not relative
         # to the center of the widget. This involves some math...
         # p is the pointed position in the scene, and we want to keep p at the
@@ -284,11 +286,13 @@ class Viewer(QGraphicsView):
         self.cam_pos_zoom = pos, zoom
         event.accept()
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
         """
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
@@ -318,18 +322,20 @@ class Viewer(QGraphicsView):
 
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse moves.
         """
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
+    def mouseReleaseEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse button is released.
         Used to get out the panning, when Right button is released.
         Used to detect the end of the Zone selection.
         """
+        if event is None:
+            return
         is_left = event.button() == Qt.MouseButton.LeftButton
         is_right = event.button() == Qt.MouseButton.RightButton
 
@@ -350,25 +356,29 @@ class Viewer(QGraphicsView):
                 self.scan_geometry.add(zone)
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: Optional[QKeyEvent]):
         """
         Called when key button is released.
         Used when the user hits the SHIFT key in ZONE mode to change
         the color of the rectangle.
         """
+        if event is None:
+            return
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
             self.__update_highlight_color()
         super().keyPressEvent(event)
 
-    def keyReleaseEvent(self, event: QKeyEvent):
+    def keyReleaseEvent(self, event: Optional[QKeyEvent]):
         """
         Called when key button is released.
         Used when the user hits the SHIFT key in ZONE mode to change
         the color of the rectangle.
         """
         super().keyReleaseEvent(event)
+        if event is None:
+            return
         if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to green (add)
