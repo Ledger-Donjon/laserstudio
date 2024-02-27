@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QPolygonF, QPen, QPainterPath, QBrush, QColor
 import logging
-import shapely.geometry as geo
-from typing import Optional
+from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
+from typing import Optional, Union
 from .scanpath import ScanPath
 from ..scanning import ScanPathGenerator, EmptyGeometryError
 
@@ -15,7 +15,7 @@ from ..scanning import ScanPathGenerator, EmptyGeometryError
 class ScanGeometry(QGraphicsItemGroup):
     def __init__(self, parent: Optional[QGraphicsItem] = None):
         super().__init__(parent)
-        self.__scan_geometry = geo.MultiPolygon()
+        self.__scan_geometry = MultiPolygon()
 
         # Scanning Path
         self.__scan_path = ScanPath(diameter=10.0)
@@ -27,7 +27,7 @@ class ScanGeometry(QGraphicsItemGroup):
         self.scan_path_generator = ScanPathGenerator()
 
     @staticmethod
-    def __poly_to_path_item(poly: geo.Polygon) -> QGraphicsPathItem:
+    def __poly_to_path_item(poly: Polygon) -> QGraphicsPathItem:
         """
         Create a QGraphicsPathItem according to Polygon.
 
@@ -89,15 +89,15 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def __add_remove(self, zone: QPolygonF, isAdd: bool = True):
         # Converts the Polygon to a shapely instance.
-        g = geo.Polygon([(p.x(), p.y()) for p in zone])
+        g = Polygon([(p.x(), p.y()) for p in zone])
         if isAdd:
             self.__scan_geometry |= g
         else:
             self.__scan_geometry -= g
         # In case that shapely converts it to a Polygon, we stick at a MultiPolygon
         logging.getLogger("laserstudio").debug(self.__scan_geometry)
-        if isinstance(self.__scan_geometry, geo.Polygon):
-            self.__scan_geometry = geo.MultiPolygon([self.__scan_geometry])
+        if isinstance(self.__scan_geometry, Polygon):
+            self.__scan_geometry = MultiPolygon([self.__scan_geometry])
 
         # Rebuild scan zone shape in the view to display the new zone.
         self.__update()
@@ -120,3 +120,62 @@ class ScanGeometry(QGraphicsItemGroup):
             return next_point
         except EmptyGeometryError:
             logging.getLogger("laserstudio").error("Cannot generate a point.")
+
+    @staticmethod
+    def shapely_to_yaml(
+        geometry: Union[Polygon, MultiPolygon, GeometryCollection]
+    ) -> dict:
+        """
+        :return: A dict for YAML serialization.
+        :g: Any shapely geometry object.
+        """
+        if isinstance(geometry, Polygon):
+            res = dict()
+            res["exterior"] = list(
+                {"x": p[0], "y": p[1]} for p in geometry.exterior.coords
+            )
+            interiors = []
+            res["interiors"] = interiors
+            for interior in geometry.interiors:
+                interiors.append(list({"x": p[0], "y": p[1]} for p in interior.coords))
+            return {"polygon": res}
+        elif isinstance(geometry, MultiPolygon):
+            res = []
+            for poly in geometry:
+                res.append(__class__.shapely_to_yaml(poly))
+            return {"multipolygon": res}
+        elif isinstance(geometry, GeometryCollection):
+            # We have this type when the zone is empty.
+            return {"geometrycollection": None}
+        # If this line is reached, some shapely type handling may be missing.
+        assert False
+
+    @staticmethod
+    def yaml_to_shapely(yaml: dict) -> Union[Polygon, MultiPolygon, GeometryCollection]:
+        assert len(yaml) == 1
+        type_, value = next(iter(yaml.items()))
+        if type_ == "polygon":
+            exterior = list((float(p["x"]), float(p["y"])) for p in value["exterior"])
+            interiors = []
+            for value_sub in value["interiors"]:
+                interior = list((float(p["x"]), float(p["y"])) for p in value_sub)
+                interiors.append(interior)
+            return Polygon(shell=exterior, holes=interiors)
+        elif type_ == "multipolygon":
+            polys = []
+            for value_sub in value:
+                polys.append(__class__.yaml_to_shapely(value_sub))
+            return MultiPolygon(polygons=polys)
+        elif type_ == "geometrycollection":
+            return GeometryCollection()
+        else:
+            assert False
+
+    @property
+    def yaml(self) -> dict:
+        return __class__.shapely_to_yaml(self.__scan_geometry)
+
+    @yaml.setter
+    def yaml(self, dict: dict):
+        self.__scan_geometry = __class__.yaml_to_shapely(dict)
+        self.__update()

@@ -114,6 +114,10 @@ class LaserStudio(QMainWindow):
         # Camera settings
         if self.instruments.camera is not None:
             data["camera"] = self.instruments.camera.yaml
+
+        # Scanning geometry
+        data["scangeometry"] = self.viewer.scan_geometry.yaml
+
         yaml.dump(data, open("settings.yaml", "w"))
 
     def reload_settings(self):
@@ -129,3 +133,8 @@ class LaserStudio(QMainWindow):
                 self.viewer.stage_sight.distortion = (
                     self.instruments.camera.correction_matrix
                 )
+
+        # Scanning geometry
+        geometry = data.get("scangeometry")
+        if geometry is not None:
+            self.viewer.scan_geometry.yaml = geometry
