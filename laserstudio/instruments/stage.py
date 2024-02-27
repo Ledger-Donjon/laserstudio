@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject
+from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QCoreApplication
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
@@ -76,6 +76,9 @@ class StageInstrument(QObject):
         # Unit factor to apply in order to get coordinates in micrometers
         self.unit_factor = config.get("unit_factor", 1.0)
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
+
+        if self.stage is not None:
+            self.stage.wait_routine = lambda: QCoreApplication.processEvents()
 
     @property
     def position(self) -> Vector:
