@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QObject
-from typing import Tuple, Optional, Any
+from typing import Optional, Any
 
 
 class ProbeInstrument(QObject):
@@ -7,7 +7,7 @@ class ProbeInstrument(QObject):
         super().__init__()
         # Set manual position relative to the center position
         # of the camera, eg in the StageSight coordinates.
-        self.fixed_pos: Optional[Tuple[float, float]] = None
+        self.fixed_pos: Optional[tuple[float, float]] = None
 
     @property
     def yaml(self) -> dict[str, Any]:

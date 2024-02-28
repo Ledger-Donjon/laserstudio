@@ -27,7 +27,7 @@ from .marker import Marker
 from ..instruments.instruments import CameraInstrument
 from ..instruments.instruments import ProbeInstrument, LaserInstrument
 from .stagesight import StageSight, StageSightViewer
-from typing import cast, Optional, Tuple, TYPE_CHECKING
+from typing import cast, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..laserstudio import LaserStudio
@@ -150,7 +150,7 @@ class CameraPositionPage(CameraPresentationPage):
     on it to indicate the position of an object
     """
 
-    def set_position(self, xy: Optional[Tuple[int, int]]):
+    def set_position(self, xy: Optional[tuple[int, int]]):
         # (De)activate the update of the image in StageSight
         self.viewer.stage_sight.pause_image_update = xy is not None
         if xy is None:
@@ -215,7 +215,7 @@ class CameraAlignmentPage(CameraPositionPage):
             "and click on the image to position the object."
         )
 
-    def set_position(self, xy: Optional[Tuple[int, int]]):
+    def set_position(self, xy: Optional[tuple[int, int]]):
         super().set_position(xy)
 
         # Enable/disable some UI elements
@@ -322,7 +322,7 @@ class ProbePositionPage(CameraPositionPage):
         )
         self.probe = probe
 
-    def set_position(self, xy: Optional[Tuple[int, int]]):
+    def set_position(self, xy: Optional[tuple[int, int]]):
         super().set_position(xy)
         self.viewer.stage_sight.pause_image_update = False
         if self.clicked_point is not None:

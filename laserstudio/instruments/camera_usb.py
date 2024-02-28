@@ -39,7 +39,7 @@ class CameraUSBInstrument(CameraInstrument):
 
     def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
         """Retrieve last captured image"""
-        # returns Tuple [width, height, fmt, data]. Data is None if acquisition failed.
+        # returns tuple [width, height, fmt, data]. Data is None if acquisition failed.
         ret, frame = self.__video_capture.read()
         if not ret or frame is None:
             return self.width, self.height, "RGB", None

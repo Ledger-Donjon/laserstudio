@@ -18,8 +18,8 @@ from PyQt6.QtGui import (
     QTransform,
 )
 from enum import Enum, auto
-from typing import Optional, Tuple
 from .stagesight import StageSight, StageInstrument, CameraInstrument
+from typing import Optional
 import logging
 from .scangeometry import ScanGeometry
 import numpy as np
@@ -217,7 +217,7 @@ class Viewer(QGraphicsView):
             self.setDragMode(Viewer.DragMode.NoDrag)
 
     @property
-    def cam_pos_zoom(self) -> Tuple[QPointF, float]:
+    def cam_pos_zoom(self) -> tuple[QPointF, float]:
         """'Camera' position and zoom of the Viewer: The first element is
         the position in the stage where the viewer is centered on.
         The second element is the zoom factor, which must be strictly positive.
@@ -228,7 +228,7 @@ class Viewer(QGraphicsView):
         return self.__compute_pos_zoom()
 
     @cam_pos_zoom.setter
-    def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
+    def cam_pos_zoom(self, new_value: tuple[QPointF, float]):
         assert new_value[1] > 0
         self.resetTransform()
         self.scale(new_value[1], -new_value[1])
