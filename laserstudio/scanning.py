@@ -3,7 +3,7 @@
 # shapely is usually available through debian repositories.
 # triangle can be installed with pip3.
 
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import MultiPolygon, Polygon, GeometryCollection
 import random
 from typing import Union, Optional, cast
 from triangle import triangulate
@@ -53,10 +53,11 @@ class RandomPointGenerator:
         result = []
 
         # If the geometry is a multipolygon, call this method recursively.
-        if isinstance(geometry, MultiPolygon):
+        if isinstance(geometry, MultiPolygon) or isinstance(
+            geometry, GeometryCollection
+        ):
             for poly in geometry.geoms:
                 result += self.__triangulate(poly)
-
         else:
             ext_count = len(geometry.exterior.coords) - 1
             if ext_count == -1:

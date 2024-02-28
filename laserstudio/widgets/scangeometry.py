@@ -68,8 +68,15 @@ class ScanGeometry(QGraphicsItemGroup):
             del child
         children = []
 
-        for poly in self.__scan_geometry.geoms:
-            self.__scan_zones_group.addToGroup(ScanGeometry.__poly_to_path_item(poly))
+        if isinstance(self.__scan_geometry, Polygon):
+            self.__scan_zones_group.addToGroup(
+                ScanGeometry.__poly_to_path_item(self.__scan_geometry)
+            )
+        else:
+            for poly in self.__scan_geometry.geoms:
+                self.__scan_zones_group.addToGroup(
+                    ScanGeometry.__poly_to_path_item(poly)
+                )
         self.addToGroup(self.__scan_zones_group)
 
         # Also, update the scan path with the new geometry
