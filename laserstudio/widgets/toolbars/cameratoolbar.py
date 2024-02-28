@@ -43,38 +43,21 @@ class CameraToolbar(QToolBar):
         )
         self.addWidget(w)
 
-        laser_studio.camera_distortion_wizard = CameraDistortionWizard(
-            laser_studio.instruments, laser_studio, laser_studio
-        )
         w = QPushButton(self)
         w.setText("Distortion Wizard")
-        w.clicked.connect(
-            lambda: (
-                laser_studio.camera_distortion_wizard.show()
-                if laser_studio.camera_distortion_wizard is not None
-                else ()
-            )
-        )
+        self.camera_distortion_wizard = CameraDistortionWizard(laser_studio, self)
+        w.clicked.connect(lambda: self.camera_distortion_wizard.show())
         self.addWidget(w)
 
-        if (
+        self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
+        w = QPushButton(self)
+        w.setText("Probes & Spots Position Wizard")
+        w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
+        self.addWidget(w)
+        w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
-            > 0
-        ):
-
-            laser_studio.camera_distortion_wizard = ProbesPositionWizard(
-                laser_studio.instruments, laser_studio, laser_studio
-            )
-            w = QPushButton(self)
-            w.setText("Probes Position Wizard")
-            w.clicked.connect(
-                lambda: (
-                    laser_studio.camera_distortion_wizard.show()
-                    if laser_studio.camera_distortion_wizard is not None
-                    else ()
-                )
-            )
-            self.addWidget(w)
+            == 0
+        )
 
         # Second representation of the camera image
         stage_sight = StageSight(None, self.camera)

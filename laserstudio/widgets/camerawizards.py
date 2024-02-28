@@ -26,7 +26,6 @@ from enum import Enum, auto
 from .marker import Marker
 from ..instruments.instruments import CameraInstrument
 from ..instruments.instruments import ProbeInstrument, LaserInstrument
-from ..instruments.instruments import Instruments
 from .stagesight import StageSight, StageSightViewer
 from typing import cast, Optional, Tuple, TYPE_CHECKING
 
@@ -124,7 +123,7 @@ class DistortionIntroductionPage(CameraWizardPage):
         self.setTitle("Camera distortion wizard")
 
     def nextId(self) -> int:
-        return PagesID.ALIGN_1
+        return PagesID.ALIGN
 
 
 class CameraPresentationPage(CameraWizardPage):
@@ -132,7 +131,7 @@ class CameraPresentationPage(CameraWizardPage):
     Wizard page where the user gets the camera image.
     """
 
-    def __init__(self, parent: "CameraDistortionWizard"):
+    def __init__(self, parent: "CameraWizard"):
         super().__init__(parent)
         camera = parent.instruments.camera
         assert camera is not None
@@ -161,7 +160,7 @@ class CameraPositionPage(CameraPresentationPage):
             # Place the marker to clicked point
             in_scene = self.viewer.mapToScene(*xy)
             self.viewer.clicked_point_marker.setPos(in_scene)
-            # We want the position of point within the stage view.
+            # We want the position of point within the StageSight view.
             self.clicked_point = self.viewer.stage_sight.mapFromScene(in_scene)
             # Save the image
             self.clicked_image_pixmap = self.viewer.stage_sight.image.pixmap()
@@ -169,7 +168,7 @@ class CameraPositionPage(CameraPresentationPage):
         self.viewer.clicked_point_marker.setVisible(xy is not None)
         self.completeChanged.emit()
 
-    def __init__(self, parent: "CameraDistortionWizard"):
+    def __init__(self, parent: "CameraWizard"):
         super().__init__(parent=parent)
         # The coordinates of the point within the camera
         self.clicked_point: Optional[QPointF] = None
@@ -239,6 +238,9 @@ class DistortedImagePresentationPage(CameraPresentationPage):
     """
     Wizard page where the user can see the result of the distortion.
     """
+
+    def wizard(self) -> "CameraDistortionWizard":
+        return cast(CameraDistortionWizard, super().wizard())
 
     def initializePage(self):
         self.transform = self.wizard().transform
@@ -320,25 +322,24 @@ class ProbePositionPage(CameraPositionPage):
         )
         self.probe = probe
 
+    def set_position(self, xy: Optional[Tuple[int, int]]):
+        super().set_position(xy)
+        self.viewer.stage_sight.pause_image_update = False
+        if self.clicked_point is not None:
+            self.probe.fixed_pos = self.clicked_point.x(), self.clicked_point.y()
+
 
 class CameraWizard(QWizard):
-    def __init__(
-        self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
-    ):
+    def __init__(self, laser_studio: "LaserStudio", parent=None):
         super().__init__(parent)
 
-        self.instruments = instruments
+        self.instruments = laser_studio.instruments
         self.laser_studio = laser_studio
 
 
 class ProbesPositionWizard(CameraWizard):
-    def __init__(
-        self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
-    ):
-        super().__init__(
-            instruments=instruments, laser_studio=laser_studio, parent=parent
-        )
-
+    def __init__(self, laser_studio: "LaserStudio", parent=None):
+        super().__init__(laser_studio=laser_studio, parent=parent)
         # Create the ProbePositionIntroductionPage page
         self.setPage(PagesID.INTRO, ProbePositionIntroductionPage(parent=self))
 
@@ -359,13 +360,8 @@ class ProbesPositionWizard(CameraWizard):
 
 
 class CameraDistortionWizard(CameraWizard):
-    def __init__(
-        self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
-    ):
-        super().__init__(
-            instruments=instruments, laser_studio=laser_studio, parent=parent
-        )
-
+    def __init__(self, laser_studio: "LaserStudio", parent=None):
+        super().__init__(laser_studio=laser_studio, parent=parent)
         # Create the DistortionIntroductionPage page
         self.setPage(PagesID.INTRO, DistortionIntroductionPage(parent=self))
 
