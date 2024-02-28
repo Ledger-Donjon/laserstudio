@@ -38,9 +38,6 @@ class StageToolbar(QToolBar):
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
-        w = QWidget()
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
         self.mem_point_selector = box = QComboBox()
         for i in range(len(self.stage.mem_points)):
             box.addItem(f"Go to M{i}")
@@ -48,6 +45,7 @@ class StageToolbar(QToolBar):
             lambda i: self.stage.move_to(self.stage.mem_points[i], wait=True)
         )
         self.addWidget(box)
+        box.setHidden(len(self.stage.mem_points) == 0)
 
         w = QPushButton(self)
         w.setText("Home")
