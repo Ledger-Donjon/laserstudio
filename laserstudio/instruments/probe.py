@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, pyqtSignal
 from typing import Optional, Any
 
 
@@ -8,6 +8,9 @@ class ProbeInstrument(QObject):
         # Set manual position relative to the center position
         # of the camera, eg in the StageSight coordinates.
         self._fixed_pos: Optional[tuple[float, float]] = None
+
+    # Signal emited when fixed pos paremeter changed
+    fixed_pos_changed = pyqtSignal()
 
     @property
     def yaml(self) -> dict[str, Any]:
@@ -29,3 +32,4 @@ class ProbeInstrument(QObject):
     @fixed_pos.setter
     def fixed_pos(self, fixed_pos):
         self._fixed_pos = fixed_pos
+        self.fixed_pos_changed.emit()
