@@ -119,6 +119,12 @@ class LaserStudio(QMainWindow):
         # Scanning geometry
         data["scangeometry"] = self.viewer.scan_geometry.yaml
 
+        # Probes
+        data["probes"] = [probe.yaml for probe in self.instruments.probes]
+
+        # Lasers
+        data["lasers"] = [laser.yaml for laser in self.instruments.lasers]
+
         yaml.dump(data, open("settings.yaml", "w"))
 
     def reload_settings(self):
@@ -139,3 +145,13 @@ class LaserStudio(QMainWindow):
         geometry = data.get("scangeometry")
         if geometry is not None:
             self.viewer.scan_geometry.yaml = geometry
+
+        # Probes
+        probes = data.get("probes", [])
+        for data, probe in zip(probes, self.instruments.probes):
+            probe.yaml = data
+
+        # Lasers
+        lasers = data.get("laser", [])
+        for data, laser in zip(lasers, self.instruments.lasers):
+            laser.yaml = data

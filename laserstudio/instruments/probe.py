@@ -14,6 +14,7 @@ class ProbeInstrument(QObject):
         yaml = {}
         if self.fixed_pos is not None:
             yaml["fixed_pos"] = list(self.fixed_pos)
+        return yaml
 
     @yaml.setter
     def yaml(self, yaml: dict):
