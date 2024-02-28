@@ -18,8 +18,10 @@ from PyQt6.QtCore import (
 )
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
+from ..instruments.probe import ProbeInstrument
 from typing import Optional
 import logging
+from .marker import ProbeMarker
 
 
 class StageSightViewer(QGraphicsView):
@@ -60,6 +62,7 @@ class StageSight(QGraphicsItemGroup):
         self,
         stage: Optional[StageInstrument],
         camera: Optional[CameraInstrument],
+        probes: list[ProbeInstrument] = [],
         parent=None,
     ):
         super(QGraphicsItemGroup, self).__init__(parent)
@@ -101,6 +104,13 @@ class StageSight(QGraphicsItemGroup):
             self.__update_size(QSizeF(camera.width_um, camera.height_um))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
+
+        # Create Markers for probes
+        self._probe_markers: list[ProbeMarker] = []
+        for probe in probes:
+            marker = ProbeMarker(probe, self)
+            marker.addToGroup(marker)
+            self._probe_markers.append(marker)
 
     @property
     def pause_image_update(self) -> bool:

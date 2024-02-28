@@ -18,8 +18,8 @@ from PyQt6.QtGui import (
     QTransform,
 )
 from enum import Enum, auto
-from .stagesight import StageSight, StageInstrument, CameraInstrument
 from typing import Optional
+from .stagesight import StageSight, StageInstrument, CameraInstrument, ProbeInstrument
 import logging
 from .scangeometry import ScanGeometry
 import numpy as np
@@ -156,14 +156,17 @@ class Viewer(QGraphicsView):
             self.background_picture_path = filename
 
     def add_stage_sight(
-        self, stage: Optional[StageInstrument], camera: Optional[CameraInstrument]
+        self,
+        stage: Optional[StageInstrument],
+        camera: Optional[CameraInstrument],
+        probes: list[ProbeInstrument] = [],
     ):
         """Instantiate a stage sight associated with given stage.
 
         :param stage: The stage instrument to be associated with the stage sight
         """
         # Add StageSight item
-        self.stage_sight = StageSight(stage, camera)
+        self.stage_sight = StageSight(stage, camera, probes)
         self.stage_sight.setZValue(1)
         self.__scene.addItem(self.stage_sight)
 

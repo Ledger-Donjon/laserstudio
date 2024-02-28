@@ -41,7 +41,11 @@ class LaserStudio(QMainWindow):
 
         # Add StageSight if there is a Stage instrument or a camera
         if self.instruments.stage is not None or self.instruments.camera is not None:
-            self.viewer.add_stage_sight(self.instruments.stage, self.instruments.camera)
+            self.viewer.add_stage_sight(
+                self.instruments.stage,
+                self.instruments.camera,
+                self.instruments.probes + self.instruments.lasers,
+            )
             self.viewer.reset_camera()
 
         # Create group of buttons for Viewer mode selection

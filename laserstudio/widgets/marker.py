@@ -3,7 +3,14 @@ from PyQt6.QtWidgets import (
     QGraphicsEllipseItem,
     QGraphicsLineItem,
 )
-from PyQt6.QtGui import QPen, QColor
+from PyQt6.QtGui import QPen, QColor, QColorConstants
+from ..instruments.probe import ProbeInstrument
+from ..instruments.laser import LaserInstrument
+from PyQt6.QtCore import Qt, QPointF
+from typing import Union, TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from .stagesight import StageSight
 
 
 class Marker(QGraphicsItemGroup):
@@ -15,7 +22,7 @@ class Marker(QGraphicsItemGroup):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.__size = 10.0
-        self.__color = QColor(255, 0, 0)
+        self.__color = QColorConstants.Red
         item = self.__ellipse = QGraphicsEllipseItem()
         pen = self.__pen = QPen(self.__color)
         pen.setCosmetic(True)
@@ -58,14 +65,40 @@ class Marker(QGraphicsItemGroup):
         return self.__color
 
     @color.setter
-    def color(self, value):
+    def color(self, value: Union[QColor, Qt.GlobalColor, int]):
         """
         Set the color of the laser sight.
         :param value: New color, as QColor.
         """
-        assert isinstance(value, QColor)
         self.__color = value
         self.__pen.setColor(value)
         self.__ellipse.setPen(self.__pen)
         self.__line1.setPen(self.__pen)
         self.__line2.setPen(self.__pen)
+
+
+class ProbeMarker(Marker):
+    def __init__(self, probe: ProbeInstrument, parent: Optional["StageSight"] = None):
+        super().__init__(parent)
+        self.stage_sight = parent
+        self.probe = probe
+        probe.fixed_pos_changed.connect(self.update_pos)
+        self.color = (
+            QColorConstants.Red
+            if isinstance(self.probe, LaserInstrument)
+            else QColorConstants.Blue
+        )
+        self.update_pos()
+
+    def update_pos(self):
+        """Update position and color."""
+        if (pos := self.probe.fixed_pos) is not None:
+            if self.stage_sight is not None:
+                self.setPos(
+                    self.stage_sight.mapFromItem(self.stage_sight.image_group, *pos)
+                )
+            else:
+                self.setPos(QPointF(*pos))
+            self.setVisible(True)
+        else:
+            self.setVisible(False)
