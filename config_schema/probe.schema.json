@@ -1,0 +1,20 @@
+{
+    "$id": "probe.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Probe",
+    "type": "object",
+    "description": "A Probe device.",
+    "properties": {
+        "enable": {
+            "type": "boolean",
+            "description": "If the device is enabled or not."
+        },
+        "fixed_pos": {
+            "type": "array",
+            "description": "The index of the PDM device",
+            "items": {
+                "type": "integer"
+            }
+        }
+    }
+}

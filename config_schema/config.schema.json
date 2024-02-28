@@ -11,9 +11,15 @@
             "$ref": "stage.schema.json"
         },
         "lasers": {
-            "type":"array",
+            "type": "array",
             "items": {
                 "$ref": "laser.schema.json"
+            }
+        },
+        "probes": {
+            "type": "array",
+            "items": {
+                "$ref": "probe.schema.json"
             }
         }
     }

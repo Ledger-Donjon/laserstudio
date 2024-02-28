@@ -4,6 +4,7 @@
     "title": "Laser",
     "type": "object",
     "description": "A Laser device.",
+    "$ref": "probe.schema.json",
     "properties": {
         "enable": {
             "type": "boolean",
@@ -11,8 +12,10 @@
         },
         "num": {
             "type": "integer",
-            "description": "The number"
+            "description": "The index of the PDM device"
         }
     },
-    "required":["num"]
+    "required": [
+        "num"
+    ]
 }

@@ -13,5 +13,7 @@
             "description": "Default API command."
         }
     },
-    "required": ["api_command"]
+    "required": [
+        "api_command"
+    ]
 }
