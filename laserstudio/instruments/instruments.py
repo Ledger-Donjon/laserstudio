@@ -5,6 +5,7 @@ from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .laser import LaserInstrument
 from .pdm import PDMInstrument
+from .probe import ProbeInstrument
 from typing import Optional, cast
 import logging
 
@@ -72,6 +73,15 @@ class Instruments:
                     logging.getLogger("laserstudio").warning(
                         f"Laser is enabled but device could not be created: {str(e)}... Skipping."
                     )
+
+        # Probes
+        self.probes: list[ProbeInstrument] = []
+        probes_config = cast(list[dict], config.get("probes", None))
+        if probes_config is not None:
+            for probe_config in probes_config:
+                if not probe_config.get("enable", False):
+                    continue
+                self.probes.append(ProbeInstrument(config=probe_config))
 
     def go_next(self):
         pass

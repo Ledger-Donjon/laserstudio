@@ -19,14 +19,16 @@ from PyQt6.QtGui import (
     QPixmap,
     QTransform,
     QPolygonF,
+    QColorConstants,
 )
 from enum import Enum, auto
 
 from .marker import Marker
 from ..instruments.instruments import CameraInstrument
+from ..instruments.instruments import ProbeInstrument, LaserInstrument
 from ..instruments.instruments import Instruments
 from .stagesight import StageSight, StageSightViewer
-from typing import cast, List, Optional, Tuple, TYPE_CHECKING
+from typing import cast, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..laserstudio import LaserStudio
@@ -35,11 +37,10 @@ if TYPE_CHECKING:
 class PagesID(int, Enum):
     INTRO = auto()
 
-    ALIGN_1 = auto()
-    ALIGN_2 = auto()
-    ALIGN_3 = auto()
-    ALIGN_4 = auto()
-    ALIGN_RESULT = auto()
+    ALIGN = auto()
+    ALIGN_RESULT = ALIGN + 4
+
+    PROBE_POSITION = ALIGN
 
     FINAL = -1
 
@@ -105,11 +106,20 @@ class CameraPicker(StageSightViewer):
 
 class CameraWizardPage(QWizardPage):
     def wizard(self) -> "CameraWizard":
-        return cast("CameraWizard", super().wizard())
+        return cast(CameraWizard, super().wizard())
 
 
-class IntroductionPage(CameraWizardPage):
-    def __init__(self, parent: "CameraWizard"):
+class ProbePositionIntroductionPage(CameraWizardPage):
+    def __init__(self, parent: "ProbesPositionWizard"):
+        super().__init__(parent)
+        self.setTitle("Probe position wizard")
+
+    def nextId(self) -> int:
+        return PagesID.PROBE_POSITION
+
+
+class DistortionIntroductionPage(CameraWizardPage):
+    def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent)
         self.setTitle("Camera distortion wizard")
 
@@ -122,7 +132,7 @@ class CameraPresentationPage(CameraWizardPage):
     Wizard page where the user gets the camera image.
     """
 
-    def __init__(self, parent: "CameraWizard"):
+    def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent)
         camera = parent.instruments.camera
         assert camera is not None
@@ -159,7 +169,7 @@ class CameraPositionPage(CameraPresentationPage):
         self.viewer.clicked_point_marker.setVisible(xy is not None)
         self.completeChanged.emit()
 
-    def __init__(self, parent: "CameraWizard"):
+    def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent=parent)
         # The coordinates of the point within the camera
         self.clicked_point: Optional[QPointF] = None
@@ -178,7 +188,7 @@ class CameraAlignmentPage(CameraPositionPage):
     def initializePage(self) -> None:
         super(CameraAlignmentPage, self).initializePage()
 
-    def __init__(self, step: int, parent: "CameraWizard"):
+    def __init__(self, step: int, parent: "CameraDistortionWizard"):
         super().__init__(parent=parent)
 
         # The information stored when the user clicks on the image
@@ -225,7 +235,7 @@ class CameraAlignmentPage(CameraPositionPage):
             self.stage_point = -QPointF(*s.position.xy)
 
 
-class DistortedImagePresentation(CameraPresentationPage):
+class DistortedImagePresentationPage(CameraPresentationPage):
     """
     Wizard page where the user can see the result of the distortion.
     """
@@ -270,7 +280,7 @@ class DistortedImagePresentation(CameraPresentationPage):
             c.correction_matrix = self.transform
         # self.wizard().laser_studio.update_stage_sight()
 
-    def __init__(self, parent: "CameraWizard"):
+    def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent=parent)
         layout = self.layout()
         assert layout is not None
@@ -285,6 +295,32 @@ class DistortedImagePresentation(CameraPresentationPage):
         self.setTitle("Camera Alignment Result")
 
 
+class ProbePositionPage(CameraPositionPage):
+    """
+    Wizard page where the user get the camera image and can click
+    on it to indicate the position of a probe/spot relatively to the
+    camera image
+    """
+
+    def __init__(
+        self, probe_index: int, probe: ProbeInstrument, parent: "ProbesPositionWizard"
+    ):
+        super().__init__(parent=parent)
+        if isinstance(probe, LaserInstrument):
+            what = "Laser Spot"
+            self.viewer.clicked_point_marker.color = QColorConstants.Red
+        else:
+            what = "Probe"
+            self.viewer.clicked_point_marker.color = QColorConstants.Blue
+        self.setTitle(f"{what} {probe_index+1} positioning")
+        self.setSubTitle(
+            f"Indicate in the image the position of the {what}."
+            f" This operation will permit {QCoreApplication.applicationName()} to move accordingly to"
+            " indicated point instead of the center of the image"
+        )
+        self.probe = probe
+
+
 class CameraWizard(QWizard):
     def __init__(
         self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
@@ -294,18 +330,52 @@ class CameraWizard(QWizard):
         self.instruments = instruments
         self.laser_studio = laser_studio
 
-        # Create the IntroductionPage page
-        self.setPage(PagesID.INTRO, IntroductionPage(parent=self))
+
+class ProbesPositionWizard(CameraWizard):
+    def __init__(
+        self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
+    ):
+        super().__init__(
+            instruments=instruments, laser_studio=laser_studio, parent=parent
+        )
+
+        # Create the ProbePositionIntroductionPage page
+        self.setPage(PagesID.INTRO, ProbePositionIntroductionPage(parent=self))
+
+        # Create pages for probe position
+        page = 0
+        for probe in enumerate(laser_studio.instruments.probes):
+            self.setPage(
+                PagesID.PROBE_POSITION + page,
+                ProbePositionPage(*probe, parent=self),
+            )
+            page += 1
+        for laser in enumerate(laser_studio.instruments.lasers):
+            self.setPage(
+                PagesID.PROBE_POSITION + page,
+                ProbePositionPage(*laser, parent=self),
+            )
+            page += 1
+
+
+class CameraDistortionWizard(CameraWizard):
+    def __init__(
+        self, instruments: Instruments, laser_studio: "LaserStudio", parent=None
+    ):
+        super().__init__(
+            instruments=instruments, laser_studio=laser_studio, parent=parent
+        )
+
+        # Create the DistortionIntroductionPage page
+        self.setPage(PagesID.INTRO, DistortionIntroductionPage(parent=self))
 
         # Creates four alignment pages
-        self.camera_pages: List[CameraAlignmentPage] = []
+        self.camera_pages: list[CameraAlignmentPage] = []
         for step in range(4):
             p = CameraAlignmentPage(step=step + 1, parent=self)
             self.camera_pages.append(p)
-            self.setPage(PagesID.ALIGN_1 + step, p)
-        self.setPage(
-            PagesID.ALIGN_RESULT.value, DistortedImagePresentation(parent=self)
-        )
+            self.setPage(PagesID.ALIGN + step, p)
+        self.setPage(PagesID.ALIGN_RESULT, DistortedImagePresentationPage(parent=self))
 
     @property
     def transform(self) -> Optional[QTransform]:

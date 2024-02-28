@@ -4,7 +4,7 @@ from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton
 from ...util import resource_path
 from ..stagesight import StageSightViewer, StageSight
-from ..camerawizard import CameraWizard
+from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -43,19 +43,38 @@ class CameraToolbar(QToolBar):
         )
         self.addWidget(w)
 
-        laser_studio.camera_wizard = CameraWizard(
+        laser_studio.camera_distortion_wizard = CameraDistortionWizard(
             laser_studio.instruments, laser_studio, laser_studio
         )
         w = QPushButton(self)
         w.setText("Distortion Wizard")
         w.clicked.connect(
             lambda: (
-                laser_studio.camera_wizard.show()
-                if laser_studio.camera_wizard is not None
+                laser_studio.camera_distortion_wizard.show()
+                if laser_studio.camera_distortion_wizard is not None
                 else ()
             )
         )
         self.addWidget(w)
+
+        if (
+            len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
+            > 0
+        ):
+
+            laser_studio.camera_distortion_wizard = ProbesPositionWizard(
+                laser_studio.instruments, laser_studio, laser_studio
+            )
+            w = QPushButton(self)
+            w.setText("Probes Position Wizard")
+            w.clicked.connect(
+                lambda: (
+                    laser_studio.camera_distortion_wizard.show()
+                    if laser_studio.camera_distortion_wizard is not None
+                    else ()
+                )
+            )
+            self.addWidget(w)
 
         # Second representation of the camera image
         stage_sight = StageSight(None, self.camera)

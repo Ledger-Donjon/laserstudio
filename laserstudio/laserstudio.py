@@ -20,7 +20,7 @@ import yaml
 from .restserver.server import RestProxy
 
 if TYPE_CHECKING:
-    from .widgets.camerawizard import CameraWizard
+    from .widgets.camerawizards import CameraDistortionWizard, ProbesPositionWizard
 
 
 class LaserStudio(QMainWindow):
@@ -77,7 +77,8 @@ class LaserStudio(QMainWindow):
 
         # Toolbar: Camera Image control
         if self.instruments.camera is not None:
-            self.camera_wizard: Optional[CameraWizard] = None
+            self.camera_distortion_wizard: Optional[CameraDistortionWizard] = None
+            self.probes_distortion_wizard: Optional[ProbesPositionWizard] = None
             toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
