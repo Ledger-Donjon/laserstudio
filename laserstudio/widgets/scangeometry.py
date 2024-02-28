@@ -141,7 +141,7 @@ class ScanGeometry(QGraphicsItemGroup):
             return {"polygon": res}
         elif isinstance(geometry, MultiPolygon):
             res = []
-            for poly in geometry:
+            for poly in geometry.geoms:
                 res.append(__class__.shapely_to_yaml(poly))
             return {"multipolygon": res}
         elif isinstance(geometry, GeometryCollection):
