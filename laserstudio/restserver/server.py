@@ -27,7 +27,7 @@ class RestProxy(QObject):
 
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__()
-        self.laser_studio = laser_studio
+        self.laser_studio: LaserStudio = laser_studio
         self.rest_object = RestServer(self)
         self._thread = RestThread()
         self.rest_object.moveToThread(self._thread)

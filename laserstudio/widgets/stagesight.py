@@ -114,6 +114,7 @@ class StageSight(QGraphicsItemGroup):
 
     @property
     def pause_image_update(self) -> bool:
+        """Permits to pause the image update when receiving the 'new_image' signal from the camera."""
         return self._pause_update
 
     @pause_image_update.setter
