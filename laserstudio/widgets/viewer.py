@@ -108,7 +108,7 @@ class Viewer(QGraphicsView):
             return
         try:
             self.stage_sight.position_changed.disconnect()
-        except:
+        except Exception:
             pass
 
         if value:
