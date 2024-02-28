@@ -191,6 +191,7 @@ class ScanPathGenerator(RandomPointGenerator):
 
         :param value: The new geometry. Any shapely geometry.
         """
+        assert RandomPointGenerator.geometry.fset is not None
         RandomPointGenerator.geometry.fset(self, value)
         self.__reset()
 

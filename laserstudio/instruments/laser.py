@@ -23,7 +23,8 @@ class LaserInstrument(ProbeInstrument):
     @yaml.setter
     def yaml(self, yaml: dict):
         """Import settings from a dict."""
-        super().yaml = yaml
+        assert ProbeInstrument.yaml.fset is not None
+        ProbeInstrument.yaml.fset(self, yaml)
         self.sweep_max = yaml.get("sweep_max", self.sweep_max)
         self.sweep_min = yaml.get("sweep_min", self.sweep_min)
         self.sweep_freq = yaml.get("sweep_freq", self.sweep_freq)

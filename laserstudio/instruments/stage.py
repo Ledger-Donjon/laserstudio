@@ -6,6 +6,18 @@ from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
 from typing import Optional
+from enum import Enum, auto
+
+
+class MoveFor(object):
+    class Type(Enum):
+        CAMERA_CENTER = auto()
+        LASER = auto()
+        PROBE = auto()
+
+    def __init__(self, type: Type, index: int = 0):
+        self.type = type
+        self.index = index
 
 
 class StageInstrument(QObject):
@@ -79,6 +91,9 @@ class StageInstrument(QObject):
 
         if self.stage is not None:
             self.stage.wait_routine = lambda: QCoreApplication.processEvents()
+
+        # Indicate
+        self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
     @property
     def position(self) -> Vector:

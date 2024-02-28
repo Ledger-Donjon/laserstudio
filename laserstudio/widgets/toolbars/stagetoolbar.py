@@ -4,12 +4,11 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
-    QHBoxLayout,
-    QWidget,
     QComboBox,
 )
 from ...util import resource_path
 from ..keyboardbox import KeyboardBox
+from ...instruments.stage import MoveFor
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -55,3 +54,19 @@ class StageToolbar(QToolBar):
         # Keyboard box
         w = KeyboardBox(self.stage)
         self.addWidget(w)
+
+        # Move for
+        self.move_for_selector = box = QComboBox()
+        box.addItem("Camera", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
+        for i in range(len(laser_studio.instruments.lasers)):
+            box.addItem(f"Laser {i+1}", userData=MoveFor(MoveFor.Type.LASER, i))
+        for i in range(len(laser_studio.instruments.probes)):
+            box.addItem(f"Probe {i+1}", userData=MoveFor(MoveFor.Type.PROBE, i))
+        box.activated.connect(self.move_for_selection)
+        self.addWidget(box)
+
+    def move_for_selection(self, index: int):
+        move_for = self.move_for_selector.itemData(index, Qt.ItemDataRole.UserRole)
+        if not isinstance(move_for, MoveFor):
+            return
+        self.stage.move_for = move_for

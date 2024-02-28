@@ -19,10 +19,17 @@ from PyQt6.QtGui import (
 )
 from enum import Enum, auto
 from typing import Optional
-from .stagesight import StageSight, StageInstrument, CameraInstrument, ProbeInstrument
+from .stagesight import (
+    StageSight,
+    StageInstrument,
+    CameraInstrument,
+    ProbeInstrument,
+    LaserInstrument,
+)
 import logging
 from .scangeometry import ScanGeometry
 import numpy as np
+from ..instruments.stage import MoveFor
 
 
 class Viewer(QGraphicsView):
@@ -193,6 +200,7 @@ class Viewer(QGraphicsView):
         if self.scan_geometry:
             next_point = self.scan_geometry.next_point()
             if next_point is not None and self.stage_sight is not None:
+                next_point = self.point_for_desired_move(next_point)
                 self.stage_sight.move_to(QPointF(*next_point))
 
     def __update_highlight_color(self, has_shift: Optional[bool] = None):
@@ -301,7 +309,8 @@ class Viewer(QGraphicsView):
             scene_pos = self.mapToScene(event.pos())
 
             if self.mode == Viewer.Mode.STAGE and self.stage_sight is not None:
-                self.stage_sight.move_to(scene_pos)
+                scene_pos = self.point_for_desired_move((scene_pos.x(), scene_pos.y()))
+                self.stage_sight.move_to(QPointF(*scene_pos))
                 event.accept()
                 return
 
@@ -485,3 +494,61 @@ class Viewer(QGraphicsView):
         scene_y = sr.bottom() - (doc_y - doc_top) * scale_y
 
         return QPointF(scene_x, scene_y), 1 / scale_x
+
+    def point_for_desired_move(self, point: tuple[float, float]) -> tuple[float, float]:
+        """
+        Gives the actual stage's destination according to desired element
+          to point at given position, indicated by
+          self.instruments.stage.move_for.
+
+        :param point: the desired position.
+        :return: the stage's position to apply
+        """
+        stage_sight = self.stage_sight
+        if stage_sight is None or stage_sight.stage is None:
+            # This should not happen...
+            return point
+        elif stage_sight.stage.move_for.type == MoveFor.Type.CAMERA_CENTER:
+            # Camera's center is always placed at Stage's coordinates.
+            return point
+        else:
+            if stage_sight.stage.move_for.type == MoveFor.Type.PROBE:
+                marker = stage_sight.marker(
+                    ProbeInstrument, stage_sight.stage.move_for.index
+                )
+            elif stage_sight.stage.move_for.type == MoveFor.Type.LASER:
+                marker = stage_sight.marker(
+                    LaserInstrument, stage_sight.stage.move_for.index
+                )
+            else:
+                return point
+            if marker is None:
+                return point
+
+            # Save camera positioning and zoom
+            old_cam_pos_zoom = self.cam_pos_zoom
+
+            # Force a refresh of main stage position
+            stage_pos = QPointF(*stage_sight.stage.position.xy.data)
+            # Force viewer to be placed at this position
+            self.cam_pos_zoom = stage_pos, old_cam_pos_zoom[1]
+
+            # Get marker's position in scene, considering the possible distortion
+            # marker_pos_stage_sight = stage_sight.mapFromItem(
+            #    stage_sight.image_group, QPointF(*probe.fixed_pos)
+            # )
+            probe_position = stage_sight.mapToScene(marker.pos())
+            probe_position = probe_position.x(), probe_position.y()
+
+            # Retrieve again the camera position from viewer
+            camera_position = self.cam_pos_zoom[0]
+
+            # Compute the point relatively
+            point = (
+                point[0] - probe_position[0] + camera_position.x(),
+                point[1] - probe_position[1] + camera_position.y(),
+            )
+
+            # Restore the camera position and zoom
+            self.cam_pos_zoom = old_cam_pos_zoom
+        return point

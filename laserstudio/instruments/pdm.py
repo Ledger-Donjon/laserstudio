@@ -12,7 +12,7 @@ class PDMInstrument(LaserInstrument):
         """
         :param config: YAML configuration object
         """
-        super().__init__(config)
+        super().__init__(config=config)
 
         device_type = config.get("type")
         dev = config.get("dev")

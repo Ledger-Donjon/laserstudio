@@ -19,7 +19,8 @@ from PyQt6.QtCore import (
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
-from typing import Optional
+from ..instruments.laser import LaserInstrument
+from typing import Optional, Union
 import logging
 from .marker import ProbeMarker
 
@@ -291,3 +292,23 @@ class StageSight(QGraphicsItemGroup):
             dx, dy = mapped_origin.x(), mapped_origin.y()
             self.image_group.setPos(-dx, -dy)
         self.__update_size(self.size)
+
+    def marker(
+        self,
+        marker_type: Union[type[LaserInstrument], type[ProbeInstrument]],
+        index: int,
+    ) -> Optional[ProbeMarker]:
+        if marker_type not in [LaserInstrument, ProbeInstrument]:
+            return None
+        index += 1
+        # Go through all markers, count for each matching types
+        for marker in self._probe_markers:
+            if LaserInstrument == marker_type:
+                if isinstance(marker.probe, LaserInstrument):
+                    index -= 1
+            elif ProbeInstrument == marker_type:
+                if type(marker.probe) == ProbeInstrument:
+                    index -= 1
+            if index == 0:
+                return marker
+        return None
