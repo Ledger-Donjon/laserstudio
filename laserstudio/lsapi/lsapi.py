@@ -7,33 +7,6 @@ from PIL import Image
 import io
 
 
-class GoNextResponse:
-    """
-    Contains the new information about the state of the equipments after moving to the next scanning
-    point.
-    - The main stage's position
-    - The lasers' current percentages
-    - The probe's destination point
-    """
-
-    def __init__(
-        self,
-        pos: Optional[Tuple[float, float, float]] = None,
-        laser_current_percentages=None,
-        destination_point=None,
-    ):
-        """
-        :param pos: Stage position. Must have 3 elements.
-        :param laser_current_percentages: The current percentage applied to the laser for next position.
-        :param destination_point: The position targeted for the next point.
-        """
-        if laser_current_percentages is None:
-            laser_current_percentages = []
-        self.pos = pos
-        self.laser_current_percentages = laser_current_percentages
-        self.destination_point = destination_point
-
-
 class LSAPI:
     # Default server and client port that is used by the API.
     PORT = 4444
@@ -45,6 +18,8 @@ class LSAPI:
 
     def __init__(self, host="localhost", port: Optional[int] = None):
         """
+        Creates a new REST session to Laser Studio, through a TCP connection.
+
         :param host: Network host. Default is localhost.
         :param port: Network port. Default is 4444.
         """
@@ -80,9 +55,9 @@ class LSAPI:
             else:
                 return self.session.post(url, json=params)
 
-    def go_next(self) -> GoNextResponse:
+    def go_next(self) -> dict:
         """Jump to next scan position."""
-        return GoNextResponse(**self.send("motion/go_next", {}).json())
+        return self.send("motion/go_next", {}).json()
 
     def autofocus(self) -> List[float]:
         """
