@@ -151,6 +151,6 @@ class LaserStudio(QMainWindow):
             probe.yaml = data
 
         # Lasers
-        lasers = data.get("laser", [])
+        lasers = data.get("lasers", [])
         for data, laser in zip(lasers, self.instruments.lasers):
             laser.yaml = data

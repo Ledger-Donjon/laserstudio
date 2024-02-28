@@ -117,3 +117,12 @@ class LaserToolbar(QToolBar):
         w = QWidget()
         w.setLayout(grid)
         self.addWidget(w)
+
+        self.reload_parameters()
+
+    def reload_parameters(self):
+        self.pulse_power_input.setText(f"{self.laser.current_percentage}")
+        self.sweep_min_input.setText(f"{self.laser.sweep_min}")
+        self.sweep_max_input.setText(f"{self.laser.sweep_max}")
+        self.sweep_freq_input.setText(f"{self.laser.sweep_freq}")
+        self.offset_current_input.setText(f"{self.laser.offset_current}")
