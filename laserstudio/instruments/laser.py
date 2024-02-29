@@ -1,4 +1,5 @@
 from .probe import ProbeInstrument
+from random import uniform
 
 
 class LaserInstrument(ProbeInstrument):
@@ -10,6 +11,7 @@ class LaserInstrument(ProbeInstrument):
         self.sweep_max = 100.0
         self.sweep_min = 0.0
         self.sweep_freq = 100
+        self._sweep_iteration = 0
 
     @property
     def yaml(self) -> dict:
@@ -46,3 +48,8 @@ class LaserInstrument(ProbeInstrument):
 
     @offset_current.setter
     def offset_current(self, value: float): ...
+
+    def go_next(self):
+        self._sweep_iteration += 1
+        if self._sweep_iteration % self.sweep_freq == 0:
+            self.current_percentage = uniform(self.sweep_min, self.sweep_max)

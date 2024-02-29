@@ -90,4 +90,5 @@ class Instruments:
                 self.probes.append(ProbeInstrument(config=probe_config))
 
     def go_next(self):
-        pass
+        for laser in self.lasers:
+            laser.go_next()
