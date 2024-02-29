@@ -536,9 +536,6 @@ class Viewer(QGraphicsView):
             self.cam_pos_zoom = stage_pos, old_cam_pos_zoom[1]
 
             # Get marker's position in scene, considering the possible distortion
-            # marker_pos_stage_sight = stage_sight.mapFromItem(
-            #    stage_sight.image_group, QPointF(*probe.fixed_pos)
-            # )
             probe_position = stage_sight.mapToScene(marker.pos())
             probe_position = probe_position.x(), probe_position.y()
 
