@@ -1,7 +1,7 @@
 import os
 from PyQt6.QtGui import QTransform
 
-__dirname = os.path.dirname(os.path.realpath(__file__))
+__dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def resource_path(path: str) -> str:
