@@ -2,7 +2,7 @@ from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
-from ..util import yaml_to_qtransform, qtransform_to_yaml
+from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
 class CameraInstrument(QObject):

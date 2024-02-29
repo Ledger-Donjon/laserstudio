@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel
-from ...util import resource_path
+from ...utils.util import resource_path
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio

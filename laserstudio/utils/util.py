@@ -25,9 +25,9 @@ def qtransform_to_yaml(transform: QTransform):
     return result
 
 
-def yaml_to_qtransform(d: dict):
+def yaml_to_qtransform(dict: dict):
     items = []
     for i in range(1, 4):
         for j in range(1, 4):
-            items.append(float(d[f"m{i}{j}"]))
+            items.append(float(dict[f"m{i}{j}"]))
     return QTransform(*items)

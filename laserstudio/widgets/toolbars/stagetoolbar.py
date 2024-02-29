@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QComboBox,
 )
-from ...util import resource_path
+from ...utils.util import resource_path
 from ..keyboardbox import KeyboardBox
 from ...instruments.stage import MoveFor
 

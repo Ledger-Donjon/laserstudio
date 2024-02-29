@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
-from ...util import resource_path
+from ...utils.util import resource_path
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio

@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap, QDoubleValidator, QIntValidator
 
 from laserstudio.instruments.laser import LaserInstrument
-from ...util import resource_path
+from ...utils.util import resource_path
 from typing import TYPE_CHECKING
 from ..return_line_edit import ReturnLineEdit
 

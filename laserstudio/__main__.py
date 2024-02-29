@@ -5,7 +5,7 @@ from PyQt6.QtGui import QPalette, QColor, QIcon
 import sys
 import yaml
 import os.path
-from .util import resource_path
+from .utils.util import resource_path
 import logging
 import argparse
 

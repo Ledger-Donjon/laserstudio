@@ -9,7 +9,7 @@ import logging
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from typing import Optional, Union
 from .scanpath import ScanPath
-from ..scanning import ScanPathGenerator, EmptyGeometryError
+from ..utils.scanning import ScanPathGenerator, EmptyGeometryError
 
 
 class ScanGeometry(QGraphicsItemGroup):
