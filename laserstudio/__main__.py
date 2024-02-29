@@ -2,6 +2,7 @@
 from .laserstudio import LaserStudio
 from PyQt6.QtWidgets import QApplication, QStyleFactory
 from PyQt6.QtGui import QPalette, QColor, QIcon
+from PyQt6.QtCore import QLocale
 import sys
 import yaml
 import os.path
@@ -61,6 +62,8 @@ if __name__ == "__main__":
     palette.setColor(QPalette.ColorRole.Highlight, QColor(40, 120, 233))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
+
+    QLocale.setDefault(QLocale.c())
 
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())
