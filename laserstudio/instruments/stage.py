@@ -1,12 +1,15 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QCoreApplication
+from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from enum import Enum, auto
+
+if TYPE_CHECKING:
+    from .instruments import Instrument
 
 
 class MoveFor(object):
@@ -20,7 +23,7 @@ class MoveFor(object):
         self.index = index
 
 
-class StageInstrument(QObject):
+class StageInstrument(Instrument):
     """Class to regroup stage instrument operations"""
 
     # Signal emitted when a new position is fetched

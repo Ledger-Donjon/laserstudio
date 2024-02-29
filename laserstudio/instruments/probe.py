@@ -1,8 +1,11 @@
 from PyQt6.QtCore import QObject, pyqtSignal
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .instruments import Instrument
 
 
-class ProbeInstrument(QObject):
+class ProbeInstrument(Instrument):
     def __init__(self, config: dict):
         super().__init__()
         # Set manual position relative to the center position
