@@ -110,7 +110,7 @@ class StageSight(QGraphicsItemGroup):
         self._probe_markers: list[ProbeMarker] = []
         for probe in probes:
             marker = ProbeMarker(probe, self)
-            marker.addToGroup(marker)
+            self.addToGroup(marker)
             self._probe_markers.append(marker)
 
     @property
