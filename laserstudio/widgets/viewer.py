@@ -120,7 +120,9 @@ class Viewer(QGraphicsView):
 
         if value:
             self.stage_sight.position_changed.connect(
-                lambda pos: self.__setattr__("cam_pos_zoom", (pos, self.zoom))
+                lambda pos: self.__setattr__(
+                    "cam_pos_zoom", (self.point_for_desired_move(pos), self.zoom)
+                )
             )
 
     def reset_camera(self):
