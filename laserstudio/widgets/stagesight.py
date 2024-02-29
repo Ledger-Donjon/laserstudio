@@ -262,11 +262,17 @@ class StageSight(QGraphicsItemGroup):
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 
-    def setPos(self, pos: QPointF):
+    def setPos(self, *args, **kwargs):
         """To make sure that the position of the stagesight is signaled
         at each change we override the setPos function.
 
         :param value: the final position of the widget"""
+        if len(args) >= 1 and isinstance(pos := args[0], QPointF):
+            pass
+        elif isinstance(pos := kwargs.get("pos", None), QPointF):
+            pass
+        else:
+            raise TypeError("Only QPointF are allowed")
         super(QGraphicsItemGroup, self).setPos(pos)
         self.position_changed.emit(pos)
 
