@@ -61,6 +61,6 @@ class ZoomToolbar(QToolBar):
             QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid-24.png"))
         )
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(laser_studio.viewer.follow_stagesight)
+        w.toggled.connect(laser_studio.viewer.follow_stage_sight)
         w.setChecked(True)
         self.addWidget(w)

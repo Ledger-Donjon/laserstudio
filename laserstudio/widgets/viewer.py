@@ -82,6 +82,7 @@ class Viewer(QGraphicsView):
 
         # By default, there is no StageSight
         self.stage_sight: Optional[StageSight] = None
+        self._follow_stage_sight = False
 
         # Scanning geometry object and its representative item in the view.
         # Also includes the scan path
@@ -110,13 +111,13 @@ class Viewer(QGraphicsView):
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
-    def follow_stagesight(self, value: bool):
+    def follow_stage_sight(self, value: bool):
+        """Triggers an update of the camera position when the stage sight change its own position."""
         if self.stage_sight is None:
             return
-        try:
+        if self._follow_stage_sight:
             self.stage_sight.position_changed.disconnect()
-        except Exception:
-            pass
+            self._follow_stage_sight = False
 
         if value:
             self.stage_sight.position_changed.connect(
@@ -124,6 +125,7 @@ class Viewer(QGraphicsView):
                     "cam_pos_zoom", (self.point_for_desired_move(pos), self.zoom)
                 )
             )
+            self._follow_stage_sight = True
 
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
