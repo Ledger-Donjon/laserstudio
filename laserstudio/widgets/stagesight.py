@@ -42,7 +42,7 @@ class StageSightObject(QObject):
     inheriting QGraphicsItemGroup, cannot inherit from QObject."""
 
     # Signal emitted when a new position is set
-    position_changed = pyqtSignal(QPointF, name="positionChanged")
+    position_changed = pyqtSignal(QPointF)
 
     def __init__(self, parent=None):
         super().__init__(parent)
