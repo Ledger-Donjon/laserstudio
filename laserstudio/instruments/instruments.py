@@ -7,13 +7,7 @@ from .laser import LaserInstrument
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
 from typing import Optional, cast, Any
-from PyQt6.QtCore import QObject, pyqtSignal
 import logging
-
-
-class Instrument(QObject):
-    # Signal emitted when the instrument has a parameter which changed in another way than UI interface
-    parameter_changed = pyqtSignal(str, Any)
 
 
 class Instruments:

@@ -47,7 +47,7 @@ class Viewer(QGraphicsView):
         PIN = auto()
 
     # Signal emitted when a new mode is set
-    mode_changed = pyqtSignal(int, name="modeChanged")
+    mode_changed = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)

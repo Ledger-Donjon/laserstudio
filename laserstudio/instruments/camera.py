@@ -1,19 +1,16 @@
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
-from typing import Optional, Literal, cast, TYPE_CHECKING
+from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
-
-
-if TYPE_CHECKING:
-    from .instruments import Instrument
+from .instrument import Instrument
 
 
 class CameraInstrument(Instrument):
     """Class to regroup camera instrument operations"""
 
     # Signal emitted when a new image is created
-    new_image = pyqtSignal(QImage, name="newImage")
+    new_image = pyqtSignal(QImage)
 
     def __init__(self, config: dict):
         """

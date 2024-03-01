@@ -35,19 +35,22 @@ class LaserInstrument(ProbeInstrument):
     def on_off(self) -> bool: ...
 
     @on_off.setter
-    def on_off(self, value: bool): ...
+    def on_off(self, value: bool):
+        self.parameter_changed.emit("on_off", value)
 
     @property
     def current_percentage(self) -> float: ...
 
     @current_percentage.setter
-    def current_percentage(self, value: float): ...
+    def current_percentage(self, value: float):
+        self.parameter_changed.emit("current_percentage", value)
 
     @property
     def offset_current(self) -> float: ...
 
     @offset_current.setter
-    def offset_current(self, value: float): ...
+    def offset_current(self, value: float):
+        self.parameter_changed.emit("offset_current", value)
 
     def go_next(self):
         self._sweep_iteration += 1

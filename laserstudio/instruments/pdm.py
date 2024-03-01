@@ -64,6 +64,8 @@ class PDMInstrument(LaserInstrument):
     def on_off(self, value: bool):
         self.pdm.activation = value
         self.pdm.apply()
+        assert LaserInstrument.on_off.fset is not None
+        LaserInstrument.on_off.fset(self, value)
 
     @property
     def current_percentage(self) -> float:
@@ -73,6 +75,8 @@ class PDMInstrument(LaserInstrument):
     def current_percentage(self, value: float):
         self.pdm.current_percentage = value
         self.pdm.apply()
+        assert LaserInstrument.current_percentage.fset is not None
+        LaserInstrument.current_percentage.fset(self, value)
 
     @property
     def offset_current(self) -> float:
@@ -82,6 +86,8 @@ class PDMInstrument(LaserInstrument):
     def offset_current(self, value: float):
         self.pdm.offset_current = value
         self.pdm.apply()
+        assert LaserInstrument.offset_current.fset is not None
+        LaserInstrument.offset_current.fset(self, value)
 
     def __del__(self):
         # On deletion of the object, we force the deactivation of the PDM

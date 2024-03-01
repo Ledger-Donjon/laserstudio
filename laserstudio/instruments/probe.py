@@ -1,8 +1,6 @@
-from PyQt6.QtCore import QObject, pyqtSignal
-from typing import Optional, Any, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .instruments import Instrument
+from PyQt6.QtCore import pyqtSignal
+from typing import Optional, Any
+from .instrument import Instrument
 
 
 class ProbeInstrument(Instrument):

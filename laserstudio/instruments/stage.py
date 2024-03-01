@@ -5,11 +5,9 @@ from pystages import Corvus, CNCRouter, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 from enum import Enum, auto
-
-if TYPE_CHECKING:
-    from .instruments import Instrument
+from .instrument import Instrument
 
 
 class MoveFor(object):
@@ -27,7 +25,7 @@ class StageInstrument(Instrument):
     """Class to regroup stage instrument operations"""
 
     # Signal emitted when a new position is fetched
-    position_changed = pyqtSignal(Vector, name="positionChanged")
+    position_changed = pyqtSignal(Vector)
 
     def __init__(self, config: dict):
         """
