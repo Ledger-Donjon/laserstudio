@@ -128,6 +128,22 @@ class ScanGeometry(QGraphicsItemGroup):
         except EmptyGeometryError:
             logging.getLogger("laserstudio").error("Cannot generate a point.")
 
+    @property
+    def density(self) -> int:
+        """
+        Number of points generated randomly in the scan shape. The bigger it
+        is, the smaller average distance between consecutive points is.
+        Changing this parameter will generate a new set of points.
+        """
+        return self.scan_path_generator.density
+
+    @density.setter
+    def density(self, value: int):
+        if value < 1:
+            raise ValueError("Invalid density")
+        self.scan_path_generator.density = value
+        self.__update_scan_path()
+
     @staticmethod
     def shapely_to_yaml(
         geometry: Union[Polygon, MultiPolygon, GeometryCollection]
