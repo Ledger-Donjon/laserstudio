@@ -28,9 +28,7 @@ class StageToolbar(QToolBar):
         # Activate stage-move mode
         w = QPushButton(self)
         w.setToolTip("Move stage mode")
-        w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/directions-solid-24.png"))
-        )
+        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/directions-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         self.addWidget(w)

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
-from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel
+from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
 from ...utils.util import resource_path
 
 if TYPE_CHECKING:
@@ -30,7 +30,9 @@ class MainToolbar(QToolBar):
         # Button to unselect any viewer mode.
         w = QPushButton(self)
         w.setToolTip("Cancel any mode")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/cursor.png")))
+        w.setIcon(
+            QIcon(resource_path(":/icons/fontawesome-free/arrow-pointer-solid.svg"))
+        )
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(True)
@@ -39,12 +41,11 @@ class MainToolbar(QToolBar):
         group.setId(w, laser_studio.viewer.Mode.NONE)
 
         w = QPushButton(self)
-        w.setText("Save")
-        w.setToolTip("Save settings to settings.yaml")
-        w.clicked.connect(laser_studio.save_settings)
-        self.addWidget(w)
-        w = QPushButton(self)
-        w.setText("Restore")
-        w.setToolTip("Restore settings from settings.yaml")
-        w.clicked.connect(laser_studio.reload_settings)
+        w.setToolTip("Settings")
+        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/sliders-solid.svg")))
+        w.setIconSize(QSize(24, 24))
+        settings_menu = QMenu("Settings", self)
+        settings_menu.addAction("Save settings", laser_studio.save_settings)
+        settings_menu.addAction("Load settings", laser_studio.reload_settings)
+        w.setMenu(settings_menu)
         self.addWidget(w)

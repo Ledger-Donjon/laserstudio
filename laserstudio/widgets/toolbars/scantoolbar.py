@@ -23,7 +23,7 @@ class ScanToolbar(QToolBar):
 
         # Activate scan-zone definition mode
         w = QPushButton(self)
-        w.setToolTip("Define scanning regions")
+        w.setToolTip("Define scanning regions. Hold Shift key to remove zone.")
         w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
@@ -33,9 +33,9 @@ class ScanToolbar(QToolBar):
 
         # Go-to-next position button
         w = QPushButton(self)
-        w.setToolTip("Go Next Scan Point")
+        w.setToolTip("Go to next Scan Point")
         w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid-24.png"))
+            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid.svg"))
         )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(laser_studio.handle_go_next)

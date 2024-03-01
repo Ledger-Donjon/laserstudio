@@ -18,8 +18,15 @@ class ZoomToolbar(QToolBar):
 
         # Zoom in (*2).
         w = QPushButton(self)
-        w.setText("Z+")
         w.setToolTip("Zoom in")
+        w.setIcon(
+            QIcon(
+                resource_path(
+                    ":/icons/fontawesome-free/magnifying-glass-plus-solid.svg"
+                )
+            )
+        )
+        w.setIconSize(QSize(24, 24))
         w.clicked.connect(
             lambda: laser_studio.viewer.__setattr__(
                 "zoom", laser_studio.viewer.zoom * 2.0
@@ -29,8 +36,15 @@ class ZoomToolbar(QToolBar):
 
         # Zoom out (/2).
         w = QPushButton(self)
-        w.setText("Z-")
         w.setToolTip("Zoom out")
+        w.setIcon(
+            QIcon(
+                resource_path(
+                    ":/icons/fontawesome-free/magnifying-glass-minus-solid.svg"
+                )
+            )
+        )
+        w.setIconSize(QSize(24, 24))
         w.clicked.connect(
             lambda: laser_studio.viewer.__setattr__(
                 "zoom", laser_studio.viewer.zoom * 0.5
@@ -58,7 +72,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Follow stage")
         w.setCheckable(True)
         w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid-24.png"))
+            QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid.svg"))
         )
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(laser_studio.viewer.follow_stage_sight)

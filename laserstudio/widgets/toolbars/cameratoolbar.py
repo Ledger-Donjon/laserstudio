@@ -27,12 +27,12 @@ class CameraToolbar(QToolBar):
         w.setChecked(True)
         icon = QIcon()
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/fontawesome-free/video-solid-24.png")),
+            QPixmap(resource_path(":/icons/fontawesome-free/video-solid.svg")),
             QIcon.Mode.Normal,
             QIcon.State.On,
         )
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/fontawesome-free/video-slash-solid-24.png")),
+            QPixmap(resource_path(":/icons/fontawesome-free/video-slash-solid.svg")),
             QIcon.Mode.Normal,
             QIcon.State.Off,
         )
@@ -51,7 +51,7 @@ class CameraToolbar(QToolBar):
 
         self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
         w = QPushButton(self)
-        w.setText("Probes & Spots Position Wizard")
+        w.setText("Probes/Spots Position Wizard")
         w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
         self.addWidget(w)
         w.setHidden(
