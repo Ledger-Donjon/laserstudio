@@ -201,11 +201,15 @@ class Viewer(QGraphicsView):
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
         """
+        result = {}
         if self.scan_geometry:
             next_point = self.scan_geometry.next_point()
             if next_point is not None and self.stage_sight is not None:
+                result = {"next_point_geometry": next_point}
                 next_point = self.point_for_desired_move(next_point)
+                result["next_point_applied"] = next_point
                 self.stage_sight.move_to(QPointF(*next_point))
+        return result
 
     def __update_highlight_color(self, has_shift: Optional[bool] = None):
         """Convenience function to change the current Application Palette to modify
