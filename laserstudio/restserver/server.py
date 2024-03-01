@@ -42,7 +42,7 @@ class RestProxy(QObject):
         }
         # if response.destination_point is not None:
         #    json["destination_point"] = list(response.destination_point)
-        return QVariant(json)
+        return QVariant(response)
 
     @pyqtSlot(result="QVariant")
     def handle_autofocus(self):
@@ -213,13 +213,21 @@ motion = flask_api.namespace("motion", description="Control stage position")
 
 viewer_pos = fields.List(fields.Float, example=[42.5, 44.1])
 stage_pos = fields.List(fields.Float, example=[42.5, 44.1, -10.22])
-
+laser_gonext = motion.model(
+    "Laser GoNext parameters", {"current_percentage": fields.Float}
+)
+lasers_gonext = motion.model(
+    "Lasers GoNext parameters",
+    {
+        "lasers": fields.List(fields.Nested(laser_gonext)),
+    },
+)
 gonext_response = motion.model(
     "Go Next Response",
     {
-        "pos": stage_pos,
-        "laser_current_percentages": fields.List(fields.Float, example=[10.0, 15.5]),
-        "destination_point": viewer_pos,
+        "next_point_geometry": stage_pos,
+        "lasers": fields.List(fields.Nested(laser_gonext)),
+        "next_point_applied": viewer_pos,
     },
 )
 

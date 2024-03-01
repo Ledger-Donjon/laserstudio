@@ -52,7 +52,9 @@ class LaserInstrument(ProbeInstrument):
     def offset_current(self, value: float):
         self.parameter_changed.emit("offset_current", value)
 
-    def go_next(self):
+    def go_next(self) -> dict[str, float]:
         self._sweep_iteration += 1
         if self._sweep_iteration % self.sweep_freq == 0:
             self.current_percentage = uniform(self.sweep_min, self.sweep_max)
+            return {"current_percentage": self.current_percentage}
+        return {}

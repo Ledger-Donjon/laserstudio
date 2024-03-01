@@ -89,13 +89,15 @@ class LaserStudio(QMainWindow):
         # Instantiate proxy for REST command reception
         self.rest_proxy = RestProxy(self)
 
-    def handle_go_next(self):
+    def handle_go_next(self) -> dict:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        self.instruments.go_next()
-        self.viewer.go_next()
+        v = {}
+        v.update(self.instruments.go_next())
+        v.update(self.viewer.go_next())
+        return v
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""

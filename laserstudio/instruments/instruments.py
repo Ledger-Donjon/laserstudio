@@ -83,6 +83,8 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
-    def go_next(self):
+    def go_next(self) -> dict[str, Any]:
+        results = []
         for laser in self.lasers:
-            laser.go_next()
+            results.append(laser.go_next())
+        return {"lasers": results}
