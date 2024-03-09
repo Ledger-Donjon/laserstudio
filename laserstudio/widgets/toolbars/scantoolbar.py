@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
-from ...utils.util import resource_path
+from ...utils.util import resource_path, colored_image
 from ...widgets.return_line_edit import ReturnLineEdit
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class ScanToolbar(QToolBar):
         w = QPushButton(self)
         w.setToolTip("Go to next Scan Point")
         w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid.svg"))
+            QIcon(colored_image(":/icons/fontawesome-free/forward-step-solid.svg"))
         )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(laser_studio.handle_go_next)

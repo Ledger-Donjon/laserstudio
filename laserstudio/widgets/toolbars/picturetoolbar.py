@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
-from ...utils.util import resource_path
+from ...utils.util import resource_path, colored_image
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -33,7 +33,7 @@ class PictureToolbar(QToolBar):
         # Button to load background picture.
         w = QPushButton(self)
         w.setToolTip("Load background picture from file")
-        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/image-regular.svg")))
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(laser_studio.viewer.load_picture)
         self.addWidget(w)

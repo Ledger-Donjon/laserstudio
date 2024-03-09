@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QComboBox,
 )
-from ...utils.util import resource_path
+from ...utils.util import colored_image
 from ..keyboardbox import KeyboardBox
 from ...instruments.stage import MoveFor
 
@@ -28,7 +28,7 @@ class StageToolbar(QToolBar):
         # Activate stage-move mode
         w = QPushButton(self)
         w.setToolTip("Move stage mode")
-        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/directions-solid.svg")))
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/directions-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         self.addWidget(w)

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton
-from ...utils.util import resource_path
+from ...utils.util import resource_path, colored_image
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
 
@@ -27,12 +27,12 @@ class CameraToolbar(QToolBar):
         w.setChecked(True)
         icon = QIcon()
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/fontawesome-free/video-solid.svg")),
+            colored_image(":/icons/fontawesome-free/video-solid.svg"),
             QIcon.Mode.Normal,
             QIcon.State.On,
         )
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/fontawesome-free/video-slash-solid.svg")),
+            colored_image(":/icons/fontawesome-free/video-slash-solid.svg"),
             QIcon.Mode.Normal,
             QIcon.State.Off,
         )

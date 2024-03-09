@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton
-from ...utils.util import resource_path
+from ...utils.util import colored_image, resource_path
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -21,7 +21,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Zoom in")
         w.setIcon(
             QIcon(
-                resource_path(
+                colored_image(
                     ":/icons/fontawesome-free/magnifying-glass-plus-solid.svg"
                 )
             )
@@ -39,7 +39,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Zoom out")
         w.setIcon(
             QIcon(
-                resource_path(
+                colored_image(
                     ":/icons/fontawesome-free/magnifying-glass-minus-solid.svg"
                 )
             )
@@ -72,7 +72,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Follow stage")
         w.setCheckable(True)
         w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid.svg"))
+            QIcon(colored_image(":/icons/fontawesome-free/arrows-to-dot-solid.svg"))
         )
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(laser_studio.viewer.follow_stage_sight)

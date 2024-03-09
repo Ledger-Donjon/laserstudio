@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon, QPixmap, QColor
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
-from ...utils.util import resource_path
+from ...utils.util import resource_path, colored_image
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -30,9 +30,15 @@ class MainToolbar(QToolBar):
         # Button to unselect any viewer mode.
         w = QPushButton(self)
         w.setToolTip("Cancel any mode")
+
         w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/arrow-pointer-solid.svg"))
+            QIcon(
+                colored_image(
+                    ":/icons/fontawesome-free/arrow-pointer-solid.svg",
+                )
+            )
         )
+
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(True)
@@ -42,7 +48,7 @@ class MainToolbar(QToolBar):
 
         w = QPushButton(self)
         w.setToolTip("Settings")
-        w.setIcon(QIcon(resource_path(":/icons/fontawesome-free/sliders-solid.svg")))
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/sliders-solid.svg")))
         w.setIconSize(QSize(24, 24))
         settings_menu = QMenu("Settings", self)
         settings_menu.addAction("Save settings", laser_studio.save_settings)

@@ -2,7 +2,7 @@
 from .laserstudio import LaserStudio
 from PyQt6.QtWidgets import QApplication, QStyleFactory
 from PyQt6.QtGui import QPalette, QColor, QIcon
-from PyQt6.QtCore import QLocale
+from PyQt6.QtCore import QLocale, Qt
 import sys
 import yaml
 import os.path
@@ -43,10 +43,10 @@ if __name__ == "__main__":
     palette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 25))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(240, 240, 240))
     palette.setColor(QPalette.ColorRole.Base, QColor(40, 40, 40))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(255, 0, 0))
+    palette.setColor(QPalette.ColorRole.AlternateBase, Qt.GlobalColor.red)
     palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(255, 255, 255))
-    palette.setColor(QPalette.ColorRole.Text, QColor(200, 200, 200))
+    palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.lightGray)
     palette.setColor(QPalette.ColorRole.Button, QColor(40, 40, 40))
     palette.setColor(
         QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, QColor(30, 30, 30)
@@ -57,8 +57,8 @@ if __name__ == "__main__":
         QPalette.ColorRole.ButtonText,
         QColor(100, 100, 100),
     )
-    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
-    palette.setColor(QPalette.ColorRole.Link, QColor(255, 0, 0))
+    palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+    palette.setColor(QPalette.ColorRole.Link, Qt.GlobalColor.red)
     palette.setColor(QPalette.ColorRole.Highlight, QColor(40, 120, 233))
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
