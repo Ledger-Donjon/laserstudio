@@ -23,6 +23,7 @@ class Marker(QGraphicsItemGroup):
         super().__init__(parent)
         self.__size = 10.0
         self.__color = QColorConstants.Red
+        self.__fillcolor = QColorConstants.Transparent
         item = self.__ellipse = QGraphicsEllipseItem()
         pen = self.__pen = QPen(self.__color)
         pen.setCosmetic(True)
@@ -53,6 +54,7 @@ class Marker(QGraphicsItemGroup):
     def size(self, value):
         """
         Set the diameter of the laser sight.
+
         :param value: New diameter, in micrometers.
         """
         assert value >= 0
@@ -67,7 +69,8 @@ class Marker(QGraphicsItemGroup):
     @color.setter
     def color(self, value: Union[QColor, Qt.GlobalColor, int]):
         """
-        Set the color of the laser sight.
+        Set the color of the marker.
+
         :param value: New color, as QColor.
         """
         self.__color = value
@@ -75,6 +78,21 @@ class Marker(QGraphicsItemGroup):
         self.__ellipse.setPen(self.__pen)
         self.__line1.setPen(self.__pen)
         self.__line2.setPen(self.__pen)
+
+    @property
+    def fillcolor(self):
+        """:return: Current fill color, as QColor."""
+        return self.__fillcolor
+
+    @fillcolor.setter
+    def fillcolor(self, value: Union[QColor, Qt.GlobalColor, int]):
+        """
+        Set the fill color of the marker.
+
+        :param value: New fill color, as QColor.
+        """
+        self.__fillcolor = value
+        self.__ellipse.setBrush(value)
 
 
 class ProbeMarker(Marker):
