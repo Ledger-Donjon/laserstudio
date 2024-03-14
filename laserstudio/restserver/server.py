@@ -37,12 +37,6 @@ class RestProxy(QObject):
     @pyqtSlot(result="QVariant")
     def handle_go_next(self):
         response = self.laser_studio.handle_go_next()
-        json = {
-            # "pos": list(response.pos),
-            # "laser_current_percentages": response.laser_current_percentages,
-        }
-        # if response.destination_point is not None:
-        #    json["destination_point"] = list(response.destination_point)
         return QVariant(response)
 
     @pyqtSlot(result="QVariant")
