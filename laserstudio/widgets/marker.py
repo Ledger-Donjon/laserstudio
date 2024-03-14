@@ -15,16 +15,22 @@ if TYPE_CHECKING:
 
 class Marker(QGraphicsItemGroup):
     """
-    Item representing the a marker in the scene.
+    Item representing the a marker in a scene.
     Size can be configured depending on radius of represented object.
     """
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        color=QColorConstants.Red,
+        fillcolor=QColorConstants.Transparent,
+    ):
         super().__init__(parent)
         self.__size = 10.0
-        self.__color = QColorConstants.Red
-        self.__fillcolor = QColorConstants.Transparent
+        self.__color = color
+        self.__fillcolor = fillcolor
         item = self.__ellipse = QGraphicsEllipseItem()
+        item.setBrush(fillcolor)
         pen = self.__pen = QPen(self.__color)
         pen.setCosmetic(True)
         item.setPen(pen)
@@ -78,6 +84,7 @@ class Marker(QGraphicsItemGroup):
         self.__ellipse.setPen(self.__pen)
         self.__line1.setPen(self.__pen)
         self.__line2.setPen(self.__pen)
+        self.update()
 
     @property
     def fillcolor(self):
@@ -120,3 +127,6 @@ class ProbeMarker(Marker):
             self.setVisible(True)
         else:
             self.setVisible(False)
+
+    def setToolTip(self, value: str):
+        self.__ellipse.setToolTip(value)
