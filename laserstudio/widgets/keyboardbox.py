@@ -77,12 +77,12 @@ class KeyboardBox(QGroupBox):
 
         self._set_background_color()
 
-    def move_stage(self, direction: Direction):
+    def move_stage(self, direction: Direction, coefficient: float = 1.0):
         # Give a factor if the keyboard SHIFT or ALT are pressed.
         modifiers = QApplication.keyboardModifiers()
         if Qt.KeyboardModifier.ShiftModifier in modifiers:
             move_factor = 10.0
-        elif Qt.KeyboardModifier.AltModifier in modifiers:
+        elif Qt.KeyboardModifier.ControlModifier in modifiers:
             move_factor = 0.1
         else:
             move_factor = 1.0
@@ -103,7 +103,7 @@ class KeyboardBox(QGroupBox):
         elif direction in [Direction.down, Direction.left, Direction.zdown]:
             displacement *= -1
 
-        displacement *= move_factor
+        displacement *= move_factor * abs(coefficient)
 
         position = self.stage.position
         position[axe] += displacement
