@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QWidget,
     QApplication,
+    QDoubleSpinBox,
 )
 from PyQt6.QtCore import Qt
 from ..instruments.instruments import StageInstrument
@@ -35,6 +36,8 @@ class KeyboardBox(QGroupBox):
 
         self.stage = stage.stage
         num_axis = stage.stage.num_axis
+        self.displacement_z = 1.0
+        self.displacement_xy = 1.0
 
         vbox = QVBoxLayout()
         self.setLayout(vbox)
@@ -49,6 +52,17 @@ class KeyboardBox(QGroupBox):
             grid.addWidget(w, 2, 3)
             grid.setColumnStretch(1, 1)
             grid.setColumnStretch(3, 1)
+
+            w = QDoubleSpinBox()
+            w.setMinimum(0)
+            w.setMaximum(1000)
+            w.setDecimals(3)
+            w.setValue(self.displacement_z)
+            w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
+            w.setSuffix(" mm")
+            w.setSingleStep(0.01)
+            grid.addWidget(w, 3, 1)
+
         if num_axis > 1:
             w = QPushButton(Direction.up)
             w.pressed.connect(lambda: self.move_stage(Direction.up))
@@ -66,12 +80,19 @@ class KeyboardBox(QGroupBox):
             grid.addWidget(w, 2, 4)
             grid.setColumnStretch(4, 1)
 
+            w = QDoubleSpinBox()
+            w.setMinimum(0)
+            w.setMaximum(1000)
+            w.setDecimals(3)
+            w.setValue(self.displacement_z)
+            w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
+            w.setSuffix(" mm")
+            w.setSingleStep(0.01)
+            grid.addWidget(w, 3, 4)
+
         w = QWidget()
         w.setLayout(grid)
         vbox.addWidget(w)
-
-        self.displacement_z = 1.0
-        self.displacement_xy = 1.0
 
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 

@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QIntValidator
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
 from ...utils.util import resource_path, colored_image
-from ...widgets.return_line_edit import ReturnLineEdit
+from ...widgets.return_line_edit import ReturnSpinBox
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -42,15 +42,17 @@ class ScanToolbar(QToolBar):
         self.addWidget(w)
 
         # Density
-        w = self.density = ReturnLineEdit()
+        w = self.density = ReturnSpinBox()
         w.setToolTip(
             "Scan density. The bigger it is, the smaller average distance between consecutive points is."
         )
-        w.setText(str(laser_studio.viewer.scan_geometry.scan_path_generator.density))
-        w.setValidator(QIntValidator(1, 1000))
+        w.setMinimum(1)
+        w.setMaximum(1000)
+        w.setValue(laser_studio.viewer.scan_geometry.scan_path_generator.density)
         w.returnPressed.connect(
             lambda: laser_studio.viewer.scan_geometry.__setattr__(
-                "density", int(self.density.text())
+                "density", self.density.value()
             )
         )
+        w.reset()
         self.addWidget(w)

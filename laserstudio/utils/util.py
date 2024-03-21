@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtGui import QTransform, QColorConstants, QPixmap, QColor
+from PyQt6.QtGui import QTransform, QPixmap, QColor
 from PyQt6.QtCore import Qt
 from typing import Union
 
