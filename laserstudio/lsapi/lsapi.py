@@ -56,7 +56,9 @@ class LSAPI:
                 return self.session.post(url, json=params)
 
     def go_next(self) -> dict:
-        """Jump to next scan position."""
+        """Jump to next scan position.
+
+        :return: A dictionary giving the details about the go_next"""
         return self.send("motion/go_next", {}).json()
 
     def autofocus(self) -> List[float]:

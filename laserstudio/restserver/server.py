@@ -242,8 +242,8 @@ gonext_response = motion.model(
 
 @motion.route("/go_next")
 class GoNext(Resource):
-    @motion.marshal_with(gonext_response)
-    def get(self):
+    #@motion.marshal_with(gonext_response)
+    def post(self):
         return RestServer.invoke("handle_go_next")
 
 
