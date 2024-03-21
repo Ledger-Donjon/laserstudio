@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSlider,
     QLabel,
+    QHBoxLayout,
 )
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
@@ -92,6 +93,23 @@ class CameraToolbar(QToolBar):
         )
         self.addWidget(w)
 
+
+        w = QWidget()
+        self.addWidget(w)
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+        hbox.addWidget(QLabel("Opacity:"))
+        w = self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        w.setMinimum(0)
+        w.setMaximum(100)
+        w.setValue(100)
+        hbox.addWidget(w)
+    
+        self.opacity_slider.valueChanged.connect(
+            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(a / self.opacity_slider.maximum())
+        )
+
+        
         # Image adjustment dialog (for USB camera)
         if isinstance(self.camera, CameraUSBInstrument):
             self.image_dialog = QDialog()
