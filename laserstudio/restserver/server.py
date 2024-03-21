@@ -1,5 +1,6 @@
 import flask
 from flask_restx import Api, Resource, fields
+from flask_restx.api import HTTPStatus
 from typing import List, Optional, TYPE_CHECKING, cast
 from PyQt6.QtCore import (
     QObject,
@@ -71,12 +72,10 @@ class RestProxy(QObject):
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_camera(self, path: Optional[str]):
-        return QVariant({"error": "Not implemented"})
         return QVariant(self.laser_studio.handle_camera(path))
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_screenshot(self, path: Optional[str]):
-        return QVariant({"error": "Not implemented"})
         return QVariant(self.laser_studio.handle_screenshot(path))
 
     @pyqtSlot(QVariant, QVariant, QVariant, QVariant, result="QVariant")
@@ -190,8 +189,17 @@ class Screenshot(Resource):
 @image.route("/camera")
 class Camera(Resource):
     @image.produces(["image/png"])
+    @image.response(
+        HTTPStatus.NOT_FOUND, "No image can be produced (there may be no camera)"
+    )
     def get(self):
-        im = cast(Image, RestServer.invoke("handle_camera", QVariant(None)))
+        im = cast(Optional[Image], RestServer.invoke("handle_camera", QVariant(None)))
+        if im is None:
+            flask_api.abort(
+                HTTPStatus.NOT_FOUND,
+                "No image can be produced (there may be no camera)",
+            )
+            return
         buffer = io.BytesIO()
         im.save(buffer, format="PNG")
         buffer.seek(0)

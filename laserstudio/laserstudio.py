@@ -18,6 +18,7 @@ from .widgets.toolbars import (
 )
 import yaml
 from .restserver.server import RestProxy
+from PIL import Image, ImageQt
 
 
 class LaserStudio(QMainWindow):
@@ -98,6 +99,44 @@ class LaserStudio(QMainWindow):
         v.update(self.instruments.go_next())
         v.update(self.viewer.go_next())
         return v
+
+    def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:
+        """
+        Handle a Screenshot API to get the image of the viewer as currently displayed in laser studio.
+        Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
+
+        :param path: The path where to store the viewer's image. If None, the image data is
+        returned.
+        :return: The Image if it has not been stored in a file, otherwise a 1x1 placeholder pixel.
+        """
+        # Takes the Image of the viewer as currently shown.
+        pixmap = self.viewer.grab()
+        if path is not None:
+            pixmap.save(path)
+            # Image has been saved at a given path, we return a 1x1 black pixel.
+            return Image.new("1", (1, 1))
+        return ImageQt.fromqpixmap(pixmap)
+
+    def handle_camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+        """
+        Handle a Camera API request to get the image of the camera associated to the main Stage.
+        Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
+
+        :param path: The path where to store the camera's image. If None, the image data is
+            returned.
+        :return: The Image if it has not been stored in a file, otherwise a 1x1 placeholder pixel.
+            None if no camera exists
+        """
+        # Takes the Image of the camera associated to the stage.
+        if self.viewer.stage_sight is None or self.viewer.stage_sight.camera is None:
+            return None
+
+        im = self.viewer.stage_sight.image.pixmap()
+        if path is not None:
+            im.save(path)
+            # Image has been saved at a given path, we return a 1x1 black pixel.
+            return Image.new("1", (1, 1))
+        return ImageQt.fromqpixmap(im)
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
