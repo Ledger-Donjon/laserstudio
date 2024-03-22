@@ -14,8 +14,14 @@ class JoystickThread(QThread):
             if evbuf := self.joystick.device.read(8):
                 time, value, type, number = struct.unpack("IhBB", evbuf)
                 if type & 0x01:
+                    # Filter out buttons different from 4 and 5
+                    if number not in [4, 5]:
+                        continue
                     self.joystick.button_pressed.emit(number, bool(value))
                 elif type & 0x02:
+                    # Filter out axes different from 0 and 1
+                    if number not in [0, 1]:
+                        continue
                     fvalue = value / 32767.0
                     if number == 1:
                         fvalue = -fvalue
