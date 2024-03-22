@@ -19,11 +19,7 @@ class CameraInstrument(Instrument):
         super().__init__()
 
         # To refresh image regularly, in real-time
-        self._timer = QTimer()
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self.get_last_qImage)
         self.refresh_interval = cast(int, config.get("refresh_interval_ms", 200))
-
         QTimer.singleShot(
             self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
         )
