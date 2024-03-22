@@ -1,7 +1,7 @@
 # Client API library to interact with laserstudio via a REST API.
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
-from typing import Optional, Union, Tuple, List
+from typing import Optional, Union, Tuple, List, Dict
 import requests
 from PIL import Image
 import io
@@ -76,21 +76,28 @@ class LSAPI:
             0.0,
             0.0,
         ),
-        pos: Optional[Tuple[float, float]] = None,
+        positions: Optional[
+            Union[List[Tuple[float, float]], Tuple[float, float]]
+        ] = None,
     ):
         """
         Add a colored measurement in the view at a specific position.
 
         :param color: (red, green, blue) or (red, green, blue, alpha) tuple or
             list. Each color channel is in [0, 1].
-        :param pos: the position of the measurement, as a tuple. If None,
+        :param positions: the position of the measurement, as a tuple. If None,
             the position is retrieved from the stage's current position.
         """
         assert len(color) in (3, 4)
-        params = {"color": list(color)}
-        if pos is not None:
-            params["pos"] = list(pos)
-        self.send("annotation/add_measurement", params)
+
+        params: Dict[str, list] = {"color": list(color)}
+        if positions is not None:
+            if isinstance(positions, tuple):
+                list_positions = [list(positions)]
+            else:
+                list_positions = [list(position) for position in positions]
+            params["pos"] = list_positions
+        return self.send("annotation/add_measurement", params).json()
 
     def go_to(self, name: str) -> List[float]:
         """

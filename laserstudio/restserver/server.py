@@ -37,12 +37,6 @@ class RestProxy(QObject):
     @pyqtSlot(result="QVariant")
     def handle_go_next(self):
         response = self.laser_studio.handle_go_next()
-        json = {
-            # "pos": list(response.pos),
-            # "laser_current_percentages": response.laser_current_percentages,
-        }
-        # if response.destination_point is not None:
-        #    json["destination_point"] = list(response.destination_point)
         return QVariant(response)
 
     @pyqtSlot(result="QVariant")
@@ -59,11 +53,10 @@ class RestProxy(QObject):
         return QVariant(self.laser_studio.handle_go_to_memory_point(name))
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
-    def handle_add_measurement(
-        self, pos: Optional[List[float]], color: Optional[List[float]]
+    def handle_add_measurements(
+        self, pos: Optional[List[List[float]]], color: Optional[List[float]]
     ):
-        return QVariant({"error": "Not implemented"})
-        return QVariant(self.laser_studio.handle_add_measurement(pos, color))
+        return QVariant(self.laser_studio.handle_add_measurements(pos, color))
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_position(self, pos: Optional[List[float]]):
@@ -299,7 +292,7 @@ annotations = flask_api.namespace("annotation", description="Manage annotations"
 measurement = flask_api.model(
     "Measurement",
     {
-        "pos": viewer_pos,
+        "pos": fields.List(viewer_pos),
         "color": fields.List(fields.Float, example=[0.0, 1.0, 0.0, 0.5]),
     },
 )
@@ -316,8 +309,10 @@ class AddMeasurement(Resource):
             return "Given value is not a dictionary", 415
         pos = json.get("pos")
         color = json.get("color")
-        RestServer.invoke("handle_add_measurement", QVariant(pos), QVariant(color))
-        return ""
+        qvar = RestServer.invoke(
+            "handle_add_measurements", QVariant(pos), QVariant(color)
+        )
+        return cast(dict, qvar)
 
 
 instruments = flask_api.namespace("instruments", description="Control instruments")

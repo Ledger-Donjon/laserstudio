@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QMainWindow,
     QButtonGroup,
@@ -137,6 +138,48 @@ class LaserStudio(QMainWindow):
             # Image has been saved at a given path, we return a 1x1 black pixel.
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
+        
+    def handle_add_measurements(
+        self, positions: Optional[list[list[float]]], color: Optional[list[float]]
+    ) -> dict:
+        """Add a marker.
+
+        :param pos: The requested position(s) of the marker(s)
+        :param color: The requested color of the marker(s). Defined as a list of 3 floats from 0.0 to 1.0 (RGB)
+            or 4 floats from 0.0 to 1.0 (RGBA).
+        :return: A dictionary containing the information about the markers' final position(s), and identifier(s)
+        """
+        if color is None:
+            qcolor = Qt.GlobalColor.red
+        else:
+            if len(color) == 3:
+                color.append(1.0)
+            if len(color) != 4:
+                ValueError(
+                    "Color argument is invalid. It should be a list of 3 or 4 floats"
+                )
+            qcolor = QColor(
+                int(color[0] * 255),
+                int(color[1] * 255),
+                int(color[2] * 255),
+                int(color[3] * 255),
+            )
+
+        if positions is None:
+            markers = [self.viewer.add_marker(None, color=qcolor)]
+        else:
+            markers = [
+                self.viewer.add_marker((pos[0], pos[1]), color=qcolor)
+                for pos in positions
+            ]
+
+        description = [
+            {"id": marker.id, "pos": [marker.pos().x(), marker.pos().y()]}
+            for marker in markers
+        ]
+        if len(description) == 1:
+            return description[0]
+        return {"markers": description}
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
