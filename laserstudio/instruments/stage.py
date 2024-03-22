@@ -1,11 +1,11 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication
+from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
-from typing import Optional
+from typing import Optional, cast
 from enum import Enum, auto
 from .instrument import Instrument
 
@@ -35,8 +35,7 @@ class StageInstrument(Instrument):
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time
-        self._timer = QTimer()
-        self._timer.timeout.connect(self.refresh_stage)
+        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
 
         dev = config.get("dev")
         if device_type in ["Corvus", "CNC"]:
@@ -59,14 +58,16 @@ class StageInstrument(Instrument):
                 f"Connecting to {device_type} {dev}... "
             )
             self.stage: Stage = Corvus(dev)
-            self._timer.start(1000)
+            if self.refresh_interval is None:
+                self.refresh_interval = 1000
 
         elif device_type == "CNC":
             logging.getLogger("laserstudio").info(
                 f"Connecting to {device_type} {dev}... "
             )
             self.stage: Stage = CNCRouter(dev)
-            self._timer.start(500)
+            if self.refresh_interval is None:
+                self.refresh_interval = 200
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
             self.stage: Stage = StageDummy(config=config, stage_instrument=self)
@@ -79,12 +80,18 @@ class StageInstrument(Instrument):
                     f"Connection to {device_type} stage failed: {str(e)}. Skipping device."
                 )
                 raise
-            self._timer.start(2000)
+            if self.refresh_interval is None:
+                self.refresh_interval = 2000
         else:
             logging.getLogger("laserstudio").error(
                 f"Unknown stage type {device_type}. Skipping device."
             )
             raise
+
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+            )
 
         # Unit factor to apply in order to get coordinates in micrometers
         self.unit_factor = config.get("unit_factor", 1.0)
@@ -117,18 +124,6 @@ class StageInstrument(Instrument):
         """
         self.move_to(value, wait=False)
 
-    @property
-    def auto_refresh_interval(self) -> Optional[int]:
-        """The poll interval of the timer dedicated to get the position regularly, in milliseconds"""
-        return self._timer.interval() if self._timer.isActive() else None
-
-    @auto_refresh_interval.setter
-    def auto_refresh_interval(self, value: Optional[int]):
-        if value is None:
-            self._timer.stop()
-        else:
-            self._timer.start(value)
-
     def refresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal"""
         try:
@@ -137,6 +132,10 @@ class StageInstrument(Instrument):
         except ProtocolError as e:
             logging.getLogger("laserstudio").warning(
                 f"Warning: Bad response!: {repr(e)}"
+            )
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
             )
 
     def move_to(self, position: Vector, wait: bool):
