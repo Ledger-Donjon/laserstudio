@@ -140,6 +140,10 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/screenshot", {"path": path})
 
+    def position(self) -> List[float]:
+        res = self.send("motion/position")
+        return res.json()
+
     def go_to_position(self, pos: List[float] = []) -> List[float]:
         """
         Requests the main stage to move to position the current focused object to given coordinates.

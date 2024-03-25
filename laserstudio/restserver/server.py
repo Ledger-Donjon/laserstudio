@@ -60,7 +60,6 @@ class RestProxy(QObject):
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_position(self, pos: Optional[List[float]]):
-        return QVariant({"error": "Not implemented"})
         return QVariant(self.laser_studio.handle_position(pos))
 
     @pyqtSlot(QVariant, result="QVariant")
@@ -235,7 +234,7 @@ gonext_response = motion.model(
 
 @motion.route("/go_next")
 class GoNext(Resource):
-    #@motion.marshal_with(gonext_response)
+    # @motion.marshal_with(gonext_response)
     def post(self):
         return RestServer.invoke("handle_go_next")
 

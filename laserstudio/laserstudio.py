@@ -138,7 +138,12 @@ class LaserStudio(QMainWindow):
             # Image has been saved at a given path, we return a 1x1 black pixel.
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
-        
+
+    def handle_position(self, pos) -> dict:
+        if self.instruments.stage is None:
+            return {"pos": []}
+        return {"pos": self.instruments.stage.position.data}
+
     def handle_add_measurements(
         self, positions: Optional[list[list[float]]], color: Optional[list[float]]
     ) -> dict:
