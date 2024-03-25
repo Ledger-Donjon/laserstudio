@@ -10,3 +10,4 @@ numpy
 pypdm
 flask
 flask_restx
+hidapi

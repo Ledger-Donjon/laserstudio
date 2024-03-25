@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -13,6 +13,7 @@ from ...utils.util import colored_image
 from ..keyboardbox import KeyboardBox, Direction
 from ...instruments.stage import MoveFor
 from ...instruments.joysticks import JoystickInstrument
+from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 import os
 
 if TYPE_CHECKING:
@@ -69,12 +70,17 @@ class StageToolbar(QToolBar):
         self.addWidget(box)
 
         # Joysticks
-        self.joystick: Optional[JoystickInstrument] = None
-        joysticks = [
-            fn
-            for fn in os.listdir(os.path.join(os.sep, "dev", "input"))
-            if fn.startswith("js")
-        ]
+        self.joystick: Optional[Union[JoystickInstrument, JoystickHIDInstrument]] = None
+        input_dir = os.path.join(os.sep, "dev", "input")
+        if os.path.exists(input_dir):
+            joysticks = [
+                fn
+                for fn in os.listdir(os.path.join(os.sep, "dev", "input"))
+                if fn.startswith("js")
+            ]
+        else:
+            joysticks = ["JoyConL", "JoyConR", "PS4"]
+
         if len(joysticks):
             hbox = QHBoxLayout()
             w = QComboBox()
@@ -107,6 +113,13 @@ class StageToolbar(QToolBar):
             self.joystick = JoystickInstrument(
                 os.path.join(os.sep, "dev", "input", name)
             )
+        if name == "JoyConR":
+            self.joystick = JoystickHIDInstrument(HIDGAMEPAD.JOYCON_R)
+        if name == "JoyConL":
+            self.joystick = JoystickHIDInstrument(HIDGAMEPAD.JOYCON_L)
+        if name == "PS4":
+            self.joystick = JoystickHIDInstrument(HIDGAMEPAD.PS4)
+        if self.joystick is not None:
             self.joystick.axis_changed.connect(self.joystick_axis)
             self.joystick.button_pressed.connect(self.joystick_button)
 
