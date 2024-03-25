@@ -115,6 +115,10 @@ class Viewer(QGraphicsView):
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
+    def marker_size(self, value: float):
+        for m in self.__markers:
+            m.size = value
+
     def follow_stage_sight(self, value: bool):
         """Triggers an update of the camera position when the stage sight change its own position."""
         if self.stage_sight is None:
@@ -592,8 +596,10 @@ class Viewer(QGraphicsView):
         assert (s := self.scene()) is not None
         s.addItem(marker)
         if position is None:
-            position = self.focused_element_position()
-        marker.setPos(position)
+            p = self.focused_element_position()
+            position = p.x(), p.y()
+        marker.setPos(*position)
         marker.setZValue(2)
+        marker.size = 30
         marker.update_tooltip()
         return marker

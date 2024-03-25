@@ -53,13 +53,13 @@ class Marker(QGraphicsItemGroup):
 
     @property
     def size(self):
-        """:return: Diameter of the laser sight, in micrometers."""
+        """:return: Diameter of the marker, in micrometers."""
         return self.__size
 
     @size.setter
     def size(self, value):
         """
-        Set the diameter of the laser sight.
+        Set the diameter of the marker.
 
         :param value: New diameter, in micrometers.
         """

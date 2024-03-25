@@ -6,8 +6,10 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
 )
 from typing import Optional, Any
+
 from .widgets.viewer import Viewer
 from .instruments.instruments import Instruments
+from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolbar,
     ZoomToolbar,
@@ -139,9 +141,11 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
 
-    def handle_position(self, pos) -> dict:
+    def handle_position(self, pos: Optional[list[float]]) -> dict:
         if self.instruments.stage is None:
             return {"pos": []}
+        if pos is not None:
+            self.instruments.stage.move_to(Vector(*pos), wait=True)
         return {"pos": self.instruments.stage.position.data}
 
     def handle_add_measurements(
