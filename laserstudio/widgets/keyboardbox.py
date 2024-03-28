@@ -34,6 +34,7 @@ class KeyboardBox(QGroupBox):
     def __init__(self, stage: StageInstrument, *__args):
         super().__init__(*__args)
 
+        self.stage_instrument = stage
         self.stage = stage.stage
         num_axis = stage.stage.num_axis
         self.displacement_z = 1.0
@@ -55,12 +56,12 @@ class KeyboardBox(QGroupBox):
 
             w = QDoubleSpinBox()
             w.setMinimum(0)
-            w.setMaximum(1000)
-            w.setDecimals(3)
+            w.setMaximum(1_000_000)
+            w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
-            w.setSuffix(" mm")
-            w.setSingleStep(0.01)
+            w.setSuffix(" um")
+            w.setSingleStep(10)
             grid.addWidget(w, 3, 1)
 
         if num_axis > 1:
@@ -82,12 +83,12 @@ class KeyboardBox(QGroupBox):
 
             w = QDoubleSpinBox()
             w.setMinimum(0)
-            w.setMaximum(1000)
-            w.setDecimals(3)
+            w.setMaximum(1000000)
+            w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
-            w.setSuffix(" mm")
-            w.setSingleStep(0.01)
+            w.setSuffix(" um")
+            w.setSingleStep(10)
             grid.addWidget(w, 3, 4)
 
         w = QWidget()
@@ -126,9 +127,9 @@ class KeyboardBox(QGroupBox):
 
         displacement *= move_factor * abs(coefficient)
 
-        position = self.stage.position
+        position = self.stage_instrument.position
         position[axe] += displacement
-        self.stage.move_to(position)
+        self.stage_instrument.move_to(position, wait=True)
 
     def _set_background_color(self, color: Optional[str] = None):
         """
