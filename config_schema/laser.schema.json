@@ -9,13 +9,35 @@
         "enable": {
             "type": "boolean",
             "description": "If the device is enabled or not."
-        },
-        "num": {
-            "type": "integer",
-            "description": "The index of the PDM device"
         }
     },
+    "oneOf": [
+        {
+            "properties": {
+                "type": {
+                    "const": "PDM",
+                    "description": "Corvus Stage."
+                }
+            },
+            "$ref": "serial.schema.json",
+            "num": {
+                "type": "integer",
+                "description": "The index of the PDM device"
+            },
+            "required": [
+                "num"
+            ]
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "DonjonLaser",
+                    "description": "Donjon's Laser Driver."
+                }
+            }
+        }
+    ],
     "required": [
-        "num"
+        "type"
     ]
 }

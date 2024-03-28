@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 from typing import Optional, Any
 
 from .widgets.viewer import Viewer
-from .instruments.instruments import Instruments
+from .instruments.instruments import Instruments, PDMInstrument, LaserDriverInstrument
 from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolbar,
@@ -17,7 +17,8 @@ from .widgets.toolbars import (
     StageToolbar,
     CameraToolbar,
     MainToolbar,
-    LaserToolbar,
+    PDMToolbar,
+    LaserDriverToolbar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -86,8 +87,13 @@ class LaserStudio(QMainWindow):
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Laser toolbars
-        for i in range(len(self.instruments.lasers)):
-            toolbar = LaserToolbar(self, i)
+        for i, laser in enumerate(self.instruments.lasers):
+            if isinstance(laser, PDMInstrument):
+                toolbar = PDMToolbar(self, i)
+            elif isinstance(laser, LaserDriverInstrument):
+                toolbar = LaserDriverToolbar(self, i)
+            else:
+                continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception

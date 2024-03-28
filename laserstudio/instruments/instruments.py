@@ -4,6 +4,7 @@ from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .laser import LaserInstrument
+from .laserdriver import LaserDriverInstrument
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
 from typing import Optional, cast, Any
@@ -64,6 +65,8 @@ class Instruments:
                 try:
                     if device_type == "PDM":
                         self.lasers.append(PDMInstrument(config=laser_config))
+                    elif device_type == "DonjonLaser":
+                        self.lasers.append(LaserDriverInstrument(config=laser_config))
                     else:
                         logging.getLogger("laserstudio").error(
                             f"Unknown laser type {device_type}. Skipping device."
