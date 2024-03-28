@@ -8,10 +8,11 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QWidget,
+    QMessageBox,
 )
 from ...utils.util import colored_image
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor
+from ...instruments.stage import MoveFor, CNCRouter
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 import os
@@ -52,7 +53,22 @@ class StageToolbar(QToolBar):
 
         w = QPushButton(self)
         w.setText("Home")
-        w.clicked.connect(self.stage.stage.home)
+        w.clicked.connect(self.home)
+        self.addWidget(w)
+
+        if isinstance(self.stage.stage, CNCRouter):
+            w = QPushButton(self)
+            w.setText("Set Origin")
+            w.clicked.connect(self.stage.stage.set_origin)
+            self.addWidget(w)
+            w = QPushButton(self)
+            w.setText("Reset GRBL")
+            w.clicked.connect(self.stage.stage.reset_grbl)
+            self.addWidget(w)
+
+        w = QPushButton(self)
+        w.setText("Get Position")
+        w.clicked.connect(lambda: print(self.stage.stage.position))
         self.addWidget(w)
 
         # Keyboard box
@@ -92,6 +108,19 @@ class StageToolbar(QToolBar):
             w = QWidget()
             w.setLayout(hbox)
             self.addWidget(w)
+
+    def home(self):
+        # Request a confirmation from the user
+        if QMessageBox.StandardButton.Apply == QMessageBox.warning(
+            None,
+            "Homing",
+            "Caution: Homing can make some collision and break your setup."
+            " Make sure that your setup is ready to perform this operation.",
+            buttons=QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Apply,
+            defaultButton=QMessageBox.StandardButton.Abort,
+        ):
+            ...
+            # self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
         move_for = self.move_for_selector.itemData(index, Qt.ItemDataRole.UserRole)
