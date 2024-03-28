@@ -37,7 +37,7 @@ class StageInstrument(Instrument):
         # To refresh stage position in the view, in real-time
         self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
 
-        self.guardrail = cast(float, config.get("guardrail", 20.0))
+        self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
         self.guardrail_enabled = True
 
         dev = config.get("dev")
@@ -157,7 +157,8 @@ class StageInstrument(Instrument):
             for i, displacement in enumerate(displacement.data):
                 if abs(displacement) > self.guardrail:
                     logging.getLogger("laserstudio").error(
-                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}mm: {displacement}mm"
+                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}µm: {displacement}µm"
                     )
+                    return
         # Move to actual destination
         self.stage.move_to(position / self.unit_factor, wait=wait)

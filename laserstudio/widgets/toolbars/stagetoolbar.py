@@ -32,13 +32,18 @@ class StageToolbar(QToolBar):
         )
         self.setFloatable(True)
 
+        w = QWidget()
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+        self.addWidget(w)
+
         # Activate stage-move mode
         w = QPushButton(self)
         w.setToolTip("Move stage mode")
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/directions-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
-        self.addWidget(w)
+        hbox.addWidget(w)
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
@@ -48,33 +53,46 @@ class StageToolbar(QToolBar):
         box.activated.connect(
             lambda i: self.stage.move_to(self.stage.mem_points[i], wait=True)
         )
-        self.addWidget(box)
+        hbox.addWidget(box)
         box.setHidden(len(self.stage.mem_points) == 0)
+
+        w = QWidget()
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+        self.addWidget(w)
 
         w = QPushButton(self)
         w.setText("Home")
         w.clicked.connect(self.home)
-        self.addWidget(w)
-
-        if isinstance(self.stage.stage, CNCRouter):
-            w = QPushButton(self)
-            w.setText("Set Origin")
-            w.clicked.connect(self.stage.stage.set_origin)
-            self.addWidget(w)
-            w = QPushButton(self)
-            w.setText("Reset GRBL")
-            w.clicked.connect(self.stage.stage.reset_grbl)
-            self.addWidget(w)
+        hbox.addWidget(w)
 
         w = QPushButton(self)
         w.setText("Get Position")
         w.clicked.connect(lambda: print(self.stage.stage.position))
-        self.addWidget(w)
+        hbox.addWidget(w)
+
+        if isinstance(self.stage.stage, CNCRouter):
+            w = QWidget()
+            hbox = QHBoxLayout()
+            w.setLayout(hbox)
+            self.addWidget(w)
+            w = QPushButton(self)
+            w.setText("Set Origin")
+            w.clicked.connect(self.stage.stage.set_origin)
+            hbox.addWidget(w)
+            w = QPushButton(self)
+            w.setText("Reset GRBL")
+            w.clicked.connect(self.stage.stage.reset_grbl)
+            hbox.addWidget(w)
 
         # Keyboard box
         self.keyboardbox = w = KeyboardBox(self.stage)
         self.addWidget(w)
 
+        w = QWidget()
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+        self.addWidget(w)
         # Move for
         self.move_for_selector = box = QComboBox()
         box.addItem("Camera", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
@@ -83,7 +101,7 @@ class StageToolbar(QToolBar):
         for i in range(len(laser_studio.instruments.probes)):
             box.addItem(f"Probe {i+1}", userData=MoveFor(MoveFor.Type.PROBE, i))
         box.activated.connect(self.move_for_selection)
-        self.addWidget(box)
+        hbox.addWidget(box)
 
         # Joysticks
         self.joystick: Optional[Union[JoystickInstrument, JoystickHIDInstrument]] = None
@@ -98,16 +116,16 @@ class StageToolbar(QToolBar):
             joysticks = ["JoyConL", "JoyConR", "PS4"]
 
         if len(joysticks):
-            hbox = QHBoxLayout()
+            hbox2 = QHBoxLayout()
             w = QComboBox()
             w.addItem("Disabled")
             w.addItems(joysticks)
             w.currentTextChanged.connect(self.activate_joystick)
-            hbox.addWidget(QLabel("Joystick:"))
-            hbox.addWidget(w)
+            hbox2.addWidget(QLabel("Joystick:"))
+            hbox2.addWidget(w)
             w = QWidget()
-            w.setLayout(hbox)
-            self.addWidget(w)
+            w.setLayout(hbox2)
+            hbox.addWidget(w)
 
     def home(self):
         # Request a confirmation from the user

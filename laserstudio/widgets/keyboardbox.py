@@ -37,8 +37,8 @@ class KeyboardBox(QGroupBox):
         self.stage_instrument = stage
         self.stage = stage.stage
         num_axis = stage.stage.num_axis
-        self.displacement_z = 1.0
-        self.displacement_xy = 1.0
+        self.displacement_z = 10.0
+        self.displacement_xy = 100.0
 
         vbox = QVBoxLayout()
         self.setLayout(vbox)
@@ -60,8 +60,8 @@ class KeyboardBox(QGroupBox):
             w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
-            w.setSuffix(" um")
-            w.setSingleStep(10)
+            w.setSuffix(" µm")
+            w.setSingleStep(5)
             grid.addWidget(w, 3, 1)
 
         if num_axis > 1:
@@ -87,7 +87,7 @@ class KeyboardBox(QGroupBox):
             w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
-            w.setSuffix(" um")
+            w.setSuffix(" µm")
             w.setSingleStep(10)
             grid.addWidget(w, 3, 4)
 

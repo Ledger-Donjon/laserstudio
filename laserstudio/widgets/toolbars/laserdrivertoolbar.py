@@ -18,4 +18,8 @@ class LaserDriverToolbar(LaserToolbar):
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
         self.setFloatable(True)
-        self.addWidget(LaserDriverPanel(self.laser.laser))
+        panel = LaserDriverPanel(self.laser.laser)
+        panel.refresh_interval_edit.setMinimum(1000)
+        panel.refresh_interval_edit.setMaximum(5000)
+        panel.refresh_interval_edit.setValue(2000)
+        self.addWidget(panel)

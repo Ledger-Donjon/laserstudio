@@ -110,12 +110,14 @@ class Viewer(QGraphicsView):
 
         # Markers
         self.__markers: list[Measurement] = []
+        self.default_marker_size = 30.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
     def marker_size(self, value: float):
+        self.default_marker_size = value
         for m in self.__markers:
             m.size = value
 
@@ -600,6 +602,6 @@ class Viewer(QGraphicsView):
             position = p.x(), p.y()
         marker.setPos(*position)
         marker.setZValue(2)
-        marker.size = 30
+        marker.size = self.default_marker_size
         marker.update_tooltip()
         return marker

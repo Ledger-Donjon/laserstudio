@@ -32,6 +32,11 @@ class CameraToolbar(QToolBar):
         )
         self.setFloatable(True)
 
+        w = QWidget()
+        self.addWidget(w)
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+
         # Button to toggle off or on the camera image presentation in main viewer
         w = QPushButton(self)
         w.setToolTip("Show/Hide Image")
@@ -53,19 +58,19 @@ class CameraToolbar(QToolBar):
         w.toggled.connect(
             lambda b: laser_studio.viewer.stage_sight.__setattr__("show_image", b)
         )
-        self.addWidget(w)
+        hbox.addWidget(w)
 
         w = QPushButton(self)
         w.setText("Distortion Wizard")
         self.camera_distortion_wizard = CameraDistortionWizard(laser_studio, self)
         w.clicked.connect(lambda: self.camera_distortion_wizard.show())
-        self.addWidget(w)
+        hbox.addWidget(w)
 
         self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
         w = QPushButton(self)
         w.setText("Probes/Spots Position Wizard")
         w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
-        self.addWidget(w)
+        hbox.addWidget(w)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
             == 0
@@ -78,6 +83,11 @@ class CameraToolbar(QToolBar):
         self.addWidget(w)
 
         # Refresh interval
+        w = QWidget()
+        self.addWidget(w)
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+        hbox.addWidget(QLabel("Refresh interval:"))
         self.refresh_interval = w = ReturnSpinBox()
         w.setSuffix("ms")
         w.setMinimum(20)
@@ -91,8 +101,7 @@ class CameraToolbar(QToolBar):
                 "refresh_interval", self.refresh_interval.value()
             )
         )
-        self.addWidget(w)
-
+        hbox.addWidget(w)
 
         w = QWidget()
         self.addWidget(w)
@@ -104,12 +113,13 @@ class CameraToolbar(QToolBar):
         w.setMaximum(100)
         w.setValue(100)
         hbox.addWidget(w)
-    
+
         self.opacity_slider.valueChanged.connect(
-            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(a / self.opacity_slider.maximum())
+            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(
+                a / self.opacity_slider.maximum()
+            )
         )
 
-        
         # Image adjustment dialog (for USB camera)
         if isinstance(self.camera, CameraUSBInstrument):
             self.image_dialog = QDialog()
