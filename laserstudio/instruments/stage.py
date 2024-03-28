@@ -37,6 +37,9 @@ class StageInstrument(Instrument):
         # To refresh stage position in the view, in real-time
         self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
 
+        self.guardrail = cast(float, config.get("guardrail", 20.0))
+        self.guardrail_enabled = True
+
         dev = config.get("dev")
         if device_type in ["Corvus", "CNC"]:
             if dev is None:
@@ -149,5 +152,12 @@ class StageInstrument(Instrument):
             If there is a configuration of z-offsetting for each move, it will be done and
             intermediates moves are blocking (eg, waiting to be done).
         """
+        if self.guardrail_enabled:
+            displacement = self.position - position
+            for i, displacement in enumerate(displacement.data):
+                if abs(displacement) > self.guardrail:
+                    logging.getLogger("laserstudio").error(
+                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}mm: {displacement}mm"
+                    )
         # Move to actual destination
         self.stage.move_to(position / self.unit_factor, wait=wait)
