@@ -141,6 +141,19 @@ class StageInstrument(Instrument):
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
             )
 
+    def move_relative(self, displacement: Vector, wait: bool):
+        """
+        Moves the stage for a specific displacement.
+
+        :param displacement: the displacement to operate as a Vector
+        :param wait: True if the stage must wait for move to be completely done
+
+        """
+        pos = self.position
+        for i, v in enumerate(displacement.data):
+            pos[i] += v
+        self.move_to(pos, wait=wait)
+
     def move_to(self, position: Vector, wait: bool):
         """
         Moves associated stage to a specific position, optionally waits for stage to stop moving.

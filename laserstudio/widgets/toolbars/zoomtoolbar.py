@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton
+from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel
 from ...utils.util import colored_image, resource_path
 
 if TYPE_CHECKING:
@@ -76,3 +76,21 @@ class ZoomToolbar(QToolBar):
         w.toggled.connect(laser_studio.viewer.follow_stage_sight)
         w.setChecked(True)
         self.addWidget(w)
+
+        # Position
+        self.position = QPushButton("Position")
+        self.position.setCheckable(True)
+        self.position.toggled.connect(self.activate_mouse_tracking)
+        self.position_signal = laser_studio.viewer.mouse_moved
+        self.addWidget(self.position)
+        self.position.setChecked(True)
+
+    def activate_mouse_tracking(self, activate: bool):
+        if not activate:
+            self.position.setText("Position")
+            self.position_signal.disconnect(self.update_position)
+        else:
+            self.position_signal.connect(self.update_position)
+
+    def update_position(self, x: float, y: float):
+        self.position.setText(f"{x:.02f}µm {y:.02f}µm")
