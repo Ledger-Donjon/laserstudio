@@ -1,0 +1,25 @@
+camera:
+  type: USB
+  enable: true
+  pixel_size_in_um: [12.5, 12.5]
+  refresh_interval_ms: 50
+stage:
+  type: CNC
+  enable: true
+  dev:
+    vid: "1A86"
+    pid: "7523"
+  unit_factor: 1000
+  guardrail_um: 2000
+  mem_points:
+    - [8600.0, -112800.0, -29740.0]
+lasers:
+  - enable: false
+    type: PDM
+    num: 2
+    dev:
+      sn: "FTA1BR1D"
+  - enable: true
+    type: DonjonLaser
+probes:
+  - enable: true
