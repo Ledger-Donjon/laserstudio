@@ -1,5 +1,5 @@
 pyqt6
-pystages>=1.1.0
+git+https://github.com/Ledger-Donjon/pystages@v1.1.1b
 Pillow
 opencv-python
 PyYAML
@@ -11,3 +11,4 @@ pypdm
 flask
 flask_restx
 hidapi
+git+ssh://***REMOVED***/donjon/laser-driver#egg=donjon-laser-driver&subdirectory=software
