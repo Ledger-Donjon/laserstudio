@@ -15,9 +15,7 @@ class PictureToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Background picture", laser_studio)
         group = laser_studio.viewer_buttons_group
-        self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
+        self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
         # Button to select Pining mode.
@@ -35,5 +33,5 @@ class PictureToolbar(QToolBar):
         w.setToolTip("Load background picture from file")
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(laser_studio.viewer.load_picture)
+        w.clicked.connect(lambda: laser_studio.viewer.load_picture())
         self.addWidget(w)

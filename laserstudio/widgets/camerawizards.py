@@ -94,13 +94,14 @@ class CameraPicker(StageSightViewer):
     def __init__(self, camera: CameraInstrument, *args):
         s = StageSight(stage=None, camera=camera)
         super().__init__(stage_sight=s, *args)
-        self.zoom = 1.0
+        self.zoom = 0.1
         self.panning = False
         self.clicked_point_marker = Marker()
         s = self.scene()
         assert s is not None
         s.addItem(self.clicked_point_marker)
         self.clicked_point_marker.setVisible(False)
+        self.reset_camera()
 
 
 class CameraWizardPage(QWizardPage):
@@ -112,6 +113,13 @@ class ProbePositionIntroductionPage(CameraWizardPage):
     def __init__(self, parent: "ProbesPositionWizard"):
         super().__init__(parent)
         self.setTitle("Probe position wizard")
+        self.setSubTitle(
+            "This tool permits to indicate where in the image "
+            "the probe or the laser spot appears. This permits to "
+            "laser studio to accomodate the move of the stage in order "
+            "that the probe or the spot is placed at the desired point instead "
+            "of the center of the camera."
+        )
 
     def nextId(self) -> int:
         return PagesID.PROBE_POSITION
@@ -121,6 +129,11 @@ class DistortionIntroductionPage(CameraWizardPage):
     def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent)
         self.setTitle("Camera distortion wizard")
+        self.setSubTitle(
+            "This tool permits to "
+            "correct the distortion of the camera image "
+            "when the camera vertically placed."
+        )
 
     def nextId(self) -> int:
         return PagesID.ALIGN

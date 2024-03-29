@@ -66,25 +66,25 @@ class LaserStudio(QMainWindow):
 
         # Toolbar: Background picture
         toolbar = PictureToolbar(self)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Zoom
         toolbar = ZoomToolbar(self)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
         if self.instruments.stage is not None:
             toolbar = StageToolbar(self)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
         # Toolbar: Scanning zone definition and usage
         toolbar = ScanToolbar(self)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Camera Image control
         if self.instruments.camera is not None:
             toolbar = CameraToolbar(self)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
         # Laser toolbars
         for i, laser in enumerate(self.instruments.lasers):
@@ -223,6 +223,9 @@ class LaserStudio(QMainWindow):
         # Lasers
         data["lasers"] = [laser.yaml for laser in self.instruments.lasers]
 
+        # Viewver
+        data["viewer"] = self.viewer.yaml
+
         yaml.dump(data, open("settings.yaml", "w"))
 
     def reload_settings(self):
@@ -253,3 +256,8 @@ class LaserStudio(QMainWindow):
         lasers = data.get("lasers", [])
         for data, laser in zip(lasers, self.instruments.lasers):
             laser.yaml = data
+
+        # Viewver's configuration
+        viewer = data.get("viewer")
+        if viewer is not None:
+            self.viewer.yaml = viewer

@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QComboBox,
     QHBoxLayout,
+    QVBoxLayout,
     QLabel,
     QWidget,
     QMessageBox,
@@ -28,14 +29,19 @@ class StageToolbar(QToolBar):
         super().__init__("Stage control", laser_studio)
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            Qt.ToolBarArea.LeftToolBarArea
+            | Qt.ToolBarArea.RightToolBarArea
+            | Qt.ToolBarArea.BottomToolBarArea
         )
         self.setFloatable(True)
 
         w = QWidget()
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
+        vbox = QVBoxLayout()
+        w.setLayout(vbox)
         self.addWidget(w)
+
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
 
         # Activate stage-move mode
         w = QPushButton(self)
@@ -56,11 +62,8 @@ class StageToolbar(QToolBar):
         hbox.addWidget(box)
         box.setHidden(len(self.stage.mem_points) == 0)
 
-        w = QWidget()
         hbox = QHBoxLayout()
-        w.setLayout(hbox)
-        self.addWidget(w)
-
+        vbox.addLayout(hbox)
         w = QPushButton(self)
         w.setText("Home")
         w.clicked.connect(self.home)
@@ -72,10 +75,7 @@ class StageToolbar(QToolBar):
         hbox.addWidget(w)
 
         if isinstance(self.stage.stage, CNCRouter):
-            w = QWidget()
             hbox = QHBoxLayout()
-            w.setLayout(hbox)
-            self.addWidget(w)
             w = QPushButton(self)
             w.setText("Set Origin")
             w.clicked.connect(self.stage.stage.set_origin)
@@ -84,15 +84,19 @@ class StageToolbar(QToolBar):
             w.setText("Reset GRBL")
             w.clicked.connect(self.stage.stage.reset_grbl)
             hbox.addWidget(w)
+            vbox.addLayout(hbox)
 
         # Keyboard box
         self.keyboardbox = w = KeyboardBox(self.stage)
         self.addWidget(w)
 
         w = QWidget()
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
+        vbox = QVBoxLayout()
+        w.setLayout(vbox)
         self.addWidget(w)
+
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
         # Move for
         self.move_for_selector = box = QComboBox()
         box.addItem("Camera", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
@@ -101,6 +105,7 @@ class StageToolbar(QToolBar):
         for i in range(len(laser_studio.instruments.probes)):
             box.addItem(f"Probe {i+1}", userData=MoveFor(MoveFor.Type.PROBE, i))
         box.activated.connect(self.move_for_selection)
+        hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)
 
         # Joysticks
@@ -116,16 +121,14 @@ class StageToolbar(QToolBar):
             joysticks = ["JoyConL", "JoyConR", "PS4"]
 
         if len(joysticks):
-            hbox2 = QHBoxLayout()
+            hbox = QHBoxLayout()
             w = QComboBox()
             w.addItem("Disabled")
             w.addItems(joysticks)
             w.currentTextChanged.connect(self.activate_joystick)
-            hbox2.addWidget(QLabel("Joystick:"))
-            hbox2.addWidget(w)
-            w = QWidget()
-            w.setLayout(hbox2)
+            hbox.addWidget(QLabel("Joystick:"))
             hbox.addWidget(w)
+            vbox.addLayout(hbox)
 
     def home(self):
         # Request a confirmation from the user
