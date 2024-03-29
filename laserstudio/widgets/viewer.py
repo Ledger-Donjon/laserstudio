@@ -31,6 +31,7 @@ from .scangeometry import ScanGeometry
 import numpy as np
 from ..instruments.stage import MoveFor
 from .measurement import Measurement
+from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
 class Viewer(QGraphicsView):
@@ -624,7 +625,11 @@ class Viewer(QGraphicsView):
         """Export settings to a dict for yaml serialization."""
         yaml = {}
         yaml["marker_size"] = self.default_marker_size
-        yaml["background_picture_path"] = self.background_picture_path
+
+        if self.background_picture_path is not None:
+            yaml["background_picture_path"] = self.background_picture_path
+        if (pic := self.__picture_item) is not None:
+            yaml["background_picture_transform"] = qtransform_to_yaml(pic.transform())
         return yaml
 
     @yaml.setter
@@ -634,3 +639,7 @@ class Viewer(QGraphicsView):
             self.marker_size(marker_size)
         if (path := yaml.get("background_picture_path")) is not None:
             self.load_picture(path)
+            if (transform := yaml.get("background_picture_transform")) is not None and (
+                pic := self.__picture_item
+            ) is not None:
+                pic.setTransform(yaml_to_qtransform(transform))
