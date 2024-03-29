@@ -16,9 +16,7 @@ class ScanToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Scanning Zones", laser_studio)
         group = laser_studio.viewer_buttons_group
-        self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
+        self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
         # Activate scan-zone definition mode

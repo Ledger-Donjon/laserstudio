@@ -152,9 +152,13 @@ class Viewer(QGraphicsView):
             min(w_ratio, h_ratio),
         )
 
-    def load_picture(self):
+    def load_picture(self, picture_path: Optional[str] = None):
         """Requests loading a backgound picture from the user"""
-        filename = QFileDialog.getOpenFileName(self, "Open picture")[0]
+        filename = (
+            QFileDialog.getOpenFileName(self, "Open picture")[0]
+            if picture_path is None
+            else picture_path
+        )
         if len(filename):
             # Remove previous picture if defined
             if self.__picture_item is not None:
@@ -605,3 +609,19 @@ class Viewer(QGraphicsView):
         marker.size = self.default_marker_size
         marker.update_tooltip()
         return marker
+
+    @property
+    def yaml(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        yaml = {}
+        yaml["marker_size"] = self.default_marker_size
+        yaml["background_picture_path"] = self.background_picture_path
+        return yaml
+
+    @yaml.setter
+    def yaml(self, yaml: dict):
+        """Import settings from a dict."""
+        if (marker_size := yaml.get("marker_size")) is not None:
+            self.marker_size(marker_size)
+        if (path := yaml.get("background_picture_path")) is not None:
+            self.load_picture(path)

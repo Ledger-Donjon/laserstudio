@@ -31,10 +31,27 @@ class StageSightViewer(QGraphicsView):
     def __init__(self, stage_sight: "StageSight", parent=None):
         super().__init__(parent)
         self.stage_sight = stage_sight
-        s = QGraphicsScene()
+        self.__scene = s = QGraphicsScene(self)
         self.scale(1, -1)
         self.setScene(s)
         s.addItem(stage_sight)
+
+    def reset_camera(self):
+        """Show all elements of the scene"""
+        all_elements_rect = self.__scene.itemsBoundingRect()
+        viewport = self.viewport()
+        viewport_size = (
+            viewport.size() if viewport is not None else all_elements_rect.size()
+        )
+        w_ratio = viewport_size.width() / (all_elements_rect.width() * 1.2)
+        h_ratio = viewport_size.height() / (all_elements_rect.height() * 1.2)
+        new_value = (
+            all_elements_rect.center(),
+            min(w_ratio, h_ratio),
+        )
+        self.resetTransform()
+        self.scale(new_value[1], -new_value[1])
+        self.centerOn(new_value[0])
 
 
 class StageSightObject(QObject):

@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QSlider,
     QLabel,
     QHBoxLayout,
+    QVBoxLayout,
 )
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
@@ -28,7 +29,9 @@ class CameraToolbar(QToolBar):
         self.camera = laser_studio.instruments.camera
         super().__init__("Camera parameters", laser_studio)
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            Qt.ToolBarArea.LeftToolBarArea
+            | Qt.ToolBarArea.RightToolBarArea
+            | Qt.ToolBarArea.BottomToolBarArea
         )
         self.setFloatable(True)
 
@@ -60,17 +63,19 @@ class CameraToolbar(QToolBar):
         )
         hbox.addWidget(w)
 
+        vbox2 = QVBoxLayout()
+        hbox.addLayout(vbox2)
         w = QPushButton(self)
         w.setText("Distortion Wizard")
         self.camera_distortion_wizard = CameraDistortionWizard(laser_studio, self)
         w.clicked.connect(lambda: self.camera_distortion_wizard.show())
-        hbox.addWidget(w)
+        vbox2.addWidget(w)
 
         self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
         w = QPushButton(self)
         w.setText("Probes/Spots Position Wizard")
         w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
-        hbox.addWidget(w)
+        vbox2.addWidget(w)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
             == 0
@@ -103,33 +108,19 @@ class CameraToolbar(QToolBar):
         )
         hbox.addWidget(w)
 
-        w = QWidget()
+        self.image_dialog = QDialog()
+        self.image_dialog.setWindowTitle("Image Adjustment")
+
+        w = QPushButton()
+        w.setToolTip(self.image_dialog.windowTitle())
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/sliders-solid.svg")))
+        w.clicked.connect(lambda: self.image_dialog.exec())
         self.addWidget(w)
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
-        hbox.addWidget(QLabel("Opacity:"))
-        w = self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
-        w.setMinimum(0)
-        w.setMaximum(100)
-        w.setValue(100)
-        hbox.addWidget(w)
 
-        self.opacity_slider.valueChanged.connect(
-            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(
-                a / self.opacity_slider.maximum()
-            )
-        )
-
+        grid = QGridLayout()
         # Image adjustment dialog (for USB camera)
+        i = 0
         if isinstance(self.camera, CameraUSBInstrument):
-            self.image_dialog = QDialog()
-            self.image_dialog.setWindowTitle("Image Adjustment")
-            sliders = QWidget(self.image_dialog)
-            sliders.setSizePolicy(
-                QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding
-            )
-            grid = QGridLayout()
-            sliders.setLayout(grid)
             for i, (att, minimum, maximum) in enumerate(
                 [
                     ("brightness", 0, 255),
@@ -142,6 +133,7 @@ class CameraToolbar(QToolBar):
             ):
                 grid.addWidget(QLabel(f"{att.capitalize()}:"), i, 0)
                 w = QSlider(Qt.Orientation.Horizontal)
+
                 w.setMinimum(minimum)
                 w.setMaximum(maximum)
                 w.setValue(int(getattr(self.camera, att)))
@@ -149,6 +141,17 @@ class CameraToolbar(QToolBar):
                     lambda x, _att=att: setattr(self.camera, _att, x)
                 )
                 grid.addWidget(w, i, 1)
-            w = QPushButton(self.image_dialog.windowTitle())
-            w.clicked.connect(lambda: self.image_dialog.exec())
-            self.addWidget(w)
+
+        grid.addWidget(QLabel("Opacity:"), i + 1, 0)
+        w = self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.opacity_slider.valueChanged.connect(
+            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(
+                a / self.opacity_slider.maximum()
+            )
+        )
+        w.setMinimum(0)
+        w.setMaximum(100)
+        w.setValue(100)
+        grid.addWidget(w, i + 1, 1)
+
+        self.image_dialog.setLayout(grid)
