@@ -49,6 +49,8 @@ class Viewer(QGraphicsView):
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
+    # Signal emitted when the mouse has moved in scene
+    mouse_moved = pyqtSignal(float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -115,6 +117,8 @@ class Viewer(QGraphicsView):
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
+
+        self.setMouseTracking(True)
 
     def marker_size(self, value: float):
         self.default_marker_size = value
@@ -361,6 +365,11 @@ class Viewer(QGraphicsView):
         """
         Called when mouse moves.
         """
+        if event is not None:
+            # Map the mouse position to the scene position
+            scene_pos = self.mapToScene(event.pos())
+            self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
+
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: Optional[QMouseEvent]):

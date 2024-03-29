@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QKeyCombination
+from PyQt6.QtGui import QColor, QMouseEvent, QShortcut, QKeySequence
 from PyQt6.QtWidgets import (
     QMainWindow,
     QButtonGroup,
@@ -98,6 +98,66 @@ class LaserStudio(QMainWindow):
 
         # Instantiate proxy for REST command reception
         self.rest_proxy = RestProxy(self)
+
+        # Create shortcuts
+        shortcut = QShortcut(Qt.Key.Key_Escape, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.NONE)
+        )
+        shortcut = QShortcut(Qt.Key.Key_R, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.ZONE)
+        )
+        # shortcut = QShortcut(Qt.Key_T, self)
+        # shortcut.activated.connect(self.zone_rot_mode)
+        shortcut = QShortcut(Qt.Key.Key_M, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.STAGE)
+        )
+        shortcut = QShortcut(Qt.Key.Key_P, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.PIN)
+        )
+        if (stage := self.instruments.stage) is not None:
+
+            shortcut = QShortcut(Qt.Key.Key_PageUp, self)
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, 1), wait=True)
+            )
+            shortcut = QShortcut(Qt.Key.Key_PageDown, self)
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, -1), wait=True)
+            )
+            shortcut = QShortcut(
+                QKeySequence(
+                    QKeyCombination(
+                        Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_PageUp
+                    )
+                ),
+                self,
+            )
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, 10), wait=True)
+            )
+            shortcut = QShortcut(
+                QKeySequence(
+                    QKeyCombination(
+                        Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_PageDown
+                    )
+                ),
+                self,
+            )
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, -10), wait=True)
+            )
+
+        shortcut = QShortcut(
+            QKeySequence(
+                QKeyCombination(Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_Space)
+            ),
+            self,
+        )
+        shortcut.activated.connect(self.handle_go_next)
 
     def handle_go_next(self) -> dict:
         """Go Next operation.
@@ -249,13 +309,13 @@ class LaserStudio(QMainWindow):
 
         # Probes
         probes = data.get("probes", [])
-        for data, probe in zip(probes, self.instruments.probes):
-            probe.yaml = data
+        for pdata, probe in zip(probes, self.instruments.probes):
+            probe.yaml = pdata
 
         # Lasers
         lasers = data.get("lasers", [])
-        for data, laser in zip(lasers, self.instruments.lasers):
-            laser.yaml = data
+        for pdata, laser in zip(lasers, self.instruments.lasers):
+            laser.yaml = pdata
 
         # Viewver's configuration
         viewer = data.get("viewer")
