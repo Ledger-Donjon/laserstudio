@@ -3,6 +3,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
 from ...utils.util import resource_path, colored_image
+from ..coloredbutton import ColoredPushButton
 from ..return_line_edit import ReturnSpinBox
 
 if TYPE_CHECKING:
@@ -29,17 +30,10 @@ class MainToolbar(QToolBar):
         self.addWidget(w)
 
         # Button to unselect any viewer mode.
-        w = QPushButton(self)
-        w.setToolTip("Cancel any mode")
-
-        w.setIcon(
-            QIcon(
-                colored_image(
-                    ":/icons/fontawesome-free/arrow-pointer-solid.svg",
-                )
-            )
+        w = ColoredPushButton(
+            ":/icons/fontawesome-free/arrow-pointer-solid.svg", parent=self
         )
-
+        w.setToolTip("Cancel any mode")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(True)

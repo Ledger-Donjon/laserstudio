@@ -2,6 +2,7 @@ import os
 from PyQt6.QtGui import QTransform, QPixmap, QColor
 from PyQt6.QtCore import Qt
 from typing import Union
+from .colors import LedgerColors
 
 __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -37,12 +38,14 @@ def yaml_to_qtransform(dict: dict):
 
 def colored_image(
     path: str,
-    color: Union[QColor, Qt.GlobalColor, int] = Qt.GlobalColor.lightGray,
+    color: Union[QColor, Qt.GlobalColor, int, LedgerColors] = Qt.GlobalColor.lightGray,
     mask_color: Union[QColor, Qt.GlobalColor, int] = Qt.GlobalColor.black,
 ) -> QPixmap:
     """Load an image, use it as a mask and create a Pixmap colored with given color"""
     pixmap = QPixmap(resource_path(path))
     mask = pixmap.createMaskFromColor(mask_color, Qt.MaskMode.MaskOutColor)
+    if isinstance(color, LedgerColors):
+        color = color.value
     pixmap.fill(color)
     pixmap.setMask(mask)
     return pixmap

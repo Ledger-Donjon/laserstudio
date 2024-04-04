@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
-from ...utils.util import resource_path, colored_image
+from ...utils.util import colored_image
+from ..coloredbutton import ColoredPushButton
 from ...widgets.return_line_edit import ReturnSpinBox
 
 if TYPE_CHECKING:
@@ -20,9 +21,8 @@ class ScanToolbar(QToolBar):
         self.setFloatable(True)
 
         # Activate scan-zone definition mode
-        w = QPushButton(self)
+        w = ColoredPushButton(":/icons/region.svg", parent=self)
         w.setToolTip("Define scanning regions. Hold Shift key to remove zone.")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         group.addButton(w)
