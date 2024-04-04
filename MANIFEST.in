@@ -1,2 +1,2 @@
 recursive-include laserstudio/icons *.png
-recursive-include laserstudio/icons *.svh
+recursive-include laserstudio/icons *.svg
