@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Optional, Union
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
@@ -11,7 +10,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from ...utils.util import colored_image
+from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
 from ...instruments.stage import MoveFor, CNCRouter
 from ...instruments.joysticks import JoystickInstrument
@@ -44,9 +43,10 @@ class StageToolbar(QToolBar):
         vbox.addLayout(hbox)
 
         # Activate stage-move mode
-        w = QPushButton(self)
+        w = ColoredPushButton(
+            ":/icons/fontawesome-free/directions-solid.svg", parent=self
+        )
         w.setToolTip("Move stage mode")
-        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/directions-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         hbox.addWidget(w)

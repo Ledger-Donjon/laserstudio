@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
 )
-from ...utils.util import resource_path, colored_image
+from ...utils.util import colored_image
+from ..coloredbutton import ColoredPushButton
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -19,9 +20,8 @@ class PictureToolbar(QToolBar):
         self.setFloatable(True)
 
         # Button to select Pining mode.
-        w = QPushButton(self)
+        w = ColoredPushButton(":/icons/pin.svg", parent=self)
         w.setToolTip("Pin mode")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/pin.png")))
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         self.addWidget(w)
