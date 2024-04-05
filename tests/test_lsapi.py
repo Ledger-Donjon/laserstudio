@@ -13,7 +13,7 @@ def test_add_measurement():
 def test_add_5000_measurements_seq():
     api = LSAPI()
     first = api.measurement(
-        (random(), random(), random(), 0.7), p := (random() * 100, random() * 100)
+        (random(), random(), random(), 0.7), (random() * 100, random() * 100)
     )
     col_pos = [
         ((random(), random(), random(), 0.7), (random() * 100, random() * 100))

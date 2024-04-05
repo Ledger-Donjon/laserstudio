@@ -1,5 +1,5 @@
 try:
-    from laser_driver import LaserDriverPanel
+    from laser_driver import LaserDriverPanel  # type: ignore
 except Exception:
     LaserDriverPanel = None
 from .lasertoolbar import LaserToolbar
