@@ -2,8 +2,9 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton
-from ...utils.util import colored_image, resource_path
+from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
+from ..return_line_edit import ReturnSpinBox
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -78,17 +79,34 @@ class ZoomToolbar(QToolBar):
         w.setChecked(True)
         self.addWidget(w)
 
-        # Position
-        self.position = QPushButton("Position")
+        # Position tracking label
+        self.position = QPushButton("Cursor Position")
+        self.marker_size_sp.setToolTip(
+            "When activated, this button shows the cursor's position in the viewer"
+        )
         self.position.setCheckable(True)
         self.position.toggled.connect(self.activate_mouse_tracking)
         self.position_signal = laser_studio.viewer.mouse_moved
         self.addWidget(self.position)
         self.position.setChecked(True)
 
+        # Markers' size
+        self.marker_size_sp = w = ReturnSpinBox()
+        self.marker_size_sp.setSuffix(" µm")
+        self.marker_size_sp.setToolTip("Markers' size")
+        self.marker_size_sp.setMinimum(1)
+        self.marker_size_sp.setSingleStep(10)
+        self.marker_size_sp.setMaximum(2000)
+        self.marker_size_sp.setValue(int(laser_studio.viewer.default_marker_size))
+        self.marker_size_sp.reset()
+        w.returnPressed.connect(
+            lambda: laser_studio.viewer.marker_size(float(self.marker_size_sp.value()))
+        )
+        self.addWidget(self.marker_size_sp)
+
     def activate_mouse_tracking(self, activate: bool):
         if not activate:
-            self.position.setText("Position")
+            self.position.setText("Cursor Position")
             self.position_signal.disconnect(self.update_position)
         else:
             self.position_signal.connect(self.update_position)

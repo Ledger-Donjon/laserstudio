@@ -4,7 +4,6 @@ from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
 from ...utils.util import resource_path, colored_image
 from ..coloredbutton import ColoredPushButton
-from ..return_line_edit import ReturnSpinBox
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -49,16 +48,4 @@ class MainToolbar(QToolBar):
         settings_menu.addAction("Save settings", laser_studio.save_settings)
         settings_menu.addAction("Load settings", laser_studio.reload_settings)
         w.setMenu(settings_menu)
-        self.addWidget(w)
-
-        self.marker_size_sp = w = ReturnSpinBox()
-        self.marker_size_sp.setSuffix(" µm")
-        self.marker_size_sp.setMinimum(1)
-        self.marker_size_sp.setSingleStep(10)
-        self.marker_size_sp.setMaximum(2000)
-        self.marker_size_sp.setValue(int(laser_studio.viewer.default_marker_size))
-        self.marker_size_sp.reset()
-        w.returnPressed.connect(
-            lambda: laser_studio.viewer.marker_size(float(self.marker_size_sp.value()))
-        )
         self.addWidget(w)
