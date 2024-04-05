@@ -370,6 +370,10 @@ class Viewer(QGraphicsView):
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
             self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
+        if self.mode == Viewer.Mode.ZONE:
+            # In Zone Mode, a release of the Shift key makes the highlight
+            # color to be changed to red (remove)
+            self.__update_highlight_color()
 
         super().mouseMoveEvent(event)
 
@@ -403,31 +407,19 @@ class Viewer(QGraphicsView):
 
     def keyPressEvent(self, event: Optional[QKeyEvent]):
         """
-        Called when key button is released.
-        Used when the user hits the SHIFT key in ZONE mode to change
-        the color of the rectangle.
+        Called when a keyboard button is pressed.
         """
+        super().keyPressEvent(event)
         if event is None:
             return
-        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            # In Zone Mode, a release of the Shift key makes the highlight
-            # color to be changed to red (remove)
-            self.__update_highlight_color()
-        super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event: Optional[QKeyEvent]):
         """
-        Called when key button is released.
-        Used when the user hits the SHIFT key in ZONE mode to change
-        the color of the rectangle.
+        Called when a keyboard button is released.
         """
         super().keyReleaseEvent(event)
         if event is None:
             return
-        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            # In Zone Mode, a release of the Shift key makes the highlight
-            # color to be changed to green (add)
-            self.__update_highlight_color()
 
     def pin(self, x: float, y: float):
         """
