@@ -1,4 +1,7 @@
-from laser_driver import LaserDriverPanel
+try:
+    from laser_driver import LaserDriverPanel
+except Exception:
+    LaserDriverPanel = None
 from .lasertoolbar import LaserToolbar
 from ...instruments.laserdriver import LaserDriverInstrument
 from typing import TYPE_CHECKING
@@ -10,6 +13,7 @@ if TYPE_CHECKING:
 
 class LaserDriverToolbar(LaserToolbar):
     def __init__(self, laser_studio: "LaserStudio", laser_num: int):
+        assert LaserDriverPanel is not None
         assert laser_num < len(laser_studio.instruments.lasers)
         self.laser = laser_studio.instruments.lasers[laser_num]
         assert isinstance(self.laser, LaserDriverInstrument)
