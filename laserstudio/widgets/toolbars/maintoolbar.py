@@ -22,7 +22,7 @@ class MainToolbar(QToolBar):
         # Icon Logo
         w = QLabel()
         w.setPixmap(
-            QPixmap(resource_path(":/icons/logo.png")).scaled(
+            QPixmap(resource_path(":/icons/logo.svg")).scaled(
                 64, 64, transformMode=Qt.TransformationMode.SmoothTransformation
             )
         )

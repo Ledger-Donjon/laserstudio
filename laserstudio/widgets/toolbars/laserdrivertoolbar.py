@@ -1,6 +1,6 @@
 from laser_driver import LaserDriverPanel
 from .lasertoolbar import LaserToolbar
-from laserstudio.instruments.laserdriver import LaserDriverInstrument
+from ...instruments.laserdriver import LaserDriverInstrument
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 
