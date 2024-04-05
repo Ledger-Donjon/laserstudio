@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     app.setApplicationName("Laser Studio")
     app.setApplicationDisplayName("Laser Studio")
-    app.setWindowIcon(QIcon(resource_path(":/icons/logo.png")))
+    app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
     app.setStyle(QStyleFactory.create("Fusion"))
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 25))

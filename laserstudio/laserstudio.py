@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination
-from PyQt6.QtGui import QColor, QMouseEvent, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 from PyQt6.QtWidgets import (
     QMainWindow,
     QButtonGroup,

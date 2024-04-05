@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 
 from laserstudio.instruments.pdm import PDMInstrument
-from ...utils.util import resource_path
+from ...utils.util import resource_path, colored_image
 from typing import TYPE_CHECKING
 from ..return_line_edit import ReturnDoubleSpinBox
 from .lasertoolbar import LaserToolbar
@@ -28,6 +28,8 @@ class PDMToolbar(LaserToolbar):
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
+
+
         self.setFloatable(True)
         w = QPushButton(self)
         w.setToolTip("On/Off Laser")
@@ -35,12 +37,12 @@ class PDMToolbar(LaserToolbar):
         w.setChecked(False)
         icon = QIcon()
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/icons8/lasing.png")),
+            QPixmap(resource_path(":/icons/laser-on.svg")),
             QIcon.Mode.Normal,
             QIcon.State.On,
         )
         icon.addPixmap(
-            QPixmap(resource_path(":/icons/icons8/not-lasing.png")),
+            QPixmap(colored_image(":/icons/laser-off.svg")),
             QIcon.Mode.Normal,
             QIcon.State.Off,
         )
