@@ -1,1 +1,3 @@
-from .lsapi import *
+from .lsapi import LSAPI
+
+__all__ = ["LSAPI"]

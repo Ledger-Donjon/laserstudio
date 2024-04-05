@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QDialog,
     QWidget,
-    QSizePolicy,
     QGridLayout,
     QSlider,
     QLabel,
@@ -148,6 +147,8 @@ class CameraToolbar(QToolBar):
             lambda a: laser_studio.viewer.stage_sight.image.setOpacity(
                 a / self.opacity_slider.maximum()
             )
+            if laser_studio.viewer.stage_sight is not None
+            else ()
         )
         w.setMinimum(0)
         w.setMaximum(100)
