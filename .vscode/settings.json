@@ -1,5 +1,12 @@
 {
     "yaml.schemas": {
         "config_schema/config.schema.json": "config.yaml"
-    }
+    },
+    "python.analysis.typeCheckingMode": "basic",
+    "python.testing.pytestArgs": [
+        "tests",
+        "-s"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
