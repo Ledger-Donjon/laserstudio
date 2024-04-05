@@ -81,7 +81,7 @@ class ZoomToolbar(QToolBar):
 
         # Position tracking label
         self.position = QPushButton("Cursor Position")
-        self.marker_size_sp.setToolTip(
+        self.position.setToolTip(
             "When activated, this button shows the cursor's position in the viewer"
         )
         self.position.setCheckable(True)
