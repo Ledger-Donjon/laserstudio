@@ -99,14 +99,14 @@ class LSAPI:
             params["pos"] = list_positions
         return self.send("annotation/add_marker", params).json()
 
-    def go_to(self, name: str) -> List[float]:
+    def go_to(self, index: int) -> List[float]:
         """
-        Jump to saved position, referenced by a memory point name.
+        Jump to saved position, referenced by a memory point index.
 
-        :param name: The name of the memory point.
+        :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send("motion/go_to_memory_point", {"name": name}).json()
+        return self.send("motion/go_to_memory_point", {"index": index}).json()
 
     def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """
