@@ -48,9 +48,8 @@ class RestProxy(QObject):
             return {"error": str(e)}
 
     @pyqtSlot(result="QVariant")
-    def handle_go_to_memory_point(self, name: str):
-        return QVariant({"error": "Not implemented"})
-        return QVariant(self.laser_studio.handle_go_to_memory_point(name))
+    def handle_go_to_memory_point(self, index: int):
+        return QVariant(self.laser_studio.handle_go_to_memory_point(index))
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
     def handle_add_markers(
@@ -239,14 +238,14 @@ class GoNext(Resource):
         return RestServer.invoke("handle_go_next")
 
 
-@motion.route("/autofocus")
-class Autofocus(Resource):
-    @motion.response(200, "Autofocus is done", stage_pos)
-    def get(self):
-        return RestServer.invoke("handle_autofocus")
+# @motion.route("/autofocus")
+# class Autofocus(Resource):
+#     @motion.response(200, "Autofocus is done", stage_pos)
+#     def get(self):
+#         return RestServer.invoke("handle_autofocus")
 
 
-memory_point = motion.model("MemoryPoint", {"name": fields.String(example="M1")})
+memory_point = motion.model("MemoryPoint", {"index": fields.Integer(example="1")})
 
 
 @motion.route("/go_to_memory_point")
@@ -259,8 +258,8 @@ class GoToMemoryPoint(Resource):
         json = flask.request.json
         if not isinstance(json, dict):
             return "Given value is not a dictionary", 415
-        name = json.get("name")
-        return RestServer.invoke("handle_go_to_memory_point", name)
+        index = json.get("index")
+        return RestServer.invoke("handle_go_to_memory_point", index)
 
 
 position_move = motion.model(
@@ -298,6 +297,7 @@ marker = flask_api.model(
 
 
 @annotations.route("/add_marker")
+@annotations.route("/add_measurement", doc={"description": "Alias for /add_marker"})
 class AddMarker(Resource):
     @annotations.expect(marker)
     def post(self):
@@ -312,50 +312,50 @@ class AddMarker(Resource):
         return cast(dict, qvar)
 
 
-instruments = flask_api.namespace("instruments", description="Control instruments")
+# instruments = flask_api.namespace("instruments", description="Control instruments")
 
-laser = instruments.model(
-    "Laser",
-    {
-        "active": fields.Boolean(description="The activation state of the laser"),
-        "power": fields.Float(description="The power level of the current, in percent"),
-        "offset_current": fields.Float(description="The offset current, in mA"),
-    },
-)
+# laser = instruments.model(
+#     "Laser",
+#     {
+#         "active": fields.Boolean(description="The activation state of the laser"),
+#         "power": fields.Float(description="The power level of the current, in percent"),
+#         "offset_current": fields.Float(description="The offset current, in mA"),
+#     },
+# )
 
 
-@instruments.route("/laser/<int:num>")
-@instruments.param("num", "Index of the laser, starting from 1")
-class Laser(Resource):
-    @instruments.doc("get_laser")
-    @instruments.marshal_with(laser)
-    def get(self, num: int):
-        qvar = RestServer.invoke(
-            "handle_laser",
-            QVariant(num),
-            QVariant(None),
-            QVariant(None),
-            QVariant(None),
-        )
-        return cast(dict, qvar)
+# @instruments.route("/laser/<int:num>")
+# @instruments.param("num", "Index of the laser, starting from 1")
+# class Laser(Resource):
+#     @instruments.doc("get_laser")
+#     @instruments.marshal_with(laser)
+#     def get(self, num: int):
+#         qvar = RestServer.invoke(
+#             "handle_laser",
+#             QVariant(num),
+#             QVariant(None),
+#             QVariant(None),
+#             QVariant(None),
+#         )
+#         return cast(dict, qvar)
 
-    @instruments.doc("put_laser")
-    @instruments.expect(laser)
-    @instruments.marshal_with(laser)
-    def put(self, num: int):
-        if not flask.request.is_json:
-            return "Given value is not a JSON", 415
-        json = flask.request.json
-        if not isinstance(json, dict):
-            return "Given value is not a dictionary", 415
-        active = json.get("active")
-        power = json.get("power")
-        offset_current = json.get("offset_current")
-        qvar = RestServer.invoke(
-            "handle_laser",
-            QVariant(num),
-            QVariant(active),
-            QVariant(power),
-            QVariant(offset_current),
-        )
-        return cast(dict, qvar)
+#     @instruments.doc("put_laser")
+#     @instruments.expect(laser)
+#     @instruments.marshal_with(laser)
+#     def put(self, num: int):
+#         if not flask.request.is_json:
+#             return "Given value is not a JSON", 415
+#         json = flask.request.json
+#         if not isinstance(json, dict):
+#             return "Given value is not a dictionary", 415
+#         active = json.get("active")
+#         power = json.get("power")
+#         offset_current = json.get("offset_current")
+#         qvar = RestServer.invoke(
+#             "handle_laser",
+#             QVariant(num),
+#             QVariant(active),
+#             QVariant(power),
+#             QVariant(offset_current),
+#         )
+#         return cast(dict, qvar)

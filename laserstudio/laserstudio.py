@@ -255,6 +255,24 @@ class LaserStudio(QMainWindow):
             return description[0]
         return {"markers": description}
 
+    def handle_go_to_memory_point(self, index: int):
+        """Perform a move operation on stage to go to a memory point.
+            Memory points are defined in the configuration file, on the
+            stage -> mem_points.
+
+        :param name: The name of the memory point to go to.
+        """
+        if self.instruments.stage is None:
+            return {"pos": []}
+
+        if index < 0 or index >= len(self.instruments.stage.mem_points):
+            return {"pos": []}
+
+        point = self.instruments.stage.mem_points[index]
+
+        self.instruments.stage.move_to(point, wait=True)
+        return {"pos": self.instruments.stage.position.data}
+
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
         if id == self.viewer_buttons_group.checkedId():
