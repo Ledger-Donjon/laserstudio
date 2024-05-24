@@ -19,6 +19,7 @@ on devices under test.
    :caption: Contents:
    
    getting_started
+   conf_file
    instruments
    viewer
    scan
