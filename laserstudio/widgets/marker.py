@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class Marker(QGraphicsItemGroup):
     """
-    Item representing the a marker in a scene.
+    Item representing a marker in a scene.
     Size can be configured depending on radius of represented object.
     """
 
@@ -130,3 +130,26 @@ class ProbeMarker(Marker):
 
     def setToolTip(self, value: str):
         self.__ellipse.setToolTip(value)
+
+
+class IdMarker(Marker):
+    """IdMarker are identifiable Markers. It is used to represent points
+    added by the user and shown in the main viewer."""
+
+    ID = 1
+
+    def __init__(self, parent=None, color=QColorConstants.Red) -> None:
+        super().__init__(parent, color=QColorConstants.Transparent, fillcolor=color)
+        self._id = IdMarker.ID
+        IdMarker.ID += 1
+
+    @property
+    def id(self):
+        """Id of the Marker, as an integer."""
+        return self._id
+
+    def update_tooltip(self):
+        """The tooltip of the marker gives its position and its ID."""
+        self.setToolTip(
+            f"M{self.id}:[{', '.join(['{:.2f}'.format(x) for x in (self.pos().x(), self.pos().y())])}]"
+        )
