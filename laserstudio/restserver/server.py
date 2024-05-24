@@ -53,10 +53,10 @@ class RestProxy(QObject):
         return QVariant(self.laser_studio.handle_go_to_memory_point(name))
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
-    def handle_add_measurements(
+    def handle_add_markers(
         self, pos: Optional[List[List[float]]], color: Optional[List[float]]
     ):
-        return QVariant(self.laser_studio.handle_add_measurements(pos, color))
+        return QVariant(self.laser_studio.handle_add_markers(pos, color))
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_position(self, pos: Optional[List[float]]):
@@ -288,8 +288,8 @@ class Position(Resource):
 
 annotations = flask_api.namespace("annotation", description="Manage annotations")
 
-measurement = flask_api.model(
-    "Measurement",
+marker = flask_api.model(
+    "Marker",
     {
         "pos": fields.List(viewer_pos),
         "color": fields.List(fields.Float, example=[0.0, 1.0, 0.0, 0.5]),
@@ -297,9 +297,9 @@ measurement = flask_api.model(
 )
 
 
-@annotations.route("/add_measurement")
-class AddMeasurement(Resource):
-    @annotations.expect(measurement)
+@annotations.route("/add_marker")
+class AddMarker(Resource):
+    @annotations.expect(marker)
     def post(self):
         if not flask.request.is_json:
             return "Given value is not a JSON", 415
@@ -308,9 +308,7 @@ class AddMeasurement(Resource):
             return "Given value is not a dictionary", 415
         pos = json.get("pos")
         color = json.get("color")
-        qvar = RestServer.invoke(
-            "handle_add_measurements", QVariant(pos), QVariant(color)
-        )
+        qvar = RestServer.invoke("handle_add_markers", QVariant(pos), QVariant(color))
         return cast(dict, qvar)
 
 

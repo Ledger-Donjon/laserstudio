@@ -30,7 +30,7 @@ import logging
 from .scangeometry import ScanGeometry
 import numpy as np
 from ..instruments.stage import MoveFor
-from .measurement import Measurement
+from .marker import IdMarker, Marker
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -112,7 +112,7 @@ class Viewer(QGraphicsView):
         self.pins = []
 
         # Markers
-        self.__markers: list[Measurement] = []
+        self.__markers: list[Marker] = []
         self.default_marker_size = 30.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
@@ -595,11 +595,11 @@ class Viewer(QGraphicsView):
 
     def add_marker(
         self, position: Optional[tuple[float, float]] = None, color=QColorConstants.Red
-    ) -> Measurement:
+    ) -> IdMarker:
         """
         Add a marker at a specific position, or at current observed position
         """
-        marker = Measurement(color=color)
+        marker = IdMarker(color=color)
         self.__markers.append(marker)
         assert (s := self.scene()) is not None
         s.addItem(marker)

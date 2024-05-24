@@ -119,7 +119,6 @@ class LaserStudio(QMainWindow):
             lambda: self.viewer.__setattr__("mode", Viewer.Mode.PIN)
         )
         if (stage := self.instruments.stage) is not None:
-
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(
                 lambda: stage.move_relative(Vector(0, 0, 1), wait=True)
@@ -214,7 +213,7 @@ class LaserStudio(QMainWindow):
             self.instruments.stage.move_to(Vector(*pos), wait=True)
         return {"pos": self.instruments.stage.position.data}
 
-    def handle_add_measurements(
+    def handle_add_markers(
         self, positions: Optional[list[list[float]]], color: Optional[list[float]]
     ) -> dict:
         """Add a marker.

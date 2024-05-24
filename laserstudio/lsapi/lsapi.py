@@ -69,7 +69,7 @@ class LSAPI:
         """
         return self.send("motion/autofocus").json()
 
-    def measurement(
+    def marker(
         self,
         color: Union[Tuple[float, float, float], Tuple[float, float, float, float]] = (
             0.0,
@@ -81,11 +81,11 @@ class LSAPI:
         ] = None,
     ):
         """
-        Add a colored measurement in the view at a specific position.
+        Add a colored marker in the view at a specific position.
 
         :param color: (red, green, blue) or (red, green, blue, alpha) tuple or
             list. Each color channel is in [0, 1].
-        :param positions: the position of the measurement, as a tuple. If None,
+        :param positions: the position of the marker, as a tuple. If None,
             the position is retrieved from the stage's current position.
         """
         assert len(color) in (3, 4)
@@ -97,7 +97,7 @@ class LSAPI:
             else:
                 list_positions = [list(position) for position in positions]
             params["pos"] = list_positions
-        return self.send("annotation/add_measurement", params).json()
+        return self.send("annotation/add_marker", params).json()
 
     def go_to(self, name: str) -> List[float]:
         """
