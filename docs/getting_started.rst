@@ -41,7 +41,7 @@ contains the configuration of the application. You can find an example of this
 file in the repository, under the name ``config.yaml.example``.
 
 You can copy this file and modify it to describe your bench configuration.
-For more details see the :ref:`configuration file` page.
+For more details see the :ref:`configuration file <conf_file:Configuration File>` page.
 
 Running
 -------
