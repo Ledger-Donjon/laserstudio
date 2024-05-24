@@ -12,5 +12,5 @@ A Python package is provided to support some instructions.
 .. automodule:: laserstudio.lsapi
 
 .. autoclass:: LSAPI
-    :members: go_next, camera, screenshot
+    :members: go_next, camera, screenshot, marker, go_to, position, go_to_position
         

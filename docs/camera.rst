@@ -20,7 +20,7 @@ you have to specify the ``camera.type`` to ``USB``.
 
 If your computer has multiple cameras connected, you may have to specify the ``camera.index``
 that will be given to OpenCV's `VideoCapture() <https://docs.opencv.org/4.x/d8/dfe/classcv_1_1VideoCapture.html#aabce0d83aa0da9af802455e8cf5fd181>`__ function during the instantiation of the camera.
-On linux system, it corresponds to the number appending ``/dev/video`` device.
+On Linux system, it corresponds to the number appending ``/dev/video`` device.
 
 REST Camera
 -----------
