@@ -166,7 +166,7 @@ class LSAPI:
         :return: the final coordinates of the stage.
         """
         params = {"pos": pos}
-        res = self.send("motion/go_to_position", params)
+        res = self.send("motion/position", params, is_put=True)
         return res.json()
 
     def laser(
