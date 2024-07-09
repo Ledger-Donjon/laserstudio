@@ -1,5 +1,5 @@
 import requests
-from typing import Optional
+from typing import Optional, cast
 
 
 class RestInstrument:
@@ -13,9 +13,9 @@ class RestInstrument:
         """
         # Creates a session for the connection to the REST server.
         self.session = requests.Session()
-        self.host = config.get("host", "localhost")
-        self.port = config.get("port", 4444)
-        self.api_command = config.get("api_command", "position")
+        self.host = cast(str, config.get("host", "localhost"))
+        self.port = cast(int, config.get("port", 4444))
+        self.api_command = cast(str, config.get("api_command", "position"))
 
     def get(self) -> requests.Response:
         """Convenience function for addressing a GET request on default API command.
@@ -44,12 +44,12 @@ class RestInstrument:
         self, command: str, params: Optional[dict] = None, is_put=False
     ) -> requests.Response:
         """
-        Sends to the session a HTTP GET, POST or PUT command according to the 
+        Sends to the session a HTTP GET, POST or PUT command according to the
         dict given in params.
 
         :param command: The REST command to be executed (eg, the path part of the URL)
         :param params: The payload to be sent in the body of the request, as a JSON
-        :param is_put: To force to send a PUT command instead of a POST, 
+        :param is_put: To force to send a PUT command instead of a POST,
             when params is not None
         :return: The response from the server.
         """

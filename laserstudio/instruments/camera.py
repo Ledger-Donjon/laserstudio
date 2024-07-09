@@ -1,14 +1,16 @@
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal, Qt
-from PyQt6.QtGui import QImage
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt
+from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
-from typing import Optional, Literal
+from typing import Optional, Literal, cast
+from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
+from .instrument import Instrument
 
 
-class CameraInstrument(QObject):
+class CameraInstrument(Instrument):
     """Class to regroup camera instrument operations"""
 
     # Signal emitted when a new image is created
-    new_image = pyqtSignal(QImage, name="newImage")
+    new_image = pyqtSignal(QImage)
 
     def __init__(self, config: dict):
         """
@@ -17,25 +19,25 @@ class CameraInstrument(QObject):
         super().__init__()
 
         # To refresh image regularly, in real-time
-        self._timer = QTimer()
-        self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self.get_last_qImage)
-        self.refresh_interval = config.get("refresh_interval_ms", 200)
-
+        self.refresh_interval = cast(int, config.get("refresh_interval_ms", 200))
         QTimer.singleShot(
             self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
         )
 
-        self.width = 640
-        self.height = 512
+        self.width = cast(int, config.get("width", 640))
+        self.height = cast(int, config.get("height", 512))
 
         # Unit factor to apply in order to get coordinates in micrometers
-        self.pixel_size_in_um = config.get("pixel_size_in_um", [1.0, 1.0])
+        self.pixel_size_in_um = cast(
+            list[float], config.get("pixel_size_in_um", [1.0, 1.0])
+        )
 
         # Objective
-        objective = config.get("objective", 1.0)
-
+        objective = cast(float, config.get("objective", 1.0))
         self.select_objective(objective)
+
+        # Correction matrix
+        self.correction_matrix: Optional[QTransform] = None
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
@@ -69,3 +71,17 @@ class CameraInstrument(QObject):
             color_mode is data from PIL.Image module.
         """
         return self.width, self.height, "L", None
+
+    @property
+    def yaml(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        if self.correction_matrix is not None:
+            return {"transform": qtransform_to_yaml(self.correction_matrix)}
+        else:
+            return {}
+
+    @yaml.setter
+    def yaml(self, data: dict):
+        """Import settings from a dict."""
+        if "transform" in data:
+            self.correction_matrix = yaml_to_qtransform(data["transform"])

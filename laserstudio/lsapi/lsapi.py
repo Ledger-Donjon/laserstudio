@@ -1,37 +1,10 @@
 # Client API library to interact with laserstudio via a REST API.
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
-from typing import Optional, Union, Tuple, List
+from typing import Optional, Union, Tuple, List, Dict
 import requests
 from PIL import Image
 import io
-
-
-class GoNextResponse:
-    """
-    Contains the new information about the state of the equipments after moving to the next scanning
-    point.
-    - The main stage's position
-    - The lasers' current percentages
-    - The probe's destination point
-    """
-
-    def __init__(
-        self,
-        pos: Optional[Tuple[float, float, float]] = None,
-        laser_current_percentages=None,
-        destination_point=None,
-    ):
-        """
-        :param pos: Stage position. Must have 3 elements.
-        :param laser_current_percentages: The current percentage applied to the laser for next position.
-        :param destination_point: The position targeted for the next point.
-        """
-        if laser_current_percentages is None:
-            laser_current_percentages = []
-        self.pos = pos
-        self.laser_current_percentages = laser_current_percentages
-        self.destination_point = destination_point
 
 
 class LSAPI:
@@ -45,6 +18,8 @@ class LSAPI:
 
     def __init__(self, host="localhost", port: Optional[int] = None):
         """
+        Creates a new REST session to Laser Studio, through a TCP connection.
+
         :param host: Network host. Default is localhost.
         :param port: Network port. Default is 4444.
         """
@@ -80,9 +55,11 @@ class LSAPI:
             else:
                 return self.session.post(url, json=params)
 
-    def go_next(self) -> GoNextResponse:
-        """Jump to next scan position."""
-        return GoNextResponse(**self.send("motion/go_next", {}).json())
+    def go_next(self) -> dict:
+        """Jump to next scan position.
+
+        :return: A dictionary giving the details about the go_next"""
+        return self.send("motion/go_next", {}).json()
 
     def autofocus(self) -> List[float]:
         """
@@ -92,37 +69,44 @@ class LSAPI:
         """
         return self.send("motion/autofocus").json()
 
-    def measurement(
+    def marker(
         self,
         color: Union[Tuple[float, float, float], Tuple[float, float, float, float]] = (
             0.0,
             0.0,
             0.0,
         ),
-        pos: Optional[Tuple[float, float]] = None,
+        positions: Optional[
+            Union[List[Tuple[float, float]], Tuple[float, float]]
+        ] = None,
     ):
         """
-        Add a colored measurement in the view at a specific position.
+        Add a colored marker in the view at a specific position.
 
         :param color: (red, green, blue) or (red, green, blue, alpha) tuple or
             list. Each color channel is in [0, 1].
-        :param pos: the position of the measurement, as a tuple. If None,
+        :param positions: the position of the marker, as a tuple. If None,
             the position is retrieved from the stage's current position.
         """
         assert len(color) in (3, 4)
-        params = {"color": list(color)}
-        if pos is not None:
-            params["pos"] = list(pos)
-        self.send("annotation/add_measurement", params)
 
-    def go_to(self, name: str) -> List[float]:
+        params: Dict[str, list] = {"color": list(color)}
+        if positions is not None:
+            if isinstance(positions, tuple):
+                list_positions = [list(positions)]
+            else:
+                list_positions = [list(position) for position in positions]
+            params["pos"] = list_positions
+        return self.send("annotation/add_marker", params).json()
+
+    def go_to(self, index: int) -> List[float]:
         """
-        Jump to saved position, referenced by a memory point name.
+        Jump to saved position, referenced by a memory point index.
 
-        :param name: The name of the memory point.
+        :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send("motion/go_to_memory_point", {"name": name}).json()
+        return self.send("motion/go_to_memory_point", {"index": index}).json()
 
     def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """
@@ -155,6 +139,10 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/screenshot", {"path": path})
+
+    def position(self) -> List[float]:
+        res = self.send("motion/position")
+        return res.json()
 
     def go_to_position(self, pos: List[float] = []) -> List[float]:
         """

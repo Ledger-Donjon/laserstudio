@@ -9,7 +9,7 @@ class StageRest(RestInstrument, Stage):
         """
         :param config: YAML configuration object
         """
-        super().__init__(config)
+        Stage.__init__(self)
         RestInstrument.__init__(self, config)
 
         # Try a communication, will raise if the connection cannot be
@@ -23,7 +23,7 @@ class StageRest(RestInstrument, Stage):
 
     @position.setter
     def position(self, value: Vector):
-        return self.post({"pos": value.data})
+        self.post({"pos": value.data})
 
     @property
     def is_moving(self) -> bool:

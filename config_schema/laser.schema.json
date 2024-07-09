@@ -1,0 +1,43 @@
+{
+    "$id": "laser.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Laser",
+    "type": "object",
+    "description": "A Laser device.",
+    "$ref": "probe.schema.json",
+    "properties": {
+        "enable": {
+            "type": "boolean",
+            "description": "If the device is enabled or not."
+        }
+    },
+    "oneOf": [
+        {
+            "properties": {
+                "type": {
+                    "const": "PDM",
+                    "description": "Corvus Stage."
+                }
+            },
+            "$ref": "serial.schema.json",
+            "num": {
+                "type": "integer",
+                "description": "The index of the PDM device"
+            },
+            "required": [
+                "num"
+            ]
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "DonjonLaser",
+                    "description": "Donjon's Laser Driver."
+                }
+            }
+        }
+    ],
+    "required": [
+        "type"
+    ]
+}

@@ -1,0 +1,61 @@
+{
+    "$id": "stage.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Stage",
+    "type": "object",
+    "description": "A Stage.",
+    "properties": {
+        "enable": {
+            "type": "boolean",
+            "description": "If the device is enabled or not."
+        },
+        "unit_factors": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            }
+        },
+        "unit_factor": {
+            "type": "number"
+        }
+    },
+    "oneOf": [
+        {
+            "properties": {
+                "type": {
+                    "const": "Corvus",
+                    "description": "Corvus Stage."
+                }
+            },
+            "$ref": "serial.schema.json"
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "CNC",
+                    "description": "CNC Stage."
+                }
+            }
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "Dummy",
+                    "description": "A Dummy Stage."
+                }
+            }
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "REST",
+                    "description": "A Stage responding to a Rest API."
+                }
+            },
+            "$ref": "rest.schema.json"
+        }
+    ],
+    "required": [
+        "type"
+    ]
+}

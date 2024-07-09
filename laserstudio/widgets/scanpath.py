@@ -2,26 +2,24 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsItemGroup, QGraphicsEllipseItem, QGraphicsPathItem
 from PyQt6.QtGui import QPen, QColor, QPainterPath, QColorConstants
 
-from typing import List
-
 
 class ScanPath(QGraphicsItemGroup):
     """Represents the scanning path"""
 
     def __init__(self, diameter: float = 0.0, hist_size: int = 0):
         super().__init__()
-        self.__path: List[QPointF] = []
+        self.__path: list[QPointF] = []
         self.__diameter = diameter
         self.__hist_size = hist_size
 
     @property
-    def path(self) -> List[QPointF]:
-        """List of points in the path"""
+    def path(self) -> list[QPointF]:
+        """list of points in the path"""
         # Clone the list to prevent external modification
         return self.__path
 
     @path.setter
-    def path(self, value: List[QPointF]):
+    def path(self, value: list[QPointF]):
         self.__path = value
         self.__rebuild()
 
@@ -48,7 +46,7 @@ class ScanPath(QGraphicsItemGroup):
         self.__hist_size = value
         self.__rebuild()
 
-    def set(self, path: List[QPointF], hist_size: int, diameter: float):
+    def set(self, path: list[QPointF], hist_size: int, diameter: float):
         """Sets all attributes and rebuild the graphic object at once."""
         self.__hist_size = hist_size
         self.__diameter = diameter

@@ -1,8 +1,15 @@
-from typing import Union, Optional
-from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QGridLayout, QPushButton, QWidget
+from typing import Optional
+from PyQt6.QtWidgets import (
+    QGroupBox,
+    QVBoxLayout,
+    QGridLayout,
+    QPushButton,
+    QWidget,
+    QApplication,
+    QDoubleSpinBox,
+)
 from PyQt6.QtCore import Qt
 from ..instruments.instruments import StageInstrument
-from ..widgets.stagesight import StageSight
 from enum import Enum
 
 
@@ -24,17 +31,14 @@ class KeyboardBox(QGroupBox):
     for each press of button or keys.
     """
 
-    def __init__(self, stage: Union[StageSight, StageInstrument], *__args):
+    def __init__(self, stage: StageInstrument, *__args):
         super().__init__(*__args)
 
-        if isinstance(stage, StageInstrument):
-            self.stage_sight = None
-            self.stage = stage.stage
-            num_axis = stage.stage.num_axis
-        else:
-            self.stage_sight = stage
-            self.stage = None
-            num_axis = 2
+        self.stage_instrument = stage
+        self.stage = stage.stage
+        num_axis = stage.stage.num_axis
+        self.displacement_z = 10.0
+        self.displacement_xy = 100.0
 
         vbox = QVBoxLayout()
         self.setLayout(vbox)
@@ -42,42 +46,75 @@ class KeyboardBox(QGroupBox):
         grid = QGridLayout()
         if num_axis > 0:
             w = QPushButton(Direction.left)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.left))
-            grid.addWidget(w, 2, 1)
+            grid.addWidget(w, 2, 1, alignment=Qt.AlignmentFlag.AlignRight)
             w = QPushButton(Direction.right)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.right))
-            grid.addWidget(w, 2, 3)
+            grid.addWidget(w, 2, 3, alignment=Qt.AlignmentFlag.AlignLeft)
             grid.setColumnStretch(1, 1)
             grid.setColumnStretch(3, 1)
+
+            w = QDoubleSpinBox()
+            w.setMinimum(0)
+            w.setMaximum(1_000_000)
+            w.setDecimals(1)
+            w.setValue(self.displacement_z)
+            w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
+            w.setSuffix(" µm")
+            w.setSingleStep(5)
+            grid.addWidget(w, 3, 1, 1, 3)
+
         if num_axis > 1:
             w = QPushButton(Direction.up)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.up))
-            grid.addWidget(w, 1, 2)
+            grid.addWidget(w, 1, 2, alignment=Qt.AlignmentFlag.AlignCenter)
             w = QPushButton(Direction.down)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.down))
-            grid.addWidget(w, 2, 2)
+            grid.addWidget(w, 2, 2, alignment=Qt.AlignmentFlag.AlignCenter)
             grid.setColumnStretch(2, 1)
         if num_axis > 2:
             w = QPushButton(Direction.zup)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.zup))
             grid.addWidget(w, 1, 4)
             w = QPushButton(Direction.zdown)
+            w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.zdown))
             grid.addWidget(w, 2, 4)
             grid.setColumnStretch(4, 1)
+
+            w = QDoubleSpinBox()
+            w.setMinimum(0)
+            w.setMaximum(1000000)
+            w.setDecimals(1)
+            w.setValue(self.displacement_z)
+            w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
+            w.setSuffix(" µm")
+            w.setSingleStep(10)
+            grid.addWidget(w, 3, 4)
 
         w = QWidget()
         w.setLayout(grid)
         vbox.addWidget(w)
 
-        self.displacement_z = 1.0
-        self.displacement_xy = 1.0
-
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self._set_background_color()
 
-    def move_stage(self, direction: Direction, move_factor=1.0):
+    def move_stage(self, direction: Direction, coefficient: float = 1.0):
+        # Give a factor if the keyboard SHIFT or ALT are pressed.
+        modifiers = QApplication.keyboardModifiers()
+        if Qt.KeyboardModifier.ShiftModifier in modifiers:
+            move_factor = 10.0
+        elif Qt.KeyboardModifier.ControlModifier in modifiers:
+            move_factor = 0.1
+        else:
+            move_factor = 1.0
+
         if direction in [Direction.left, Direction.right]:
             axe = 0
         elif direction in [Direction.up, Direction.down]:
@@ -94,19 +131,11 @@ class KeyboardBox(QGroupBox):
         elif direction in [Direction.down, Direction.left, Direction.zdown]:
             displacement *= -1
 
-        displacement *= move_factor
+        displacement *= move_factor * abs(coefficient)
 
-        if self.stage is not None:
-            position = self.stage.position
-            position[axe] += displacement
-            self.stage.move_to(position)
-        elif self.stage_sight is not None:
-            position = self.stage_sight.pos()
-            if axe == 0:
-                position.setX(position.x() + displacement)
-            elif axe == 1:
-                position.setY(position.y() + displacement)
-            self.stage_sight.move_to(position)
+        position = self.stage_instrument.position
+        position[axe] += displacement
+        self.stage_instrument.move_to(position, wait=True)
 
     def _set_background_color(self, color: Optional[str] = None):
         """
@@ -120,41 +149,39 @@ class KeyboardBox(QGroupBox):
             + "}"
         )
 
-    def focusInEvent(self, event) -> None:
+    def focusInEvent(self, a0) -> None:
         """
         Changes the background to gray to show the box has focused.
         """
-        super().focusInEvent(event)
+        super().focusInEvent(a0)
         self._set_background_color(color="gray")
 
-    def focusOutEvent(self, event) -> None:
+    def focusOutEvent(self, a0) -> None:
         """
         Removes the background color to show the box has focused out.
         """
-        super().focusOutEvent(event)
+        super().focusOutEvent(a0)
         self._set_background_color()
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, a0):
         """
         Detects a key press event and redispatch to the correct
         movement.
         """
-        if Qt.KeyboardModifier.ShiftModifier in event.modifiers():
-            factor = 10.0
-        else:
-            factor = 1.0
+        if a0 is None:
+            return
 
-        if event.key() == Qt.Key.Key_Up:
-            self.move_stage(direction=Direction.up, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Down:
-            self.move_stage(direction=Direction.down, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Left:
-            self.move_stage(direction=Direction.left, move_factor=factor)
-        elif event.key() == Qt.Key.Key_Right:
-            self.move_stage(direction=Direction.right, move_factor=factor)
-        elif event.key() == Qt.Key.Key_PageUp:
-            self.move_stage(direction=Direction.zup, move_factor=factor)
-        elif event.key() == Qt.Key.Key_PageDown:
-            self.move_stage(direction=Direction.zdown, move_factor=factor)
+        if a0.key() == Qt.Key.Key_Up:
+            self.move_stage(direction=Direction.up)
+        elif a0.key() == Qt.Key.Key_Down:
+            self.move_stage(direction=Direction.down)
+        elif a0.key() == Qt.Key.Key_Left:
+            self.move_stage(direction=Direction.left)
+        elif a0.key() == Qt.Key.Key_Right:
+            self.move_stage(direction=Direction.right)
+        elif a0.key() == Qt.Key.Key_PageUp:
+            self.move_stage(direction=Direction.zup)
+        elif a0.key() == Qt.Key.Key_PageDown:
+            self.move_stage(direction=Direction.zdown)
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(a0)

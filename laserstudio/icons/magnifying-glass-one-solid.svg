@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="magnifying-glass-one-solid.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.34375"
+     inkscape:cx="245.5814"
+     inkscape:cy="255.62791"
+     inkscape:window-width="1392"
+     inkscape:window-height="1212"
+     inkscape:window-x="2240"
+     inkscape:window-y="25"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg1" />
+  <!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+  <path
+     d="m 416,208 c 0,45.9 -14.9,88.3 -40,122.7 l 126.6,126.7 c 12.5,12.5 12.5,32.8 0,45.3 -12.5,12.5 -32.8,12.5 -45.3,0 L 330.7,376 C 296.3,401.2 253.9,416 208,416 93.1,416 0,322.9 0,208 0,93.1 93.1,0 208,0 322.9,0 416,93.1 416,208 Z"
+     id="path1"
+     sodipodi:nodetypes="sccsccssss" />
+  <path
+     style="font-weight:600;font-size:266.667px;font-family:'Avenir Next';-inkscape-font-specification:'Avenir Next Semi-Bold';letter-spacing:0px;fill:#ffffff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2.2;paint-order:fill markers stroke"
+     d="m 304.86481,155.90549 -37.15382,30.81491 -18.57691,-22.24033 58.64995,-47.69612 h 28.92691 v 189.7127 h -31.84613 z"
+     id="path4" />
+  <path
+     id="path2"
+     style="font-weight:600;font-size:266.667px;font-family:'Avenir Next';-inkscape-font-specification:'Avenir Next Semi-Bold';letter-spacing:0px;fill:#ffffff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2.2;paint-order:fill markers stroke"
+     d="m 185.91862,269.09976 q 0,-8.57459 6.10384,-14.73757 6.36923,-6.16298 15.12692,-6.16298 8.4923,0 14.86152,5.89503 6.36923,5.89502 6.36923,14.46961 0,8.57459 -6.36923,14.73757 -6.10384,6.16298 -14.86152,6.16298 -4.24615,0 -8.22692,-1.60773 -3.71538,-1.60774 -6.63461,-4.2873 -2.91923,-2.67956 -4.77692,-6.43093 -1.59231,-3.75139 -1.59231,-8.03868 z m 0,-90.56906 q 0,-8.57458 6.10384,-14.73757 6.36923,-6.16298 15.12692,-6.16298 8.4923,0 14.86152,5.89503 6.36923,5.89503 6.36923,14.46961 0,8.57458 -6.36923,14.73757 -6.10384,6.16298 -14.86152,6.16298 -4.24615,0 -8.22692,-1.60774 -3.71538,-1.60773 -6.63461,-4.28729 -2.91923,-2.67955 -4.77692,-6.43094 -1.59231,-3.75137 -1.59231,-8.03867 z" />
+  <path
+     style="font-weight:600;font-size:266.667px;font-family:'Avenir Next';-inkscape-font-specification:'Avenir Next Semi-Bold';letter-spacing:0px;fill:#ffffff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2.2;paint-order:fill markers stroke"
+     d="M 115.45808,155.90549 78.304268,186.72041 59.72736,164.48008 118.37731,116.78395 h 28.9269 v 189.7127 h -31.84613 z"
+     id="text1" />
+</svg>

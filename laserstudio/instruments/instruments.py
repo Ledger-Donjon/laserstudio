@@ -3,7 +3,11 @@ from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
-from typing import Optional
+from .laser import LaserInstrument
+from .laserdriver import LaserDriverInstrument, LaserDriver
+from .pdm import PDMInstrument
+from .probe import ProbeInstrument
+from typing import Optional, cast, Any
 import logging
 
 
@@ -50,5 +54,40 @@ class Instruments:
                 )
                 self.camera = None
 
-    def go_next(self):
-        pass
+        # Laser modules
+        self.lasers: list[LaserInstrument] = []
+        lasers_config = cast(list[dict], config.get("lasers", None))
+        if lasers_config is not None:
+            for laser_config in lasers_config:
+                if not laser_config.get("enable", False):
+                    continue
+                device_type = laser_config.get("type")
+                try:
+                    if device_type == "PDM":
+                        self.lasers.append(PDMInstrument(config=laser_config))
+                    elif LaserDriver is not None and device_type == "DonjonLaser":
+                        self.lasers.append(LaserDriverInstrument(config=laser_config))
+                    else:
+                        logging.getLogger("laserstudio").error(
+                            f"Unknown laser type {device_type}. Skipping device."
+                        )
+                        raise
+                except Exception as e:
+                    logging.getLogger("laserstudio").warning(
+                        f"Laser is enabled but device could not be created: {str(e)}... Skipping."
+                    )
+
+        # Probes
+        self.probes: list[ProbeInstrument] = []
+        probes_config = cast(list[dict], config.get("probes", None))
+        if probes_config is not None:
+            for probe_config in probes_config:
+                if not probe_config.get("enable", False):
+                    continue
+                self.probes.append(ProbeInstrument(config=probe_config))
+
+    def go_next(self) -> dict[str, Any]:
+        results = []
+        for laser in self.lasers:
+            results.append(laser.go_next())
+        return {"lasers": results}

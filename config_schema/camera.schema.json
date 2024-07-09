@@ -1,0 +1,60 @@
+{
+    "$id": "camera.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Camera",
+    "type": "object",
+    "properties": {
+        "enable": {
+            "type": "boolean",
+            "description": "If the device is enabled or not."
+        },
+        "width": {
+            "type": "integer",
+            "description": "Image width, in pixel."
+        },
+        "height": {
+            "type": "integer",
+            "description": "Image height, in pixel."
+        },
+        "refresh_interval_ms": {
+            "type": "integer",
+            "description": "Refreshing rate, in milliseconds."
+        },
+        "pixel_size_in_um": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "description": "Size in micrometers of one pixel, when no image distortion is applied. Provide two values if the size if not the same for width and height."
+        },
+        "objective": {
+            "type": "number",
+            "description": "If there is a optical magnifier, specify the zooming factor of the objective."
+        }
+    },
+    "oneOf": [
+        {
+            "properties": {
+                "type": {
+                    "const": "USB"
+                },
+                "index": {
+                    "type": "integer",
+                    "description": "Index of the camera (a used in OpenCV)."
+                }
+            }
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "REST",
+                    "description": "A Camera responding to a Rest API."
+                }
+            },
+            "$ref": "rest.schema.json"
+        }
+    ],
+    "required": [
+        "type"
+    ]
+}
