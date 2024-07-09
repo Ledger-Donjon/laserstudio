@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from typing import Union, cast
 import serial.tools.list_ports
 
 
@@ -30,16 +31,17 @@ class MultipleDeviceFound(DeviceSearchError):
     pass
 
 
-def get_serial_device(config):
+def get_serial_device(config: Union[str, dict]):
     """
     Find serial device path given a configuration.
-    :param config: Configuration from YAML file. If it is a string, it is directly the
-        serial device path. Otherwise, it should be a dict with search filters,
+    :param config: Configuration from YAML file.
+        If it is a string, it is directly the serial device path.
+        Otherwise, it should be a dict with search filters,
         such as the serial number.
     """
-    if type(config) == str:
+    if isinstance(config, str):
         return config
-    elif type(config) == dict:
+    elif isinstance(config, dict):
         possible_matches = []
         sn = None
         vid, pid = None, None
@@ -47,15 +49,15 @@ def get_serial_device(config):
         for port in serial.tools.list_ports.comports():
             match_sn = match_vid_pid = match_location = None
             if "sn" in config:
-                sn = config["sn"]
+                sn = cast(str, config["sn"])
                 match_sn = (sn == port.serial_number) or (port.device.endswith(sn))
-            if "vid_pid" in config:
-                vid, pid = config["vid_pid"].split("_")
+            if "vid" in config and "pid" in config:
+                vid, pid = cast(str, config["vid"]), cast(str, config["pid"])
                 match_vid_pid = (vid == f"{port.vid or 0:04X}") and (
                     pid == f"{port.pid or 0:04X}"
                 )
             if "location" in config:
-                location = config["location"]
+                location = cast(str, config["location"])
                 match_location = (port.location or "").startswith(location)
             matches = [match_sn, match_vid_pid, match_location]
             # There should be at least one match, and only matches.

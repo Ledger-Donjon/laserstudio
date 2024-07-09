@@ -1,17 +1,31 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject
+from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
-from pystages import Corvus, Stage, Vector
+from pystages import Corvus, CNCRouter, Stage, Vector
 from .stage_rest import StageRest
+from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
-from typing import Optional
+from typing import Optional, cast
+from enum import Enum, auto
+from .instrument import Instrument
 
 
-class StageInstrument(QObject):
+class MoveFor(object):
+    class Type(Enum):
+        CAMERA_CENTER = auto()
+        LASER = auto()
+        PROBE = auto()
+
+    def __init__(self, type: Type, index: int = 0):
+        self.type = type
+        self.index = index
+
+
+class StageInstrument(Instrument):
     """Class to regroup stage instrument operations"""
 
     # Signal emitted when a new position is fetched
-    position_changed = pyqtSignal(Vector, name="positionChanged")
+    position_changed = pyqtSignal(Vector)
 
     def __init__(self, config: dict):
         """
@@ -21,11 +35,13 @@ class StageInstrument(QObject):
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time
-        self._timer = QTimer()
-        self._timer.timeout.connect(self.refresh_stage)
+        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
+
+        self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
+        self.guardrail_enabled = True
 
         dev = config.get("dev")
-        if device_type in ["Corvus"]:
+        if device_type in ["Corvus", "CNC"]:
             if dev is None:
                 logging.getLogger("laserstudio").error(
                     f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
@@ -45,7 +61,19 @@ class StageInstrument(QObject):
                 f"Connecting to {device_type} {dev}... "
             )
             self.stage: Stage = Corvus(dev)
-            self._timer.start(1000)
+            if self.refresh_interval is None:
+                self.refresh_interval = 1000
+
+        elif device_type == "CNC":
+            logging.getLogger("laserstudio").info(
+                f"Connecting to {device_type} {dev}... "
+            )
+            self.stage: Stage = CNCRouter(dev)
+            if self.refresh_interval is None:
+                self.refresh_interval = 200
+        elif device_type == "Dummy":
+            logging.getLogger("laserstudio").info("Creating a dummy stage... ")
+            self.stage: Stage = StageDummy(config=config, stage_instrument=self)
         elif device_type == "REST":
             logging.getLogger("laserstudio").info(f"Connecting to {device_type}...")
             try:
@@ -55,15 +83,28 @@ class StageInstrument(QObject):
                     f"Connection to {device_type} stage failed: {str(e)}. Skipping device."
                 )
                 raise
-            self._timer.start(2000)
+            if self.refresh_interval is None:
+                self.refresh_interval = 2000
         else:
             logging.getLogger("laserstudio").error(
                 f"Unknown stage type {device_type}. Skipping device."
             )
             raise
 
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+            )
+
         # Unit factor to apply in order to get coordinates in micrometers
-        self.unit_factors = config.get("unit_factors", [1.0] * self.stage.num_axis)
+        self.unit_factor = config.get("unit_factor", 1.0)
+        self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
+
+        if self.stage is not None:
+            self.stage.wait_routine = lambda: QCoreApplication.processEvents()
+
+        # Indicate
+        self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
     @property
     def position(self) -> Vector:
@@ -71,7 +112,7 @@ class StageInstrument(QObject):
 
         :return: Get the position of the stage
         """
-        return self.stage.position
+        return self.stage.position * self.unit_factor
 
     @position.setter
     def position(self, value: Vector):
@@ -86,18 +127,6 @@ class StageInstrument(QObject):
         """
         self.move_to(value, wait=False)
 
-    @property
-    def auto_refresh_interval(self) -> Optional[int]:
-        """The poll interval of the timer dedicated to get the position regularly, in milliseconds"""
-        return self._timer.interval() if self._timer.isActive() else None
-
-    @auto_refresh_interval.setter
-    def auto_refresh_interval(self, value: Optional[int]):
-        if value is None:
-            self._timer.stop()
-        else:
-            self._timer.start(value)
-
     def refresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal"""
         try:
@@ -107,6 +136,23 @@ class StageInstrument(QObject):
             logging.getLogger("laserstudio").warning(
                 f"Warning: Bad response!: {repr(e)}"
             )
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+            )
+
+    def move_relative(self, displacement: Vector, wait: bool):
+        """
+        Moves the stage for a specific displacement.
+
+        :param displacement: the displacement to operate as a Vector
+        :param wait: True if the stage must wait for move to be completely done
+
+        """
+        pos = self.position
+        for i, v in enumerate(displacement.data):
+            pos[i] += v
+        self.move_to(pos, wait=wait)
 
     def move_to(self, position: Vector, wait: bool):
         """
@@ -119,5 +165,13 @@ class StageInstrument(QObject):
             If there is a configuration of z-offsetting for each move, it will be done and
             intermediates moves are blocking (eg, waiting to be done).
         """
+        if self.guardrail_enabled:
+            displacement = self.position - position
+            for i, displacement in enumerate(displacement.data):
+                if abs(displacement) > self.guardrail:
+                    logging.getLogger("laserstudio").error(
+                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}µm: {displacement}µm"
+                    )
+                    return
         # Move to actual destination
-        self.stage.move_to(position, wait=wait)
+        self.stage.move_to(position / self.unit_factor, wait=wait)

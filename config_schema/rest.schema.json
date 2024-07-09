@@ -1,0 +1,19 @@
+{
+    "properties": {
+        "host": {
+            "type": "string",
+            "description": "IP or hostname Rest device."
+        },
+        "port": {
+            "type": "integer",
+            "description": "Port to connect to the Rest device."
+        },
+        "api_command": {
+            "type": "string",
+            "description": "Default API command."
+        }
+    },
+    "required": [
+        "api_command"
+    ]
+}

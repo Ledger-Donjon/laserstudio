@@ -18,11 +18,20 @@ from PyQt6.QtGui import (
     QTransform,
 )
 from enum import Enum, auto
-from typing import Optional, Tuple
-from .stagesight import StageSight, StageInstrument, CameraInstrument
+from typing import Optional, Union
+from .stagesight import (
+    StageSight,
+    StageInstrument,
+    CameraInstrument,
+    ProbeInstrument,
+    LaserInstrument,
+)
 import logging
 from .scangeometry import ScanGeometry
 import numpy as np
+from ..instruments.stage import MoveFor
+from .marker import IdMarker, Marker
+from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
 class Viewer(QGraphicsView):
@@ -40,7 +49,9 @@ class Viewer(QGraphicsView):
         PIN = auto()
 
     # Signal emitted when a new mode is set
-    mode_changed = pyqtSignal(int, name="modeChanged")
+    mode_changed = pyqtSignal(int)
+    # Signal emitted when the mouse has moved in scene
+    mouse_moved = pyqtSignal(float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -75,6 +86,7 @@ class Viewer(QGraphicsView):
 
         # By default, there is no StageSight
         self.stage_sight: Optional[StageSight] = None
+        self._follow_stage_sight = False
 
         # Scanning geometry object and its representative item in the view.
         # Also includes the scan path
@@ -99,21 +111,36 @@ class Viewer(QGraphicsView):
         # Pin points for background picture
         self.pins = []
 
+        # Markers
+        self.__markers: list[Marker] = []
+        self.default_marker_size = 30.0
+
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
-    def follow_stagesight(self, value: bool):
+        self.setMouseTracking(True)
+
+    def marker_size(self, value: float):
+        self.default_marker_size = value
+        for m in self.__markers:
+            m.size = value
+
+    def follow_stage_sight(self, value: bool):
+        """Triggers an update of the camera position when the stage sight change its own position."""
         if self.stage_sight is None:
             return
-        try:
+        if self._follow_stage_sight:
             self.stage_sight.position_changed.disconnect()
-        except:
-            pass
+            self._follow_stage_sight = False
 
         if value:
+            self._follow_stage_sight = True
             self.stage_sight.position_changed.connect(
-                lambda pos: self.__setattr__("cam_pos_zoom", (pos, self.zoom))
+                lambda _: self.__setattr__(
+                    "cam_pos_zoom",
+                    (self.focused_element_position(), self.zoom),
+                )
             )
 
     def reset_camera(self):
@@ -130,9 +157,13 @@ class Viewer(QGraphicsView):
             min(w_ratio, h_ratio),
         )
 
-    def load_picture(self):
+    def load_picture(self, picture_path: Optional[str] = None):
         """Requests loading a backgound picture from the user"""
-        filename = QFileDialog.getOpenFileName(self, "Open picture")[0]
+        filename = (
+            QFileDialog.getOpenFileName(self, "Open picture")[0]
+            if picture_path is None
+            else picture_path
+        )
         if len(filename):
             # Remove previous picture if defined
             if self.__picture_item is not None:
@@ -156,14 +187,17 @@ class Viewer(QGraphicsView):
             self.background_picture_path = filename
 
     def add_stage_sight(
-        self, stage: Optional[StageInstrument], camera: Optional[CameraInstrument]
+        self,
+        stage: Optional[StageInstrument],
+        camera: Optional[CameraInstrument],
+        probes: list[ProbeInstrument] = [],
     ):
         """Instantiate a stage sight associated with given stage.
 
         :param stage: The stage instrument to be associated with the stage sight
         """
         # Add StageSight item
-        self.stage_sight = StageSight(stage, camera)
+        self.stage_sight = StageSight(stage, camera, probes)
         self.stage_sight.setZValue(1)
         self.__scene.addItem(self.stage_sight)
 
@@ -187,10 +221,15 @@ class Viewer(QGraphicsView):
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
         """
+        result = {}
         if self.scan_geometry:
             next_point = self.scan_geometry.next_point()
             if next_point is not None and self.stage_sight is not None:
+                result = {"next_point_geometry": next_point}
+                next_point = self.point_for_desired_move(next_point)
+                result["next_point_applied"] = next_point
                 self.stage_sight.move_to(QPointF(*next_point))
+        return result
 
     def __update_highlight_color(self, has_shift: Optional[bool] = None):
         """Convenience function to change the current Application Palette to modify
@@ -217,7 +256,7 @@ class Viewer(QGraphicsView):
             self.setDragMode(Viewer.DragMode.NoDrag)
 
     @property
-    def cam_pos_zoom(self) -> Tuple[QPointF, float]:
+    def cam_pos_zoom(self) -> tuple[QPointF, float]:
         """'Camera' position and zoom of the Viewer: The first element is
         the position in the stage where the viewer is centered on.
         The second element is the zoom factor, which must be strictly positive.
@@ -228,7 +267,7 @@ class Viewer(QGraphicsView):
         return self.__compute_pos_zoom()
 
     @cam_pos_zoom.setter
-    def cam_pos_zoom(self, new_value: Tuple[QPointF, float]):
+    def cam_pos_zoom(self, new_value: tuple[QPointF, float]):
         assert new_value[1] > 0
         self.resetTransform()
         self.scale(new_value[1], -new_value[1])
@@ -253,10 +292,12 @@ class Viewer(QGraphicsView):
         self.zoom = 1.0
 
     # User interactions
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event: Optional[QWheelEvent]):
         """
         Handle mouse wheel events to manage zoom.
         """
+        if event is None:
+            return
         # We want to zoom relative to the current cursor position, not relative
         # to the center of the widget. This involves some math...
         # p is the pointed position in the scene, and we want to keep p at the
@@ -284,17 +325,20 @@ class Viewer(QGraphicsView):
         self.cam_pos_zoom = pos, zoom
         event.accept()
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
         """
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
 
             if self.mode == Viewer.Mode.STAGE and self.stage_sight is not None:
-                self.stage_sight.move_to(scene_pos)
+                scene_pos = self.point_for_desired_move((scene_pos.x(), scene_pos.y()))
+                self.stage_sight.move_to(QPointF(*scene_pos))
                 event.accept()
                 return
 
@@ -318,18 +362,29 @@ class Viewer(QGraphicsView):
 
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse moves.
         """
+        if event is not None:
+            # Map the mouse position to the scene position
+            scene_pos = self.mapToScene(event.pos())
+            self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
+        if self.mode == Viewer.Mode.ZONE:
+            # In Zone Mode, a release of the Shift key makes the highlight
+            # color to be changed to red (remove)
+            self.__update_highlight_color()
+
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
+    def mouseReleaseEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse button is released.
         Used to get out the panning, when Right button is released.
         Used to detect the end of the Zone selection.
         """
+        if event is None:
+            return
         is_left = event.button() == Qt.MouseButton.LeftButton
         is_right = event.button() == Qt.MouseButton.RightButton
 
@@ -350,29 +405,21 @@ class Viewer(QGraphicsView):
                 self.scan_geometry.add(zone)
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: Optional[QKeyEvent]):
         """
-        Called when key button is released.
-        Used when the user hits the SHIFT key in ZONE mode to change
-        the color of the rectangle.
+        Called when a keyboard button is pressed.
         """
-        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            # In Zone Mode, a release of the Shift key makes the highlight
-            # color to be changed to red (remove)
-            self.__update_highlight_color()
         super().keyPressEvent(event)
+        if event is None:
+            return
 
-    def keyReleaseEvent(self, event: QKeyEvent):
+    def keyReleaseEvent(self, event: Optional[QKeyEvent]):
         """
-        Called when key button is released.
-        Used when the user hits the SHIFT key in ZONE mode to change
-        the color of the rectangle.
+        Called when a keyboard button is released.
         """
         super().keyReleaseEvent(event)
-        if self.mode == Viewer.Mode.ZONE and Qt.Key.Key_Shift == event.key():
-            # In Zone Mode, a release of the Shift key makes the highlight
-            # color to be changed to green (add)
-            self.__update_highlight_color()
+        if event is None:
+            return
 
     def pin(self, x: float, y: float):
         """
@@ -472,3 +519,119 @@ class Viewer(QGraphicsView):
         scene_y = sr.bottom() - (doc_y - doc_top) * scale_y
 
         return QPointF(scene_x, scene_y), 1 / scale_x
+
+    def focused_element_position(self) -> QPointF:
+        """
+        Gives the focused element's position, indicated by
+          self.instruments.stage.move_for.
+        """
+        stage_sight = self.stage_sight
+        if stage_sight is None or stage_sight.stage is None:
+            # This should not happen...
+            return QPointF()
+
+        pos = stage_sight.mapToScene(0.0, 0.0)
+        if stage_sight.stage.move_for.type == MoveFor.Type.CAMERA_CENTER:
+            # Camera's center is always placed at StageSigth's coordinates.
+            return pos
+
+        if stage_sight.stage.move_for.type == MoveFor.Type.PROBE:
+            marker = stage_sight.marker(
+                ProbeInstrument, stage_sight.stage.move_for.index
+            )
+        elif stage_sight.stage.move_for.type == MoveFor.Type.LASER:
+            marker = stage_sight.marker(
+                LaserInstrument, stage_sight.stage.move_for.index
+            )
+        else:
+            # This should not happen...
+            return pos
+
+        if marker is None:
+            # This should not happen...
+            return pos
+
+        probe_position = stage_sight.mapToScene(marker.pos())
+        return probe_position
+
+    def point_for_desired_move(
+        self, point: Union[QPointF, tuple[float, float]]
+    ) -> tuple[float, float]:
+        """
+        Gives the actual stage's destination according to desired element
+          to point at given position, indicated by
+          self.instruments.stage.move_for.
+
+        :param point: the desired position.
+        :return: the stage's position to apply
+        """
+        if isinstance(point, QPointF):
+            point = point.x(), point.y()
+
+        stage_sight = self.stage_sight
+        if stage_sight is None or stage_sight.stage is None:
+            # This should not happen...
+            return point
+        elif stage_sight.stage.move_for.type == MoveFor.Type.CAMERA_CENTER:
+            # Camera's center is always placed at Stage's coordinates.
+            return point
+
+        # Save camera positioning and zoom
+        old_cam_pos_zoom = self.cam_pos_zoom
+
+        # Force a refresh of main stage position (that may change viewer's position)
+        stage_position = stage_sight.stage.position.xy.data
+
+        # Get focused element scene's position
+        probe_position = self.focused_element_position()
+
+        # Restore the camera position and zoom
+        self.cam_pos_zoom = old_cam_pos_zoom
+
+        return (
+            point[0] + stage_position[0] - probe_position.x(),
+            point[1] + stage_position[1] - probe_position.y(),
+        )
+
+    def add_marker(
+        self, position: Optional[tuple[float, float]] = None, color=QColorConstants.Red
+    ) -> IdMarker:
+        """
+        Add a marker at a specific position, or at current observed position
+        """
+        marker = IdMarker(color=color)
+        self.__markers.append(marker)
+        assert (s := self.scene()) is not None
+        s.addItem(marker)
+        if position is None:
+            p = self.focused_element_position()
+            position = p.x(), p.y()
+        marker.setPos(*position)
+        marker.setZValue(2)
+        marker.size = self.default_marker_size
+        marker.update_tooltip()
+        return marker
+
+    @property
+    def yaml(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        yaml = {}
+        yaml["marker_size"] = self.default_marker_size
+
+        if self.background_picture_path is not None:
+            yaml["background_picture_path"] = self.background_picture_path
+        if (pic := self.__picture_item) is not None:
+            yaml["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+        return yaml
+
+    @yaml.setter
+    def yaml(self, yaml: dict):
+        """Import settings from a dict."""
+        if (marker_size := yaml.get("marker_size")) is not None:
+            self.marker_size(marker_size)
+        if (path := yaml.get("background_picture_path")) is not None:
+            self.load_picture(path)
+            if (transform := yaml.get("background_picture_transform")) is not None and (
+                pic := self.__picture_item
+            ) is not None:
+                pic.setTransform(yaml_to_qtransform(transform))

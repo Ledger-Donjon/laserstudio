@@ -18,8 +18,11 @@ from PyQt6.QtCore import (
 )
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
-from typing import Optional
+from ..instruments.probe import ProbeInstrument
+from ..instruments.laser import LaserInstrument
+from typing import Optional, Union
 import logging
+from .marker import ProbeMarker
 
 
 class StageSightViewer(QGraphicsView):
@@ -27,15 +30,36 @@ class StageSightViewer(QGraphicsView):
 
     def __init__(self, stage_sight: "StageSight", parent=None):
         super().__init__(parent)
-        s = QGraphicsScene()
+        self.stage_sight = stage_sight
+        self.__scene = s = QGraphicsScene(self)
         self.scale(1, -1)
         self.setScene(s)
         s.addItem(stage_sight)
 
+    def reset_camera(self):
+        """Show all elements of the scene"""
+        all_elements_rect = self.__scene.itemsBoundingRect()
+        viewport = self.viewport()
+        viewport_size = (
+            viewport.size() if viewport is not None else all_elements_rect.size()
+        )
+        w_ratio = viewport_size.width() / (all_elements_rect.width() * 1.2)
+        h_ratio = viewport_size.height() / (all_elements_rect.height() * 1.2)
+        new_value = (
+            all_elements_rect.center(),
+            min(w_ratio, h_ratio),
+        )
+        self.resetTransform()
+        self.scale(new_value[1], -new_value[1])
+        self.centerOn(new_value[0])
+
 
 class StageSightObject(QObject):
+    """Proxy object for signal emission, StageSight, as
+    inheriting QGraphicsItemGroup, cannot inherit from QObject."""
+
     # Signal emitted when a new position is set
-    position_changed = pyqtSignal(QPointF, name="positionChanged")
+    position_changed = pyqtSignal(QPointF)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,6 +80,7 @@ class StageSight(QGraphicsItemGroup):
         self,
         stage: Optional[StageInstrument],
         camera: Optional[CameraInstrument],
+        probes: list[ProbeInstrument] = [],
         parent=None,
     ):
         super(QGraphicsItemGroup, self).__init__(parent)
@@ -92,10 +117,34 @@ class StageSight(QGraphicsItemGroup):
         # Associate the CameraInstrument
         self.camera = camera
         if camera is not None:
+            self._pause_update = False
             camera.new_image.connect(self.set_image)
             self.__update_size(QSizeF(camera.width_um, camera.height_um))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
+
+        # Create Markers for probes
+        self._probe_markers: list[ProbeMarker] = []
+        for probe in probes:
+            marker = ProbeMarker(probe, self)
+            self.addToGroup(marker)
+            self._probe_markers.append(marker)
+
+    @property
+    def pause_image_update(self) -> bool:
+        """Permits to pause the image update when receiving the 'new_image' signal from the camera."""
+        return self._pause_update
+
+    @pause_image_update.setter
+    def pause_image_update(self, value: bool):
+        if self.camera is None:
+            return
+        if self._pause_update != value:
+            if value:
+                self.camera.new_image.disconnect(self.set_image)
+            else:
+                self.camera.new_image.connect(self.set_image)
+        self._pause_update = value
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -146,17 +195,25 @@ class StageSight(QGraphicsItemGroup):
         )
         image.setTransform(transform)
 
-    def set_image(self, image: QImage):
+    def set_pixmap(self, pixmap: QPixmap):
         """
         Set the PixMap item's image.
 
         :param image: The image to show
         """
-        pixmap = QPixmap.fromImage(image.copy())
         self.image.setPixmap(pixmap)
 
         # The original image size may have changed
         self.__update_image_size()
+
+    def set_image(self, image: QImage):
+        """
+        Set the item's image.
+
+        :param image: The image to show
+        """
+        pixmap = QPixmap.fromImage(image.copy())
+        self.set_pixmap(pixmap)
 
     @property
     def size(self) -> QSizeF:
@@ -222,15 +279,59 @@ class StageSight(QGraphicsItemGroup):
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 
-    def setPos(self, value: QPointF):
+    def setPos(self, *args, **kwargs):
         """To make sure that the position of the stagesight is signaled
         at each change we override the setPos function.
 
         :param value: the final position of the widget"""
-        super(QGraphicsItemGroup, self).setPos(value)
-        self.position_changed.emit(value)
+        if len(args) >= 1 and isinstance(pos := args[0], QPointF):
+            pass
+        elif isinstance(pos := kwargs.get("pos", None), QPointF):
+            pass
+        else:
+            raise TypeError("Only QPointF are allowed")
+        super(QGraphicsItemGroup, self).setPos(pos)
+        self.position_changed.emit(pos)
 
     @property
     def position_changed(self) -> pyqtBoundSignal:
         """Convenient access to the position_changed signal from proxy object"""
         return self.__object.position_changed
+
+    @property
+    def distortion(self) -> QTransform:
+        return self.image_group.transform()
+
+    @distortion.setter
+    def distortion(self, transform: Optional[QTransform]):
+        self.resetTransform()
+        self.image_group.resetTransform()
+        if transform is not None:
+            self.image_group.setTransform(transform)
+            # The transform may induce a final translation
+            # which can be measured by mapping the origin
+            # and corrected by setting the image_group's position.
+            mapped_origin = transform.map(QPointF(0.0, 0.0))
+            dx, dy = mapped_origin.x(), mapped_origin.y()
+            self.image_group.setPos(-dx, -dy)
+        self.__update_size(self.size)
+
+    def marker(
+        self,
+        marker_type: Union[type[LaserInstrument], type[ProbeInstrument]],
+        index: int,
+    ) -> Optional[ProbeMarker]:
+        if marker_type not in [LaserInstrument, ProbeInstrument]:
+            return None
+        index += 1
+        # Go through all markers, count for each matching types
+        for marker in self._probe_markers:
+            if LaserInstrument == marker_type:
+                if isinstance(marker.probe, LaserInstrument):
+                    index -= 1
+            elif ProbeInstrument == marker_type:
+                if type(marker.probe) == ProbeInstrument:
+                    index -= 1
+            if index == 0:
+                return marker
+        return None

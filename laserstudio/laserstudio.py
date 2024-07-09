@@ -1,21 +1,28 @@
 #!/usr/bin/python3
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QKeyCombination
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 from PyQt6.QtWidgets import (
     QMainWindow,
-    QGridLayout,
-    QLabel,
-    QToolBar,
-    QWidget,
-    QPushButton,
     QButtonGroup,
 )
-from PyQt6.QtGui import QPixmap, QIcon
-from typing import Optional
-from .util import resource_path
+from typing import Optional, Any
+
 from .widgets.viewer import Viewer
-from .widgets.keyboardbox import KeyboardBox
-from .instruments.instruments import Instruments
-from .widgets.stagesight import StageSightViewer, StageSight
+from .instruments.instruments import Instruments, PDMInstrument, LaserDriverInstrument
+from .instruments.stage import Vector
+from .widgets.toolbars import (
+    PictureToolbar,
+    ZoomToolbar,
+    ScanToolbar,
+    StageToolbar,
+    CameraToolbar,
+    MainToolbar,
+    PDMToolbar,
+    LaserDriverToolbar,
+)
+import yaml
+from .restserver.server import RestProxy
+from PIL import Image, ImageQt
 
 
 class LaserStudio(QMainWindow):
@@ -39,226 +46,232 @@ class LaserStudio(QMainWindow):
 
         # Add StageSight if there is a Stage instrument or a camera
         if self.instruments.stage is not None or self.instruments.camera is not None:
-            self.viewer.add_stage_sight(self.instruments.stage, self.instruments.camera)
-
-        toolbar = QToolBar(self)
-        toolbar.setWindowTitle("Main")
-        toolbar.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
-        toolbar.setFloatable(True)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
-
-        # Icon Logo
-        w = QLabel()
-        w.setPixmap(
-            QPixmap(resource_path(":/icons/logo.png")).scaled(
-                64, 64, transformMode=Qt.TransformationMode.SmoothTransformation
+            self.viewer.add_stage_sight(
+                self.instruments.stage,
+                self.instruments.camera,
+                self.instruments.probes + self.instruments.lasers,
             )
-        )
-        w.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        toolbar.addWidget(w)
+            self.viewer.reset_camera()
 
         # Create group of buttons for Viewer mode selection
-        self.viewer_buttons_group = group = QButtonGroup(toolbar)
+        self.viewer_buttons_group = group = QButtonGroup(self)
         group.idClicked.connect(
             lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
         )
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
-        # Button to unselect any viewer mode.
-        w = QPushButton(toolbar)
-        w.setToolTip("Cancel any mode")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/cursor.png")))
-        w.setIconSize(QSize(24, 24))
-        w.setCheckable(True)
-        w.setChecked(True)
-        toolbar.addWidget(w)
-        group.addButton(w)
-        group.setId(w, int(Viewer.Mode.NONE))
+        # Toolbar: Main
+        toolbar = MainToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Background picture
-        toolbar = QToolBar(self)
-        toolbar.setWindowTitle("Background picture")
-        toolbar.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
-        toolbar.setFloatable(True)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+        toolbar = PictureToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Button to select Pining mode.
-        w = QPushButton(toolbar)
-        w.setToolTip("Pin mode")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/pin.png")))
-        w.setIconSize(QSize(24, 24))
-        w.setCheckable(True)
-        toolbar.addWidget(w)
-        group.addButton(w)
-        group.setId(w, int(Viewer.Mode.PIN))
-
-        # Button to load background picture.
-        w = QPushButton(toolbar)
-        w.setToolTip("Load background picture from file")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/picture.png")))
-        w.setIconSize(QSize(24, 24))
-        w.clicked.connect(self.viewer.load_picture)
-        toolbar.addWidget(w)
-
-        # Zoom toolbar
-        toolbar = QToolBar(self)
-        toolbar.setWindowTitle("Zoom control")
-        toolbar.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
-        toolbar.setFloatable(True)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
-
-        # Zoom in (*2).
-        w = QPushButton(toolbar)
-        w.setText("Z+")
-        w.setToolTip("Zoom in")
-        w.clicked.connect(
-            lambda: self.viewer.__setattr__("zoom", self.viewer.zoom * 2.0)
-        )
-        toolbar.addWidget(w)
-
-        # Zoom out (/2).
-        w = QPushButton(toolbar)
-        w.setText("Z-")
-        w.setToolTip("Zoom out")
-        w.clicked.connect(
-            lambda: self.viewer.__setattr__("zoom", self.viewer.zoom * 0.5)
-        )
-        toolbar.addWidget(w)
-
-        # Zoom reset (1:1).
-        w = QPushButton(toolbar)
-        w.setText("Z:1x")
-        w.setToolTip("Reset zoom")
-        w.clicked.connect(lambda: self.viewer.__delattr__("zoom"))
-        toolbar.addWidget(w)
-
-        # Zoom to all.
-        w = QPushButton(toolbar)
-        w.setToolTip("Reset Viewer to see all elements")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/zoom-reset.png")))
-        w.setIconSize(QSize(24, 24))
-        w.clicked.connect(self.viewer.reset_camera)
-        toolbar.addWidget(w)
-
-        # Button to enable/disable StageSight position tracking.
-        w = QPushButton(toolbar)
-        w.setToolTip("Follow stage")
-        w.setCheckable(True)
-        w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/arrows-to-dot-solid-24.png"))
-        )
-        w.setIconSize(QSize(24, 24))
-        w.toggled.connect(self.viewer.follow_stagesight)
-        w.setChecked(True)
-        toolbar.addWidget(w)
+        # Toolbar: Zoom
+        toolbar = ZoomToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
-        if self.viewer.stage_sight is not None:
-            toolbar = QToolBar(self)
-            toolbar.setWindowTitle("Stage control")
-            toolbar.setAllowedAreas(
-                Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-            )
-            toolbar.setFloatable(True)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
-
-            # Activate stage-move mode
-            w = QPushButton(toolbar)
-            w.setToolTip("Move stage mode")
-            w.setIcon(
-                QIcon(resource_path(":/icons/fontawesome-free/directions-solid-24.png"))
-            )
-            w.setIconSize(QSize(24, 24))
-            w.setCheckable(True)
-            toolbar.addWidget(w)
-            group.addButton(w)
-            group.setId(w, int(Viewer.Mode.STAGE))
-
-            # Keyboard box
-            w = KeyboardBox(self.viewer.stage_sight)
-            toolbar.addWidget(w)
+        if self.instruments.stage is not None:
+            toolbar = StageToolbar(self)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
         # Toolbar: Scanning zone definition and usage
-        toolbar = QToolBar(self)
-        toolbar.setWindowTitle("Scanning Zones")
-        toolbar.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-        )
-        toolbar.setFloatable(True)
-        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
-
-        # Activate scan-zone definition mode
-        w = QPushButton(toolbar)
-        w.setToolTip("Define scanning regions")
-        w.setIcon(QIcon(resource_path(":/icons/icons8/region.png")))
-        w.setIconSize(QSize(24, 24))
-        w.setCheckable(True)
-        group.addButton(w)
-        group.setId(w, int(Viewer.Mode.ZONE))
-        toolbar.addWidget(w)
-
-        # Go-to-next position button
-        w = QPushButton(toolbar)
-        w.setToolTip("Go Next Scan Point")
-        w.setIcon(
-            QIcon(resource_path(":/icons/fontawesome-free/forward-step-solid-24.png"))
-        )
-        w.setIconSize(QSize(24, 24))
-        w.clicked.connect(self.handle_go_next)
-        toolbar.addWidget(w)
+        toolbar = ScanToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Camera Image control
         if self.instruments.camera is not None:
-            toolbar = QToolBar(self)
-            toolbar.setWindowTitle("Camera parameters")
-            toolbar.setAllowedAreas(
-                Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
-            )
-            toolbar.setFloatable(True)
+            toolbar = CameraToolbar(self)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+
+        # Laser toolbars
+        for i, laser in enumerate(self.instruments.lasers):
+            if isinstance(laser, PDMInstrument):
+                toolbar = PDMToolbar(self, i)
+            elif isinstance(laser, LaserDriverInstrument):
+                toolbar = LaserDriverToolbar(self, i)
+            else:
+                continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
-            # Button to toggle off or on the camera image presentation in main viewer
-            w = QPushButton(toolbar)
-            w.setToolTip("Show/Hide Image")
-            w.setCheckable(True)
-            w.setChecked(True)
-            icon = QIcon()
-            icon.addPixmap(
-                QPixmap(resource_path(":/icons/fontawesome-free/video-solid-24.png")),
-                QIcon.Mode.Normal,
-                QIcon.State.On,
+        # Instantiate proxy for REST command reception
+        self.rest_proxy = RestProxy(self)
+
+        # Create shortcuts
+        shortcut = QShortcut(Qt.Key.Key_Escape, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.NONE)
+        )
+        shortcut = QShortcut(Qt.Key.Key_R, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.ZONE)
+        )
+        # shortcut = QShortcut(Qt.Key_T, self)
+        # shortcut.activated.connect(self.zone_rot_mode)
+        shortcut = QShortcut(Qt.Key.Key_M, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.STAGE)
+        )
+        shortcut = QShortcut(Qt.Key.Key_P, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.__setattr__("mode", Viewer.Mode.PIN)
+        )
+        if (stage := self.instruments.stage) is not None:
+            shortcut = QShortcut(Qt.Key.Key_PageUp, self)
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, 1), wait=True)
             )
-            icon.addPixmap(
-                QPixmap(
-                    resource_path(":/icons/fontawesome-free/video-slash-solid-24.png")
+            shortcut = QShortcut(Qt.Key.Key_PageDown, self)
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, -1), wait=True)
+            )
+            shortcut = QShortcut(
+                QKeySequence(
+                    QKeyCombination(
+                        Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_PageUp
+                    )
                 ),
-                QIcon.Mode.Normal,
-                QIcon.State.Off,
+                self,
             )
-            w.setIcon(icon)
-            w.setIconSize(QSize(24, 24))
-            w.toggled.connect(
-                lambda b: self.viewer.stage_sight.__setattr__("show_image", b)
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, 10), wait=True)
             )
-            toolbar.addWidget(w)
+            shortcut = QShortcut(
+                QKeySequence(
+                    QKeyCombination(
+                        Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_PageDown
+                    )
+                ),
+                self,
+            )
+            shortcut.activated.connect(
+                lambda: stage.move_relative(Vector(0, 0, -10), wait=True)
+            )
 
-            # Second representation of the camera image
-            stage_sight = StageSight(None, self.instruments.camera)
-            toolbar.addWidget(StageSightViewer(stage_sight))
+        shortcut = QShortcut(
+            QKeySequence(
+                QKeyCombination(Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_Space)
+            ),
+            self,
+        )
+        shortcut.activated.connect(self.handle_go_next)
 
-    def handle_go_next(self):
+    def handle_go_next(self) -> dict:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        self.instruments.go_next()
-        self.viewer.go_next()
+        v = {}
+        v.update(self.instruments.go_next())
+        v.update(self.viewer.go_next())
+        return v
+
+    def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:
+        """
+        Handle a Screenshot API to get the image of the viewer as currently displayed in laser studio.
+        Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
+
+        :param path: The path where to store the viewer's image. If None, the image data is
+        returned.
+        :return: The Image if it has not been stored in a file, otherwise a 1x1 placeholder pixel.
+        """
+        # Takes the Image of the viewer as currently shown.
+        pixmap = self.viewer.grab()
+        if path is not None:
+            pixmap.save(path)
+            # Image has been saved at a given path, we return a 1x1 black pixel.
+            return Image.new("1", (1, 1))
+        return ImageQt.fromqpixmap(pixmap)
+
+    def handle_camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+        """
+        Handle a Camera API request to get the image of the camera associated to the main Stage.
+        Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
+
+        :param path: The path where to store the camera's image. If None, the image data is
+            returned.
+        :return: The Image if it has not been stored in a file, otherwise a 1x1 placeholder pixel.
+            None if no camera exists
+        """
+        # Takes the Image of the camera associated to the stage.
+        if self.viewer.stage_sight is None or self.viewer.stage_sight.camera is None:
+            return None
+
+        im = self.viewer.stage_sight.image.pixmap()
+        if path is not None:
+            im.save(path)
+            # Image has been saved at a given path, we return a 1x1 black pixel.
+            return Image.new("1", (1, 1))
+        return ImageQt.fromqpixmap(im)
+
+    def handle_position(self, pos: Optional[list[float]]) -> dict:
+        if self.instruments.stage is None:
+            return {"pos": []}
+        if pos is not None:
+            self.instruments.stage.move_to(Vector(*pos), wait=True)
+        return {"pos": self.instruments.stage.position.data}
+
+    def handle_add_markers(
+        self, positions: Optional[list[list[float]]], color: Optional[list[float]]
+    ) -> dict:
+        """Add a marker.
+
+        :param pos: The requested position(s) of the marker(s)
+        :param color: The requested color of the marker(s). Defined as a list of 3 floats from 0.0 to 1.0 (RGB)
+            or 4 floats from 0.0 to 1.0 (RGBA).
+        :return: A dictionary containing the information about the markers' final position(s), and identifier(s)
+        """
+        if color is None:
+            qcolor = Qt.GlobalColor.red
+        else:
+            if len(color) == 3:
+                color.append(1.0)
+            if len(color) != 4:
+                ValueError(
+                    "Color argument is invalid. It should be a list of 3 or 4 floats"
+                )
+            qcolor = QColor(
+                int(color[0] * 255),
+                int(color[1] * 255),
+                int(color[2] * 255),
+                int(color[3] * 255),
+            )
+
+        if positions is None:
+            markers = [self.viewer.add_marker(None, color=qcolor)]
+        else:
+            markers = [
+                self.viewer.add_marker((pos[0], pos[1]), color=qcolor)
+                for pos in positions
+            ]
+
+        description = [
+            {"id": marker.id, "pos": [marker.pos().x(), marker.pos().y()]}
+            for marker in markers
+        ]
+        if len(description) == 1:
+            return description[0]
+        return {"markers": description}
+
+    def handle_go_to_memory_point(self, index: int):
+        """Perform a move operation on stage to go to a memory point.
+            Memory points are defined in the configuration file, on the
+            stage -> mem_points.
+
+        :param name: The name of the memory point to go to.
+        """
+        if self.instruments.stage is None:
+            return {"pos": []}
+
+        if index < 0 or index >= len(self.instruments.stage.mem_points):
+            return {"pos": []}
+
+        point = self.instruments.stage.mem_points[index]
+
+        self.instruments.stage.move_to(point, wait=True)
+        return {"pos": self.instruments.stage.position.data}
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
@@ -267,3 +280,61 @@ class LaserStudio(QMainWindow):
         for b in self.viewer_buttons_group.buttons():
             if id == self.viewer_buttons_group.id(b):
                 b.setChecked(True)
+
+    def save_settings(self):
+        """
+        Save some settings in the settings.yaml file.
+        """
+        data: dict[str, Any] = {}
+
+        # Camera settings
+        if self.instruments.camera is not None:
+            data["camera"] = self.instruments.camera.yaml
+
+        # Scanning geometry
+        data["scangeometry"] = self.viewer.scan_geometry.yaml
+
+        # Probes
+        data["probes"] = [probe.yaml for probe in self.instruments.probes]
+
+        # Lasers
+        data["lasers"] = [laser.yaml for laser in self.instruments.lasers]
+
+        # Viewver
+        data["viewer"] = self.viewer.yaml
+
+        yaml.dump(data, open("settings.yaml", "w"))
+
+    def reload_settings(self):
+        """
+        Restore settings in the settings.yaml file.
+        """
+        data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        # Camera settings (maybe missing from settings)
+        camera = data.get("camera")
+        if (self.instruments.camera is not None) and (camera is not None):
+            self.instruments.camera.yaml = camera
+            if self.viewer.stage_sight is not None:
+                self.viewer.stage_sight.distortion = (
+                    self.instruments.camera.correction_matrix
+                )
+
+        # Scanning geometry
+        geometry = data.get("scangeometry")
+        if geometry is not None:
+            self.viewer.scan_geometry.yaml = geometry
+
+        # Probes
+        probes = data.get("probes", [])
+        for pdata, probe in zip(probes, self.instruments.probes):
+            probe.yaml = pdata
+
+        # Lasers
+        lasers = data.get("lasers", [])
+        for pdata, laser in zip(lasers, self.instruments.lasers):
+            laser.yaml = pdata
+
+        # Viewver's configuration
+        viewer = data.get("viewer")
+        if viewer is not None:
+            self.viewer.yaml = viewer
