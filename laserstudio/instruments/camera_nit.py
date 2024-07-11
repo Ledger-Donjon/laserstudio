@@ -1,5 +1,5 @@
 from .camera import CameraInstrument
-from typing import Optional, Literal
+from typing import Optional, Literal, cast
 
 
 class CameraNITInstrument(CameraInstrument):
@@ -15,6 +15,10 @@ class CameraNITInstrument(CameraInstrument):
             ),
             bpr_filepath=config.get("bpr_filepath", "./nuc/25mhz/BPM.yml"),
         )
+
+        # Objective
+        objective = cast(float, config.get("objective", 5.0))
+        self.select_objective(objective)
 
     def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
         """
@@ -39,8 +43,8 @@ class CameraNITInstrument(CameraInstrument):
         :rtype: tuple[float, float]
         """
         return (
-            self.pynit.gain_controller.get_low(),
-            self.pynit.gain_controller.get_high(),
+            self.pynit.gain_controller.get_low() * 64,
+            self.pynit.gain_controller.get_high() * 64,
         )
 
     @gain.setter
@@ -60,9 +64,7 @@ class CameraNITInstrument(CameraInstrument):
             raise ValueError("Low bound out of range!")
         if (high < 0) or (high > 0xFFFF):
             raise ValueError("High bound out of range!")
-        self.pynit.gain_controller.set_range(low, high)
-
-        self.pynit.gain_controller.set_range(low, high)
+        self.pynit.gain_controller.set_range(low / 64, high / 64)
 
     def gain_autoset(self) -> tuple[int, int]:
         """

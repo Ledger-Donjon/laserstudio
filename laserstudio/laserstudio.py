@@ -8,7 +8,12 @@ from PyQt6.QtWidgets import (
 from typing import Optional, Any
 
 from .widgets.viewer import Viewer
-from .instruments.instruments import Instruments, PDMInstrument, LaserDriverInstrument
+from .instruments.instruments import (
+    Instruments,
+    PDMInstrument,
+    LaserDriverInstrument,
+    CameraNITInstrument,
+)
 from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolbar,
@@ -19,6 +24,7 @@ from .widgets.toolbars import (
     MainToolbar,
     PDMToolbar,
     LaserDriverToolbar,
+    CameraNITToolBar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -84,6 +90,11 @@ class LaserStudio(QMainWindow):
         # Toolbar: Camera Image control
         if self.instruments.camera is not None:
             toolbar = CameraToolbar(self)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+
+        # Toolbar: NIT Camera Image control
+        if isinstance(self.instruments.camera, CameraNITInstrument):
+            toolbar = CameraNITToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
         # Laser toolbars
