@@ -52,6 +52,22 @@
                 }
             },
             "$ref": "rest.schema.json"
+        },
+        {
+            "properties": {
+                "type": {
+                    "const": "NIT",
+                    "description": "A Camera from New Imaging Technologies."
+                },
+                "nuc_filepath": {
+                    "type": "string",
+                    "description": "The file path pointing to the NUC settings of the camera."
+                },
+                "bpr_filepath": {
+                    "type": "string",
+                    "description": "The file path pointing to the BPR settings of the camera."
+                }
+            }
         }
     ],
     "required": [

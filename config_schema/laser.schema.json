@@ -16,7 +16,7 @@
             "properties": {
                 "type": {
                     "const": "PDM",
-                    "description": "Corvus Stage."
+                    "description": "Pulse-on-Demand Module from ALPhANOV."
                 }
             },
             "$ref": "serial.schema.json",
