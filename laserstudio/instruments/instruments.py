@@ -3,8 +3,9 @@ from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
+from .camera_nit import CameraNITInstrument
 from .laser import LaserInstrument
-from .laserdriver import LaserDriverInstrument, LaserDriver
+from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
 from typing import Optional, cast, Any
@@ -46,6 +47,10 @@ class Instruments:
                     )
                 elif device_type == "REST":
                     self.camera: Optional[CameraInstrument] = CameraRESTInstrument(
+                        camera_config
+                    )
+                elif device_type == "NIT":
+                    self.camera: Optional[CameraInstrument] = CameraNITInstrument(
                         camera_config
                     )
             except Exception as e:
