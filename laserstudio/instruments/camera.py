@@ -33,8 +33,8 @@ class CameraInstrument(Instrument):
         )
 
         # Objective
-        objective = cast(float, config.get("objective", 1.0))
-        self.select_objective(objective)
+        self.objective = cast(float, config.get("objective", 1.0))
+        self.select_objective(self.objective)
 
         # Correction matrix
         self.correction_matrix: Optional[QTransform] = None
@@ -44,6 +44,7 @@ class CameraInstrument(Instrument):
 
         :param factor: The magnifying factor of the objective (5x, 10x, 20x, 50x...)
         """
+        self.objective = factor
         self.width_um = self.width * self.pixel_size_in_um[0] / factor
         self.height_um = self.height * self.pixel_size_in_um[1] / factor
 
