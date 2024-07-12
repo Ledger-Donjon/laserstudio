@@ -86,6 +86,8 @@ class CameraNITToolBar(QToolBar):
         for x in [5, 10, 20, 50]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
+            if x == self.camera.objective:
+                w.setCurrentIndex(w.count() - 1)
         w.setStyleSheet("QListView::item {height:24px;}")
         w.currentIndexChanged.connect(self.mag_changed)
         hbox.addWidget(w)
