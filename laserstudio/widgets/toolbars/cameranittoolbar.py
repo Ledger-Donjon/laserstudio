@@ -9,10 +9,12 @@ from PyQt6.QtWidgets import (
     QLabel,
     QHBoxLayout,
     QVBoxLayout,
+    QMessageBox,
 )
 from ..return_line_edit import ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
 from ...utils import util
+import pickle
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -92,6 +94,29 @@ class CameraNITToolBar(QToolBar):
         w.currentIndexChanged.connect(self.mag_changed)
         hbox.addWidget(w)
 
+        # Shading correction
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        w = QPushButton("Shade")
+        w.setToolTip("Set current image as shading correction")
+        w.clicked.connect(self.camera.shade_correct)
+        hbox.addWidget(w)
+
+        w = QPushButton("Clear")
+        w.setToolTip("Clear shading correction")
+        w.clicked.connect(self.camera.clear_shade_correction)
+        hbox.addWidget(w)
+
+        w = QPushButton("Save")
+        w.setToolTip("Save shading correction")
+        w.clicked.connect(self.shade_save)
+        hbox.addWidget(w)
+
+        w = QPushButton("Load")
+        w.setToolTip("Load shading correction")
+        w.clicked.connect(self.shade_load)
+        hbox.addWidget(w)
+
     def gain_changed(self):
         """
         Called when histogram gain bound is changed in the UI.
@@ -135,3 +160,21 @@ class CameraNITToolBar(QToolBar):
         self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()
+
+    def shade_save(self):
+        """
+        Save shading correction to file.
+        """
+        data = self.camera.shade_correction
+        with open(f"shade-{self.camera.objective:.0f}x.pickle", "wb") as f:
+            pickle.dump(data, f)
+
+    def shade_load(self):
+        """
+        Load shading correction from file.
+        """
+        try:
+            with open(f"shade-{self.camera.objective:.0f}x.pickle", "rb") as f:
+                self.camera.shade_correction = pickle.load(f)
+        except FileNotFoundError:
+            QMessageBox().critical(None, "Error", "Shading correction file not found.")
