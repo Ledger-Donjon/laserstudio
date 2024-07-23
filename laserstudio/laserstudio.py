@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-from PyQt6.QtCore import Qt, QKeyCombination
+from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -42,6 +42,9 @@ class LaserStudio(QMainWindow):
 
         if config is None:
             config = {}
+
+        # User settings
+        self.settings = QSettings("ledger", "laserstudio")
 
         # Instantiate all instruments
         self.instruments = Instruments(config)
@@ -168,6 +171,20 @@ class LaserStudio(QMainWindow):
             self,
         )
         shortcut.activated.connect(self.handle_go_next)
+
+        # Restore docks are previous session
+        geometry = self.settings.value("geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+        window_state = self.settings.value("window-state")
+        if window_state is not None:
+            self.restoreState(window_state)
+
+    def closeEvent(self, event):
+        """Saves user settings before closing the application."""
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.setValue("window-state", self.saveState())
+        super().closeEvent(event)
 
     def handle_go_next(self) -> dict:
         """Go Next operation.

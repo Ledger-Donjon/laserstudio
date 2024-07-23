@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 class MainToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Main", laser_studio)
+        self.setObjectName("toolbar-main")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea

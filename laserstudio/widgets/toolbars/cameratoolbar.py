@@ -27,6 +27,7 @@ class CameraToolbar(QToolBar):
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
         super().__init__("Camera parameters", laser_studio)
+        self.setObjectName("toolbar-camera")  # For settings save and restore
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea
             | Qt.ToolBarArea.RightToolBarArea

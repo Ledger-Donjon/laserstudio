@@ -26,6 +26,7 @@ class StageToolbar(QToolBar):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
         super().__init__("Stage control", laser_studio)
+        self.setObjectName("toolbar-stage")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea
