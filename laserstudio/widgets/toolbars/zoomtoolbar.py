@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 class ZoomToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Zoom control", laser_studio)
+        self.setObjectName("toolbar-zoom")  # For settings save and restore
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 

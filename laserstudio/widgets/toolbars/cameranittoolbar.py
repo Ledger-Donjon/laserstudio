@@ -28,6 +28,7 @@ class CameraNITToolBar(QToolBar):
         self.laser_studio = laser_studio
 
         super().__init__("NIT Camera parameters", laser_studio)
+        self.setObjectName("toolbar-camera-nit")  # For settings save and restore
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea
             | Qt.ToolBarArea.RightToolBarArea

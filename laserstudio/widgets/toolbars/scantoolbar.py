@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 class ScanToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Scanning Zones", laser_studio)
+        self.setObjectName("toolbar-scanning")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
