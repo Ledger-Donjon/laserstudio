@@ -17,7 +17,7 @@ class LaserDriverToolbar(LaserToolbar):
         assert laser_num < len(laser_studio.instruments.lasers)
         self.laser = laser_studio.instruments.lasers[laser_num]
         assert isinstance(self.laser, LaserDriverInstrument)
-        super().__init__(f"Laser {laser_num} (Donjon Driver)", f"toolbar-laser-donjon-{laser_num}")
+        super().__init__(f"Laser {laser_num} (Donjon Driver)", "donjon", laser_num)
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )

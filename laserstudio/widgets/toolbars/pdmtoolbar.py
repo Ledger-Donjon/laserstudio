@@ -24,7 +24,7 @@ class PDMToolbar(LaserToolbar):
         assert laser_num < len(laser_studio.instruments.lasers)
         self.laser = laser_studio.instruments.lasers[laser_num]
         assert isinstance(self.laser, PDMInstrument)
-        super().__init__(f"Laser {laser_num} (PDM)", f"toolbar-laser-pdm-{laser_num}")
+        super().__init__(f"Laser {laser_num} (PDM)", "pdm", laser_num)
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
