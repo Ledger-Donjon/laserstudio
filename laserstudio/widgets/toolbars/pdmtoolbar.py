@@ -21,10 +21,16 @@ if TYPE_CHECKING:
 
 class PDMToolbar(LaserToolbar):
     def __init__(self, laser_studio: "LaserStudio", laser_num: int):
+        """
+        :param laser_studio: Main windows of laserstudio. Can be used for interacting with
+            other elements of the UI.
+        :param laser_num: Laser equipment index.
+        """
         assert laser_num < len(laser_studio.instruments.lasers)
         self.laser = laser_studio.instruments.lasers[laser_num]
         assert isinstance(self.laser, PDMInstrument)
-        super().__init__(f"Laser {laser_num} (PDM)", "pdm", laser_num)
+        super().__init__(f"Laser {laser_num} (PDM)", laser_studio, laser_num)
+        super().setObjectName(f"toolbox-laser-pdm-{laser_num}")  # For settings save and restore
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
