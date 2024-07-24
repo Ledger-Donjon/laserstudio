@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 class PictureToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Background picture", laser_studio)
+        self.setObjectName("toolbar-background-picture")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
