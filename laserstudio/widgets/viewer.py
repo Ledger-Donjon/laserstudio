@@ -298,27 +298,27 @@ class Viewer(QGraphicsView):
         """
         if event is None:
             return
-        # We want to zoom relative to the current cursor position, not relative
-        # to the center of the widget. This involves some math...
-        # p is the pointed position in the scene, and we want to keep p at the
-        # same screen position after changing the zoom. If c1 and c2 are the
-        # camera positions before and after the zoom changes,
-        # z1 and z2 the zoom levels, then we want:
-        # z1 * (p - c1) = z2 * (p - c2)
-        # which gives:
-        # c2 = c1 * (z1/z2) + p * (1 - z1/z2)
-        # we can use zr = z2/z1, the zoom factor to apply.
-
-        # The pointed position
-        p = self.mapToScene(event.position().toPoint())
-
+        # Get current position and zoom factor of camera
+        pos, zoom = self.cam_pos_zoom
         # The zoom factor to apply
         zr = 2 ** (event.angleDelta().y() / (8 * 120))
 
-        # Get current position and zoom factor of camera
-        pos, zoom = self.cam_pos_zoom
+        if not self._follow_stage_sight:
+            # We want to zoom relative to the current cursor position, not relative
+            # to the center of the widget. This involves some math...
+            # p is the pointed position in the scene, and we want to keep p at the
+            # same screen position after changing the zoom. If c1 and c2 are the
+            # camera positions before and after the zoom changes,
+            # z1 and z2 the zoom levels, then we want:
+            # z1 * (p - c1) = z2 * (p - c2)
+            # which gives:
+            # c2 = c1 * (z1/z2) + p * (1 - z1/z2)
+            # we can use zr = z2/z1, the zoom factor to apply.
 
-        pos = (pos / zr) + (p * (1 - (1 / zr)))
+            # The pointed position
+            p = self.mapToScene(event.position().toPoint())
+            pos = (pos / zr) + (p * (1 - (1 / zr)))
+
         zoom *= zr
 
         # Update the position and zoom factors
