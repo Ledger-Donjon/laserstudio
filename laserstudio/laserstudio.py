@@ -70,7 +70,7 @@ class LaserStudio(QMainWindow):
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Toolbar: Main
-        toolbar = MainToolbar(self)
+        toolbar = MainToolbar(self, self.viewer)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Background picture

@@ -612,6 +612,12 @@ class Viewer(QGraphicsView):
         marker.update_tooltip()
         return marker
 
+    def clear_markers(self):
+        """Removes all markers."""
+        for marker in self.__markers:
+            self.__scene.removeItem(marker)
+        self.__markers.clear()
+
     @property
     def yaml(self) -> dict:
         """Export settings to a dict for yaml serialization."""
