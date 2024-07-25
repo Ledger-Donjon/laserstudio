@@ -347,18 +347,19 @@ class Viewer(QGraphicsView):
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
-            # Scroll gesture mode
-            self.setDragMode(Viewer.DragMode.ScrollHandDrag)
-            # Transform as left press button event,
-            # to make the scroll by dragging actually effective.
-            event = QMouseEvent(
-                event.type(),
-                event.position(),
-                Qt.MouseButton.LeftButton,
-                event.buttons(),
-                event.modifiers(),
-                event.pointingDevice(),
-            )
+            if not self._follow_stage_sight:
+                # Scroll gesture mode
+                self.setDragMode(Viewer.DragMode.ScrollHandDrag)
+                # Transform as left press button event,
+                # to make the scroll by dragging actually effective.
+                event = QMouseEvent(
+                    event.type(),
+                    event.position(),
+                    Qt.MouseButton.LeftButton,
+                    event.buttons(),
+                    event.modifiers(),
+                    event.pointingDevice(),
+                )
 
         super().mousePressEvent(event)
 
