@@ -22,6 +22,7 @@ from .widgets.toolbars import (
     StageToolbar,
     CameraToolbar,
     MainToolbar,
+    MarkersToolbar,
     PDMToolbar,
     LaserDriverToolbar,
     CameraNITToolBar,
@@ -70,7 +71,7 @@ class LaserStudio(QMainWindow):
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Toolbar: Main
-        toolbar = MainToolbar(self, self.viewer)
+        toolbar = MainToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Background picture
@@ -79,6 +80,10 @@ class LaserStudio(QMainWindow):
 
         # Toolbar: Zoom
         toolbar = ZoomToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+        # Toolbar: Markers
+        toolbar = MarkersToolbar(self, self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
