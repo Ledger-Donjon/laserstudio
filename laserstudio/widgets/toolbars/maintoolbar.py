@@ -4,14 +4,13 @@ from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
 from ...utils.util import resource_path, colored_image
 from ..coloredbutton import ColoredPushButton
-from ..viewer import Viewer
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
 class MainToolbar(QToolBar):
-    def __init__(self, laser_studio: "LaserStudio", viewer: Viewer):
+    def __init__(self, laser_studio: "LaserStudio"):
         """
         :param viewer: Required for the menu to remove markers.
         """
@@ -50,7 +49,5 @@ class MainToolbar(QToolBar):
         settings_menu = QMenu("Settings", self)
         settings_menu.addAction("Save settings", laser_studio.save_settings)
         settings_menu.addAction("Load settings", laser_studio.reload_settings)
-        settings_menu.addSeparator()
-        settings_menu.addAction("Clear markers", viewer.clear_markers)
         w.setMenu(settings_menu)
         self.addWidget(w)
