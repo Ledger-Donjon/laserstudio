@@ -83,7 +83,7 @@ class LaserStudio(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Markers
-        toolbar = MarkersToolbar(self, self.viewer)
+        toolbar = MarkersToolbar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
