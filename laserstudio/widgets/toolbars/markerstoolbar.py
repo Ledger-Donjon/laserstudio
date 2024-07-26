@@ -19,7 +19,7 @@ class MarkersToolbar(QToolBar):
         w.setIcon(QIcon(colored_image(":/icons/location-pin-plus.svg")))
         w.setIconSize(QSize(24, 24))
         w.setToolTip("Add markers")
-        w.clicked.connect(viewer.add_marker)
+        w.clicked.connect(lambda: viewer.add_marker())
         self.addWidget(w)
 
         # Clear all markers
