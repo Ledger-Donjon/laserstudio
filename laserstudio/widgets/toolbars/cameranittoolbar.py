@@ -57,18 +57,17 @@ class CameraNITToolBar(QToolBar):
         hbox.addWidget(w)
         # Button to trigger the NIT camera gain
         # Checkbox to activate/deactivate the timer
-        w = QPushButton("AGC")
+        self.button_agc = w = QPushButton("AGC")
         w.setToolTip("Auto gain control (every 1 second)")
         w.setCheckable(True)
         w.setChecked(True)
-        w.clicked.connect(
-            lambda state: self.timer.setInterval(1000) if state else self.timer.stop()
-        )
+        w.clicked.connect(self.agc_changed)
         hbox.addWidget(w)
         # Timer to trigger gain autoset every 1 seconds
         self.timer = QTimer()
         self.timer.timeout.connect(self.gain_autoset)
-        self.timer.start(1000)  # 1 seconds interval
+        self.timer.setInterval(1000)  # 1 second interval
+        self.agc_changed(self.button_agc.isChecked())
 
         # Averaging management
         hbox = QHBoxLayout()
@@ -179,3 +178,19 @@ class CameraNITToolBar(QToolBar):
                 self.camera.shade_correction = pickle.load(f)
         except FileNotFoundError:
             QMessageBox().critical(None, "Error", "Shading correction file not found.")
+
+    def agc_changed(self, state: bool):
+        """
+        Called when AGC button is toggled.
+        Enables or disables Automatic Gain Correction.
+
+        :param state: True when button is checked, which enables AGC. False otherwise.
+        """
+        if state:
+            # Apply gain correcttion immediately, don't wait 1 second for the timer to
+            # expire.
+            self.gain_autoset()
+            # Re-enabled timer
+            self.timer.start()
+        else:
+            self.timer.stop()
