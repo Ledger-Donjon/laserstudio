@@ -141,8 +141,7 @@ class StageToolbar(QToolBar):
             buttons=QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Apply,
             defaultButton=QMessageBox.StandardButton.Abort,
         ):
-            ...
-            # self.stage.stage.home(wait=True)
+            self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
         move_for = self.move_for_selector.itemData(index, Qt.ItemDataRole.UserRole)
