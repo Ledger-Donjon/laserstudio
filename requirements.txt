@@ -1,4 +1,4 @@
-PyQt6==6.6.1
+PyQt6
 pystages @ git+https://github.com/Ledger-Donjon/pystages@10d09f535a4a0e5ef6130d390e98fc0ce3f9cbd5
 Pillow==10.3.0
 opencv-python==4.9.0.80

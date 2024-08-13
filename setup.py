@@ -57,7 +57,7 @@ and randomly go through these zones, by controlling motion devices.""",
         "Documentation": "https://laserstudio.readthedocs.org/",
     },
     install_requires=[
-        "PyQt6==6.6.1",
+        "PyQt6",
         "pystages==1.1.1",
         "Pillow==10.3.0",
         "opencv-python==4.9.0.80",
