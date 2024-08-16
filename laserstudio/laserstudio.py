@@ -94,8 +94,14 @@ class LaserStudio(QMainWindow):
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
         # Toolbar: Focusing
-        if (self.instruments.stage is not None) and (self.instruments.camera is not None):
-            toolbar = FocusToolbar(self.instruments.stage, self.instruments.camera)
+        if (self.instruments.stage is not None) and (
+            self.instruments.camera is not None
+        ):
+            toolbar = FocusToolbar(
+                self.instruments.stage,
+                self.instruments.camera,
+                self.instruments.autofocus_helper,
+            )
             self.addToolBar(toolbar)
 
         # Toolbar: Scanning zone definition and usage

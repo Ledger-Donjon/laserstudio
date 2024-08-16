@@ -13,9 +13,9 @@ from laserstudio.utils.util import colored_image
 class FocusToolbar(QToolBar):
     """Toolbar for focus registration and autofocus."""
 
-    def __init__(self, stage, camera: CameraNITInstrument):
+    def __init__(self, stage, camera: CameraNITInstrument, autofocus_helper: Autofocus):
         """
-        :param autofocus: Stores the registered points and calculates focus on demand.
+        :param autofocus_helper: Stores the registered points and calculates focus on demand.
         """
         super().__init__("Focus")
         self.setObjectName("toolbar-focus")  # For settings save and restore
@@ -26,7 +26,7 @@ class FocusToolbar(QToolBar):
         # This is used to prevent launching two search threads at the same time.
         self.focus_thread: FocusThread | None = None
 
-        self.autofocus_helper = Autofocus()
+        self.autofocus_helper = autofocus_helper
         self.stage = stage
         self.camera = camera
 

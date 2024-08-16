@@ -41,11 +41,8 @@ class RestProxy(QObject):
 
     @pyqtSlot(result="QVariant")
     def handle_autofocus(self):
-        return QVariant({"error": "Not implemented"})
-        try:
-            return QVariant(self.laser_studio.autofocus(no_warning=True))
-        except RuntimeError as e:
-            return {"error": str(e)}
+        self.laser_studio.instruments.autofocus()
+        return QVariant({})
 
     @pyqtSlot(result="QVariant")
     def handle_go_to_memory_point(self, index: int):
