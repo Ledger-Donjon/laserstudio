@@ -1,5 +1,5 @@
 PyQt6
-pystages @ git+https://github.com/Ledger-Donjon/pystages@10d09f535a4a0e5ef6130d390e98fc0ce3f9cbd5
+pystages==1.2
 Pillow==10.3.0
 opencv-python==4.9.0.80
 pyusb==1.2.1
