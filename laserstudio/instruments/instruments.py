@@ -1,3 +1,6 @@
+from pystages import Autofocus, Vector
+from typing import Optional, cast, Any
+import logging
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
@@ -8,8 +11,6 @@ from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
-from typing import Optional, cast, Any
-import logging
 
 
 class Instruments:
@@ -91,8 +92,22 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
+        # Autofocus helper: stores registered position in order to do automatic camera
+        # focusing. This can be considered as an abstract instrument.
+        self.autofocus_helper = Autofocus()
+
     def go_next(self) -> dict[str, Any]:
         results = []
         for laser in self.lasers:
             results.append(laser.go_next())
         return {"lasers": results}
+
+    def autofocus(self):
+        if self.stage is None:
+            return
+        if len(self.autofocus_helper.registered_points) < 3:
+            return
+        pos = self.stage.position
+        z = self.autofocus_helper.focus(pos.x, pos.y)
+        assert abs(z - pos.z) < 500
+        self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
