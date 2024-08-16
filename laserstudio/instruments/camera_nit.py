@@ -137,3 +137,19 @@ class CameraNITInstrument(CameraInstrument):
         :rtype: float
         """
         return self.pynit.get_laplacian_std_dev()
+
+    @property
+    def averaged_count(self):
+        return self.pynit.get_averaged_count()
+
+    def averaging_restart(self):
+        self.pynit.averaging_restart()
+
+    @property
+    def counter(self):
+        """Number of capture frames since last counter reset."""
+        return self.pynit.counter
+
+    def reset_counter(self):
+        """Resets frame counter."""
+        self.pynit.reset_counter()
