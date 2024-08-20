@@ -16,9 +16,6 @@ class ZoomToolbar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
-        # Store a reference to the viewer.
-        self.viewer = viewer
-
         # Zoom in (*2).
         w = QPushButton(self)
         w.setToolTip("Zoom in")
