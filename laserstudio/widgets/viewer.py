@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QGraphicsPixmapItem,
 )
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal, pyqtProperty
+from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -359,8 +359,7 @@ class Viewer(QGraphicsView):
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
-            # Disable the stagesight following,
-            # through the toolbar' button (to update its state)
+            # Disable the StageSight tracking
             self.follow_stage_sight = False
 
             # Scroll gesture mode
