@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QGraphicsPixmapItem,
 )
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, pyqtSignal, pyqtProperty
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -52,6 +52,8 @@ class Viewer(QGraphicsView):
     mode_changed = pyqtSignal(int)
     # Signal emitted when the mouse has moved in scene
     mouse_moved = pyqtSignal(float, float)
+    # Signal emitted when the follow stage sight option changed
+    followStageSightChanged = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -126,22 +128,32 @@ class Viewer(QGraphicsView):
         for m in self.__markers:
             m.size = value
 
+    @property
+    def follow_stage_sight(self) -> bool:
+        return self._follow_stage_sight
+
+    @follow_stage_sight.setter
     def follow_stage_sight(self, value: bool):
         """Triggers an update of the camera position when the stage sight change its own position."""
         if self.stage_sight is None:
             return
+
+        # We force to disconnect, in all cases (if already connected).
         if self._follow_stage_sight:
             self.stage_sight.position_changed.disconnect()
-            self._follow_stage_sight = False
 
         if value:
-            self._follow_stage_sight = True
             self.stage_sight.position_changed.connect(
                 lambda _: self.__setattr__(
                     "cam_pos_zoom",
                     (self.focused_element_position(), self.zoom),
                 )
             )
+
+        # Emit the signal if necessary
+        if self._follow_stage_sight != value:
+            self._follow_stage_sight = value
+            self.followStageSightChanged.emit(value)
 
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
@@ -347,19 +359,22 @@ class Viewer(QGraphicsView):
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
-            if not self._follow_stage_sight:
-                # Scroll gesture mode
-                self.setDragMode(Viewer.DragMode.ScrollHandDrag)
-                # Transform as left press button event,
-                # to make the scroll by dragging actually effective.
-                event = QMouseEvent(
-                    event.type(),
-                    event.position(),
-                    Qt.MouseButton.LeftButton,
-                    event.buttons(),
-                    event.modifiers(),
-                    event.pointingDevice(),
-                )
+            # Disable the stagesight following,
+            # through the toolbar' button (to update its state)
+            self.follow_stage_sight = False
+
+            # Scroll gesture mode
+            self.setDragMode(Viewer.DragMode.ScrollHandDrag)
+            # Transform as left press button event,
+            # to make the scroll by dragging actually effective.
+            event = QMouseEvent(
+                event.type(),
+                event.position(),
+                Qt.MouseButton.LeftButton,
+                event.buttons(),
+                event.modifiers(),
+                event.pointingDevice(),
+            )
 
         super().mousePressEvent(event)
 
