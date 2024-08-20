@@ -6,12 +6,12 @@ from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
 
 if TYPE_CHECKING:
-    from ...laserstudio import LaserStudio
+    from ...widgets.viewer import Viewer
 
 
 class ZoomToolbar(QToolBar):
-    def __init__(self, laser_studio: "LaserStudio"):
-        super().__init__("Zoom control", laser_studio)
+    def __init__(self, viewer: "Viewer"):
+        super().__init__("Zoom control")
         self.setObjectName("toolbar-zoom")  # For settings save and restore
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
@@ -27,11 +27,7 @@ class ZoomToolbar(QToolBar):
             )
         )
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(
-            lambda: laser_studio.viewer.__setattr__(
-                "zoom", laser_studio.viewer.zoom * 2.0
-            )
-        )
+        w.clicked.connect(lambda: viewer.__setattr__("zoom", viewer.zoom * 2.0))
         self.addWidget(w)
 
         # Zoom out (/2).
@@ -45,11 +41,7 @@ class ZoomToolbar(QToolBar):
             )
         )
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(
-            lambda: laser_studio.viewer.__setattr__(
-                "zoom", laser_studio.viewer.zoom * 0.5
-            )
-        )
+        w.clicked.connect(lambda: viewer.__setattr__("zoom", viewer.zoom * 0.5))
         self.addWidget(w)
 
         # Zoom reset (1:1).
@@ -57,7 +49,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Reset zoom")
         w.setIcon(QIcon(colored_image(":/icons/magnifying-glass-one-solid.svg")))
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(lambda: laser_studio.viewer.__delattr__("zoom"))
+        w.clicked.connect(lambda: viewer.__delattr__("zoom"))
         self.addWidget(w)
 
         # Zoom to all.
@@ -65,7 +57,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Reset Viewer to see all elements")
         w.setIcon(QIcon(colored_image(":/icons/magnifying-glass-all-solid.svg")))
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(laser_studio.viewer.reset_camera)
+        w.clicked.connect(viewer.reset_camera)
         self.addWidget(w)
 
         # Button to enable/disable StageSight position tracking.
@@ -75,7 +67,7 @@ class ZoomToolbar(QToolBar):
         w.setToolTip("Center on focused item")
         w.setCheckable(True)
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(laser_studio.viewer.follow_stage_sight)
+        w.toggled.connect(lambda x: viewer.__setattr__("follow_stage_sight", x))
         w.setChecked(True)
         self.addWidget(w)
 
@@ -86,7 +78,7 @@ class ZoomToolbar(QToolBar):
         )
         self.position.setCheckable(True)
         self.position.toggled.connect(self.activate_mouse_tracking)
-        self.position_signal = laser_studio.viewer.mouse_moved
+        self.position_signal = viewer.mouse_moved
         self.addWidget(self.position)
         self.position.setChecked(True)
 

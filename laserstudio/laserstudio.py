@@ -79,7 +79,7 @@ class LaserStudio(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Zoom
-        toolbar = ZoomToolbar(self)
+        toolbar = ZoomToolbar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Toolbar: Markers
