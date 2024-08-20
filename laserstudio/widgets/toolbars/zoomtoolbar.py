@@ -16,6 +16,9 @@ class ZoomToolbar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
+        # Store a reference to the viewer.
+        self.viewer = viewer
+
         # Zoom in (*2).
         w = QPushButton(self)
         w.setToolTip("Zoom in")
@@ -68,6 +71,7 @@ class ZoomToolbar(QToolBar):
         w.setCheckable(True)
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda x: viewer.__setattr__("follow_stage_sight", x))
+        viewer.followStageSightChanged.connect(w.setChecked)
         w.setChecked(True)
         self.addWidget(w)
 
