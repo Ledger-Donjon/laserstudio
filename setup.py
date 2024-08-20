@@ -58,7 +58,7 @@ and randomly go through these zones, by controlling motion devices.""",
     },
     install_requires=[
         "PyQt6",
-        "pystages==1.1.1",
+        "pystages==1.2",
         "Pillow==10.3.0",
         "opencv-python==4.9.0.80",
         "pyusb==1.2.1",
