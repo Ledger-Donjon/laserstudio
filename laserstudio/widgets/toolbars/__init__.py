@@ -1,6 +1,5 @@
 from .cameratoolbar import CameraToolbar
 from .cameranittoolbar import CameraNITToolBar
-from .lasertoolbar import LaserToolbar
 from .pdmtoolbar import PDMToolbar
 from .laserdrivertoolbar import LaserDriverToolbar
 from .maintoolbar import MainToolbar
@@ -17,7 +16,6 @@ __all__ = [
     "CameraToolbar",
     "CameraNITToolBar",
     "PictureToolbar",
-    "LaserToolbar",
     "LaserDriverToolbar",
     "PDMToolbar",
 ]

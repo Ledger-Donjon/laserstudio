@@ -11,31 +11,28 @@ from PyQt6.QtGui import QIcon, QPixmap
 
 from laserstudio.instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
-from typing import TYPE_CHECKING
 from ..return_line_edit import ReturnDoubleSpinBox
-from .lasertoolbar import LaserToolbar
-
-if TYPE_CHECKING:
-    from ...laserstudio import LaserStudio
+from PyQt6.QtWidgets import QToolBar
 
 
-class PDMToolbar(LaserToolbar):
-    def __init__(self, laser_studio: "LaserStudio", laser_num: int):
+class PDMToolbar(QToolBar):
+    def __init__(self, laser: PDMInstrument, laser_num: int):
         """
-        :param laser_studio: Main windows of laserstudio. Can be used for interacting with
-            other elements of the UI.
+        :param laser: Alphanov PDM instrument.
         :param laser_num: Laser equipment index.
         """
-        assert laser_num < len(laser_studio.instruments.lasers)
-        self.laser = laser_studio.instruments.lasers[laser_num]
-        assert isinstance(self.laser, PDMInstrument)
-        super().__init__(f"Laser {laser_num} (PDM)", laser_studio, laser_num)
-        super().setObjectName(f"toolbox-laser-pdm-{laser_num}")  # For settings save and restore
+        assert isinstance(laser, PDMInstrument)
+        self.laser = laser
+        super().__init__(f"Laser {laser_num} (PDM)")
+        self.setObjectName(
+            f"toolbox-laser-pdm-{laser_num}"
+        )  # For settings save and restore
+
         self.setAllowedAreas(
             Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
         )
-
         self.setFloatable(True)
+
         w = QPushButton(self)
         w.setToolTip("On/Off Laser")
         w.setCheckable(True)
