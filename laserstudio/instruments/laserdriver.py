@@ -1,4 +1,4 @@
-# Lazy import, LaserDriver is not supported yet.
+# Lazy import, LaserDriver is not pubicly supported yet.
 try:
     from laser_driver import LaserDriver  # type: ignore
 except Exception:

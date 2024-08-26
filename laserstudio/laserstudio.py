@@ -108,9 +108,9 @@ class LaserStudio(QMainWindow):
         # Laser toolbars
         for i, laser in enumerate(self.instruments.lasers):
             if isinstance(laser, PDMInstrument):
-                toolbar = PDMToolbar(self, i)
+                toolbar = PDMToolbar(laser, i)
             elif isinstance(laser, LaserDriverInstrument):
-                toolbar = LaserDriverToolbar(self, i)
+                toolbar = LaserDriverToolbar(laser, i)
             else:
                 continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
