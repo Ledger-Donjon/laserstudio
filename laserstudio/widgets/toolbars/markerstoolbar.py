@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton

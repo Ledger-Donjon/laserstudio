@@ -7,7 +7,7 @@ from PyQt6.QtGui import QPen, QColor, QColorConstants
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
 from PyQt6.QtCore import Qt, QPointF
-from typing import Union, TYPE_CHECKING, Optional
+from typing import Union, TYPE_CHECKING, Optional, cast
 
 if TYPE_CHECKING:
     from .stagesight import StageSight
@@ -68,7 +68,7 @@ class Marker(QGraphicsItemGroup):
         self.__update_size()
 
     @property
-    def color(self):
+    def color(self) -> Union[QColor, Qt.GlobalColor, int]:
         """:return: Current color, as QColor."""
         return self.__color
 
@@ -108,10 +108,11 @@ class ProbeMarker(Marker):
         self.stage_sight = parent
         self.probe = probe
         probe.fixed_pos_changed.connect(self.update_pos)
-        self.color = (
+        self.color = cast(
+            QColor,
             QColorConstants.Red
             if isinstance(self.probe, LaserInstrument)
-            else QColorConstants.Blue
+            else QColorConstants.Blue,
         )
         self.update_pos()
 
@@ -128,8 +129,8 @@ class ProbeMarker(Marker):
         else:
             self.setVisible(False)
 
-    def setToolTip(self, value: str):
-        self.__ellipse.setToolTip(value)
+    def setToolTip(self, toolTip: Optional[str]):
+        self.__ellipse.setToolTip(toolTip)
 
 
 class IdMarker(Marker):

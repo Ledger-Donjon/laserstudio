@@ -197,11 +197,11 @@ class LaserStudio(QMainWindow):
         if window_state is not None:
             self.restoreState(window_state)
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
-        super().closeEvent(event)
+        super().closeEvent(a0)
 
     def handle_go_next(self) -> dict:
         """Go Next operation.
