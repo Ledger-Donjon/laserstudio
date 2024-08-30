@@ -1,8 +1,10 @@
 import threading
 from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt, QMutex
+from PyQt6.QtWidgets import QMessageBox
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
+from pystages.cncrouter import CNCError
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
@@ -105,6 +107,8 @@ class StageInstrument(Instrument):
         # Indicate
         self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
+        self.in_error = False
+
     @property
     def position(self) -> Vector:
         """Get the position of the stage instrument
@@ -132,8 +136,11 @@ class StageInstrument(Instrument):
     def refresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal"""
         try:
-            self.position_changed.emit(position := self.position)
-            logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
+            if not self.in_error:
+                self.position_changed.emit(position := self.position)
+                logging.getLogger("laserstudio").debug(
+                    f"Position refreshed: {position}"
+                )
         except ProtocolError as e:
             logging.getLogger("laserstudio").warning(
                 f"Warning: Bad response!: {repr(e)}"
@@ -156,12 +163,13 @@ class StageInstrument(Instrument):
             pos[i] += v
         self.move_to(pos, wait=wait)
 
-    def move_to(self, position: Vector, wait: bool):
+    def move_to(self, position: Vector, wait: bool, interactive: bool = False):
         """
         Moves associated stage to a specific position, optionally waits for stage to stop moving.
 
         :param position: destination as a Vector
         :param wait: True if the stage must wait for move to be completely done
+        :param interactive: True if the move action is initiated by the user through the user interface
 
         .. note::
             If there is a configuration of z-offsetting for each move, it will be done and
@@ -174,8 +182,43 @@ class StageInstrument(Instrument):
                     logging.getLogger("laserstudio").error(
                         f"Do not move!! One axis ({i}) moves further than {self.guardrail}µm: {displacement}µm"
                     )
+
+                    # Ask the user if he wants to move anyway
+                    if (
+                        interactive
+                        and QMessageBox.StandardButton.Yes
+                        == QMessageBox.warning(
+                            None,
+                            "Guardrail",
+                            f"Stage is configured to prevent moves greater than {self.guardrail}µm. Do you want to continue?",
+                            buttons=QMessageBox.StandardButton.Yes
+                            | QMessageBox.StandardButton.No,
+                            defaultButton=QMessageBox.StandardButton.No,
+                        )
+                    ):
+                        # Continue the move, do not need to check for other axes
+                        break
+
+                    # Interrupt the displacement
                     return
+
         # Move to actual destination
         self.mutex.lock()
-        self.stage.move_to(position / self.unit_factor, wait=wait)
+        try:
+            self.stage.move_to(position / self.unit_factor, wait=wait)
+        except CNCError as e:
+            self.in_error = True
+            logging.getLogger("laserstudio").error(
+                f"Error moving stage: {str(e)}, Error Code: {e.code}, Status: {e.cncstatus}"
+            )
+            # In order to prevent stage to stay in error state and not responding anymore
+            assert type(self.stage) is CNCRouter
+            if QMessageBox.StandardButton.Reset == QMessageBox.critical(
+                None,
+                "Error",
+                f"Error moving stage: {str(e)}, Error Code: {e.code}, Status: {e.cncstatus}",
+                buttons=QMessageBox.StandardButton.Reset,
+                defaultButton=QMessageBox.StandardButton.Reset,
+            ):
+                self.stage.reset_grbl(3)
         self.mutex.unlock()

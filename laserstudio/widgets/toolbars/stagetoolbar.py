@@ -58,7 +58,9 @@ class StageToolbar(QToolBar):
         for i in range(len(self.stage.mem_points)):
             box.addItem(f"Go to M{i}")
         box.activated.connect(
-            lambda i: self.stage.move_to(self.stage.mem_points[i], wait=True)
+            lambda i: self.stage.move_to(
+                self.stage.mem_points[i], wait=True, interactive=True
+            )
         )
         hbox.addWidget(box)
         box.setHidden(len(self.stage.mem_points) == 0)
@@ -84,6 +86,10 @@ class StageToolbar(QToolBar):
             w = QPushButton(self)
             w.setText("Reset GRBL")
             w.clicked.connect(self.stage.stage.reset_grbl)
+            hbox.addWidget(w)
+            w = QPushButton(self)
+            w.setText("Unlock")
+            w.clicked.connect(self.stage.stage.unlock)
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 

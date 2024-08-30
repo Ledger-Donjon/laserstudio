@@ -262,16 +262,21 @@ class StageSight(QGraphicsItemGroup):
             v[1] = position.y()
         return v
 
-    def move_to(self, position: QPointF):
+    def move_to(self, position: QPointF, interactive=False):
         """Perform a move operation on associated stage.
 
         :param position: The position to aim, in the viewer's scene.
+        :param interactive: True if the move action is initiated by the user through the user interface.
         """
         x, y = position.x(), position.y()
         logging.getLogger("laserstudio").info(f"Move to position {x, y}")
 
         if self.stage is not None:
-            self.stage.move_to(self.stage_coords_from_scene_coords(position), wait=True)
+            self.stage.move_to(
+                self.stage_coords_from_scene_coords(position),
+                wait=True,
+                interactive=interactive,
+            )
         else:
             self.setPos(position)
 
