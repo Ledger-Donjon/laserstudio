@@ -168,11 +168,14 @@ class LSAPI:
         Controls the laser's state.
 
         :param num: The index of the laser to control (starting from 1).
-        :param active: Sets the activation's state of the laser.
-        :param power: Sets the current power (in %).
-        :param offset_current: Sets the offset current of the laser (in mA).
+        :param active: If not None, sets the activation's state of the laser.
+        :param power: If not None, sets the current power (in %).
+        :param offset_current: If not None, sets the offset current of the laser (in mA).
         :return: The actual settings values read back from the laser instrument.
         """
+        if active is None and power is None and offset_current is None:
+            return self.send(f"instruments/laser/{num}").json()
+
         return self.send(
             f"instruments/laser/{num}",
             {

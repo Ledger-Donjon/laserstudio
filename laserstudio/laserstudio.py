@@ -318,6 +318,37 @@ class LaserStudio(QMainWindow):
         self.instruments.stage.move_to(point, wait=True)
         return {"pos": self.instruments.stage.position.data}
 
+    def handle_laser(
+        self,
+        num: int,
+        active: Optional[bool],
+        power: Optional[float],
+        offset_current: Optional[float],
+    ) -> dict:
+        """Handle a Laser API request to control the laser.
+
+        :param num: The number of the laser to control
+        :param active: The requested active state of the laser
+        :param power: The requested power of the laser
+        :param offset_current: The requested offset current of the laser
+        :return: A dictionary containing the information about the laser's final state
+        """
+        if num < 0 or num >= len(self.instruments.lasers):
+            return {}
+
+        laser = self.instruments.lasers[num]
+        if active is not None:
+            laser.on_off = active
+        if power is not None:
+            laser.current_percentage = power
+        if offset_current is not None:
+            laser.offset_current = offset_current
+        return {
+            "active": laser.on_off,
+            "power": laser.current_percentage,
+            "offset_current": laser.offset_current,
+        }
+
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
         if id == self.viewer_buttons_group.checkedId():
