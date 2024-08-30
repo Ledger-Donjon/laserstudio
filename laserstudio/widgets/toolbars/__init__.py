@@ -8,6 +8,7 @@ from .scantoolbar import ScanToolbar
 from .picturetoolbar import PictureToolbar
 from .stagetoolbar import StageToolbar
 from .zoomtoolbar import ZoomToolbar
+from .focustoolbar import FocusToolbar
 
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "LaserDriverToolbar",
     "PDMToolbar",
     "MarkersToolbar",
+    "FocusToolbar"
 ]
