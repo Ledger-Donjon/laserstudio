@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QVariant
 from PyQt6.QtGui import QIcon, QPixmap
 
 from laserstudio.instruments.pdm import PDMInstrument
@@ -33,8 +33,8 @@ class PDMToolbar(QToolBar):
         )
         self.setFloatable(True)
 
-        w = QPushButton(self)
-        w.setToolTip("On/Off Laser")
+        w = self.on_off_button = QPushButton(self)
+        w.setToolTip(a0="On/Off Laser")
         w.setCheckable(True)
         w.setChecked(False)
         icon = QIcon()
@@ -129,11 +129,15 @@ class PDMToolbar(QToolBar):
 
         self.reload_parameters()
 
+        self.laser.parameter_changed.connect(self.handle_parameter_changed)
+
     def reload_parameters(self):
         # To prevent boxes changing to Blue
         self.pulse_power_input.blockSignals(True)
         self.offset_current_input.blockSignals(True)
+        self.on_off_button.blockSignals(True)
 
+        self.on_off_button.setChecked(self.laser.on_off)
         self.pulse_power_input.setValue(self.laser.current_percentage)
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
@@ -142,3 +146,14 @@ class PDMToolbar(QToolBar):
 
         self.pulse_power_input.blockSignals(False)
         self.offset_current_input.blockSignals(False)
+        self.on_off_button.blockSignals(False)
+
+    def handle_parameter_changed(self, name: str, value: QVariant):
+        if name == "current_percentage":
+            self.pulse_power_input.setValue(value.value())
+        elif name == "offset_current":
+            self.offset_current_input.setValue(value.value())
+        elif name == "on_off":
+            self.on_off_button.setChecked(value.value())
+        else:
+            raise ValueError(f"Unknown parameter {name}")

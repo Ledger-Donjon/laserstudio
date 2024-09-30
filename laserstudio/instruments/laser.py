@@ -1,5 +1,6 @@
 from .probe import ProbeInstrument
 from random import uniform
+from PyQt6.QtCore import QVariant
 
 
 class LaserInstrument(ProbeInstrument):
@@ -36,21 +37,21 @@ class LaserInstrument(ProbeInstrument):
 
     @on_off.setter
     def on_off(self, value: bool):
-        self.parameter_changed.emit("on_off", value)
+        self.parameter_changed.emit("on_off", QVariant(value))
 
     @property
     def current_percentage(self) -> float: ...
 
     @current_percentage.setter
     def current_percentage(self, value: float):
-        self.parameter_changed.emit("current_percentage", value)
+        self.parameter_changed.emit("current_percentage", QVariant(value))
 
     @property
     def offset_current(self) -> float: ...
 
     @offset_current.setter
     def offset_current(self, value: float):
-        self.parameter_changed.emit("offset_current", value)
+        self.parameter_changed.emit("offset_current", QVariant(value))
 
     def go_next(self) -> dict[str, float]:
         self._sweep_iteration += 1
