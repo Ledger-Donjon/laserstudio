@@ -49,7 +49,7 @@ class PDMInstrument(LaserInstrument):
         self.pdm = pdm = PDM(config["num"], link)
         # Switch off the laser as soon as possible
         logging.getLogger("laserstudio").debug("Deactivate laser")
-        pdm.activation = False
+        pdm.activation = self._activation = False
         pdm.apply()
         # Set some default settings
         logging.getLogger("laserstudio").debug("Setting some default values")
@@ -79,14 +79,21 @@ class PDMInstrument(LaserInstrument):
         return state
     
     @property
-    def on_off(self):
-        return self.pdm.activation
-
+    def on_off(self) -> bool:
+        """This property is volatile, the PDM may change its state"""
+        value = self.pdm.activation
+        if self._activation != value:
+            self.parameter_changed.emit("on_off", QVariant(value))
+            self._activation = value
+        return value
+    
     @on_off.setter
     def on_off(self, value: bool):
         self.pdm.activation = value
         self.pdm.apply()
+        self._activation = value
         assert LaserInstrument.on_off.fset is not None
+        # This call will emit the new state
         LaserInstrument.on_off.fset(self, value)
 
     @property
