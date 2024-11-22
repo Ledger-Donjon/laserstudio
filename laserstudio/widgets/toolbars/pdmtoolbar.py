@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QSize, QVariant
 from PyQt6.QtGui import QIcon, QPixmap
-
+from typing import Any
 from laserstudio.instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox
@@ -51,6 +51,10 @@ class PDMToolbar(QToolBar):
         w.setIcon(icon)
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))
+        self.addWidget(w)
+
+        # Laser interlock status
+        self.interlock_label = w = QLabel("Interlock status: Unknown")
         self.addWidget(w)
 
         grid = QGridLayout()
@@ -128,32 +132,31 @@ class PDMToolbar(QToolBar):
         self.addWidget(w)
 
         self.reload_parameters()
+        self.laser.parameter_changed.connect(self.refresh_interface)
+    
+    def refresh_interface(self, name: str, value: Any):
+        """Refresh the Toolbar UI according to given parameter and value"""
+        if name == "on_off":
+            self.on_off_button.blockSignals(True)
+            self.on_off_button.setChecked(value)
+            self.on_off_button.blockSignals(False)
+        elif name == "current_percentage":
+            self.pulse_power_input.blockSignals(True)
+            self.pulse_power_input.setValue(value)
+            self.pulse_power_input.blockSignals(False)
+        elif name == "offset_current":
+            self.offset_current_input.blockSignals(True)
+            self.offset_current_input.setValue(value)
+            self.offset_current_input.blockSignals(False)
+        elif name == "interlock_status":
+            self.interlock_label.setText(f"Interlock status: {'opened' if value else 'closed'}")
 
         self.laser.parameter_changed.connect(self.handle_parameter_changed)
 
     def reload_parameters(self):
-        # To prevent boxes changing to Blue
-        self.pulse_power_input.blockSignals(True)
-        self.offset_current_input.blockSignals(True)
-        self.on_off_button.blockSignals(True)
-
-        self.on_off_button.setChecked(self.laser.on_off)
-        self.pulse_power_input.setValue(self.laser.current_percentage)
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
         self.sweep_freq_input.setValue(self.laser.sweep_freq)
-        self.offset_current_input.setValue(self.laser.offset_current)
-
-        self.pulse_power_input.blockSignals(False)
-        self.offset_current_input.blockSignals(False)
-        self.on_off_button.blockSignals(False)
-
-    def handle_parameter_changed(self, name: str, value: QVariant):
-        if name == "current_percentage":
-            self.pulse_power_input.setValue(value.value())
-        elif name == "offset_current":
-            self.offset_current_input.setValue(value.value())
-        elif name == "on_off":
-            self.on_off_button.setChecked(value.value())
-        else:
-            raise ValueError(f"Unknown parameter {name}")
+        self.refresh_interface("current_percentage", self.laser.current_percentage)
+        self.refresh_interface("offset_current", self.laser.offset_current)
+        self.refresh_interface("interlock_status", self.laser.interlock_status)
