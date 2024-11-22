@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QToolBar, QPushButton
 from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
-
+from .markerslistdialog import MarkerListDialog
 
 class MarkersToolbar(QToolBar):
     def __init__(self, viewer: Viewer):
@@ -42,3 +42,13 @@ class MarkersToolbar(QToolBar):
             lambda: viewer.marker_size(float(self.marker_size_sp.value()))
         )
         self.addWidget(self.marker_size_sp)
+
+        # Markers categories
+        self.makers_list_dialog = MarkerListDialog(viewer)
+        self.makers_list_dialog.setModal(False)
+        self.makers_list_dialog.setWindowTitle("Markers list")
+        
+        self.show_list = w = QPushButton("Show List")
+        w.clicked.connect(lambda: self.makers_list_dialog.open())  
+
+        self.addWidget(w)
