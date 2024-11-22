@@ -56,6 +56,20 @@ class PDMInstrument(LaserInstrument):
         pdm.apply()
         logging.getLogger("laserstudio").debug("Finishing discussion with PDM")
 
+        self._interlock_status = None
+    @property
+    def interlock_status(self) -> bool:
+        """Get the laser interlock status, emits a signal when it changes"""
+        state = self.pdm.interlock_status
+        if state != self._interlock_status:
+            self._interlock_status = state
+            self.parameter_changed.emit("interlock_status", QVariant(state))
+            if state == True:
+                # The interlock has been opened, it may have changed the state of the
+                # activation
+                _ = self.on_off
+        return state
+    
     @property
     def on_off(self):
         return self.pdm.activation
