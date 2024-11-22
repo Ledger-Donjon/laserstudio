@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from typing import Optional, Any
 
-from .widgets.viewer import Viewer
+from .widgets.viewer import Viewer, IdMarker
 from .instruments.instruments import (
     Instruments,
     PDMInstrument,
@@ -245,6 +245,19 @@ class LaserStudio(QMainWindow):
         if pos is not None:
             self.instruments.stage.move_to(Vector(*pos), wait=True)
         return {"pos": self.instruments.stage.position.data}
+
+    def handle_markers(self) -> list[dict]:
+        """Handle a Markers API request to get the list of markers."""
+        
+        return [
+            {
+                "id": marker.id if isinstance(marker, IdMarker) else -1,
+                "pos": [marker.pos().x(), marker.pos().y()],
+                "color": 
+                    [marker.qfillcolor.redF(), marker.qfillcolor.greenF(), marker.qfillcolor.blueF(), marker.qfillcolor.alphaF()]
+            }
+            for marker in self.viewer.markers
+        ]
 
     def handle_add_markers(
         self, positions: Optional[list[list[float]]], color: Optional[list[float]]
