@@ -69,6 +69,14 @@ class LSAPI:
         """
         return self.send("motion/autofocus").json()
 
+    def markers(self) -> List[Dict[str, Union[int, Tuple[float, float]]]]:
+        """
+        Get the list of markers in the scene.
+
+        :return: A list of dictionaries, each containing the marker's id, position and RGBA color.
+        """
+        return self.send("annotation/markers").json()
+
     def marker(
         self,
         color: Union[Tuple[float, float, float], Tuple[float, float, float, float]] = (

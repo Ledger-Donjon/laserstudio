@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="lsapi",
-    version="1.1",
+    version="1.2",
     install_requires=["requests", "Pillow"],
     python_requires=">=3.7",
 )

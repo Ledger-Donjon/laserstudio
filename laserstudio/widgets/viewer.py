@@ -123,6 +123,10 @@ class Viewer(QGraphicsView):
 
         self.setMouseTracking(True)
 
+    @property
+    def markers(self) -> list[Marker]:
+        return self.__markers
+
     def marker_size(self, value: float):
         self.default_marker_size = value
         for m in self.__markers:
