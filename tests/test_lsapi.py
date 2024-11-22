@@ -29,11 +29,11 @@ def test_add_5000_markers_seq():
 def test_add_5000_markers_batch_by100():
     api = LSAPI()
     for _ in range(50):
+        color = (random(), random(), random(), 0.7)
         first = api.marker(
-            (random(), random(), random(), 0.7), (random() * 100, random() * 100)
+            color, (random() * 100, random() * 100)
         )
         positions = [(random() * 100, random() * 100) for _ in range(1, 100)]
-        color = (random(), random(), random(), 0.7)
         markers = api.marker(color, positions)
 
         for i, m in enumerate(markers["markers"]):
@@ -42,11 +42,11 @@ def test_add_5000_markers_batch_by100():
 
 def test_add_5000_markers_in_one():
     api = LSAPI()
+    color = (random(), random(), random(), 0.7)
     first = api.marker(
-        (random(), random(), random(), 0.7), (random() * 100, random() * 100)
+        color, (random() * 100, random() * 100)
     )
     positions = [(random() * 100, random() * 100) for _ in range(1, 5000)]
-    color = (random(), random(), random(), 0.7)
     markers = api.marker(color, positions)
 
     for i, m in enumerate(markers["markers"]):
