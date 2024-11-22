@@ -1,7 +1,9 @@
+from PyQt6.QtCore import QTimer, QVariant, Qt
 from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
+from typing import Optional, cast
 
 
 class PDMInstrument(LaserInstrument):
@@ -29,7 +31,7 @@ class PDMInstrument(LaserInstrument):
             dev = get_serial_device(dev)
         except DeviceSearchError as e:
             logging.getLogger("laserstudio").error(
-                f"Laser is enabled but {device_type} is not found: {str(e)}...  Skipping."
+                f"Laser is enabled but {device_type} is not found: {str(e)}... Skipping."
             )
             raise
 
