@@ -68,7 +68,7 @@ class ZoomToolbar(QToolBar):
         w.setCheckable(True)
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda x: viewer.__setattr__("follow_stage_sight", x))
-        viewer.followStageSightChanged.connect(w.setChecked)
+        viewer.follow_stage_sight_changed.connect(w.setChecked)
         w.setChecked(True)
         self.addWidget(w)
 
