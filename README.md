@@ -31,10 +31,10 @@ python3 -m pip install --upgrade -r requirements.txt
 ## Usage
 
 To run Laser Studio, tune your configuration file `config.yaml` with appropriate
-information about your hardware instruments, then a terminal and run Laser Studio as a module.
+information about your hardware instruments, then a terminal and run Laser Studio:
 
 ```shell
-python3 -m laserstudio
+laserstudio
 ```
 
 # Documentation
