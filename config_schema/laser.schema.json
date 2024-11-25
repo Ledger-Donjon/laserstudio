@@ -17,6 +17,10 @@
                 "type": {
                     "const": "PDM",
                     "description": "Pulse-on-Demand Module from ALPhANOV."
+                },
+                "refresh_interval_ms": {
+                    "type": "integer",
+                    "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update."
                 }
             },
             "$ref": "serial.schema.json",
