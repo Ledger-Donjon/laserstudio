@@ -34,7 +34,7 @@ class PDMToolbar(QToolBar):
         self.setFloatable(True)
 
         w = self.on_off_button = QPushButton(self)
-        w.setToolTip(a0="On/Off Laser")
+        w.setToolTip("On/Off Laser")
         w.setCheckable(True)
         w.setChecked(False)
         icon = QIcon()
