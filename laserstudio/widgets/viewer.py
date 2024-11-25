@@ -53,7 +53,7 @@ class Viewer(QGraphicsView):
     # Signal emitted when the mouse has moved in scene
     mouse_moved = pyqtSignal(float, float)
     # Signal emitted when the follow stage sight option changed
-    followStageSightChanged = pyqtSignal(bool)
+    follow_stage_sight_changed = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -153,7 +153,7 @@ class Viewer(QGraphicsView):
         # Emit the signal if necessary
         if self._follow_stage_sight != value:
             self._follow_stage_sight = value
-            self.followStageSightChanged.emit(value)
+            self.follow_stage_sight_changed.emit(value)
 
     def reset_camera(self):
         """Resets the camera to show all elements of the scene"""
