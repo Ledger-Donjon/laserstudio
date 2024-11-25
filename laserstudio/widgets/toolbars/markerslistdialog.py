@@ -4,14 +4,43 @@ from PyQt6.QtWidgets import QPushButton, QDialog, QTreeWidget, QTreeWidgetItem, 
 from ..viewer import Viewer
 from ..marker import Marker
 
+class MarkerGroupListItem(QTreeWidgetItem):
+    def __init__(self, parent: QTreeWidget):
+        super().__init__(parent)
+        self._number_of_checked = 0
+
+    @property
+    def number_of_checked(self):
+        return self._number_of_checked
+    
+    @number_of_checked.setter
+    def number_of_checked(self, value):
+        self._number_of_checked = value
+
+    def update_checked_state(self):
+        self.treeWidget().blockSignals(True)
+        self.setToolTip(0, f"{self._number_of_checked} shown over {self.childCount()}")
+        self.treeWidget().blockSignals(False)
+        if self._number_of_checked == 0:
+            self.setCheckState(0, Qt.CheckState.Unchecked)
+        elif self._number_of_checked == self.childCount():
+            self.setCheckState(0, Qt.CheckState.Checked)
+        else:
+            self.setCheckState(0, Qt.CheckState.PartiallyChecked)
+
+
 class MarkerListItem(QTreeWidgetItem):
-    def __init__(self, group: QTreeWidgetItem, marker: Marker):
+    def __init__(self, group: MarkerGroupListItem, marker: Marker):
         super().__init__(group)
+        self.group = group
         x, y  = marker.pos().x(), marker.pos().y()
         self.marker = marker
-        self.setCheckState(0, Qt.CheckState.Checked if marker.isVisible() else Qt.CheckState.Unchecked)
+        visible = marker.isVisible()
+        self.setCheckState(0, Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked)
         self.setText(0, f"{x:.02f}µm {y:.02f}µm")
         self.setForeground(0, marker.fillcolor)
+        if visible:
+            group.number_of_checked += 1
 
 class MarkerListDialog(QDialog):
     def open(self):
@@ -40,14 +69,17 @@ class MarkerListDialog(QDialog):
             else:
                 markers_by_colors[name].append(marker)
         for color in sorted(markers_by_colors.keys()):
-            markers = markers_by_colors[color]
-            group = QTreeWidgetItem(self.list)
+            markers: list[Marker] = markers_by_colors[color]
+            group = MarkerGroupListItem(self.list)
             group.setForeground(0, markers[0].fillcolor)
-            group.setText(0, f"{len(markers)} marker(s)")
-            group.setCheckState(0, Qt.CheckState.Checked)
+            group.setText(0, f"{len(markers)} marker" + ("" if len(markers) == 1 else "s"))
 
+            self.list.itemChanged.disconnect(self.item_changed)
             for marker in markers:
                 MarkerListItem(group, marker)
+            group.update_checked_state()
+            self.list.itemChanged.connect(self.item_changed)
+
 
     def __init__(self, viewer: Viewer):
         super().__init__()
@@ -72,9 +104,7 @@ class MarkerListDialog(QDialog):
         w.clicked.connect(self.hide_selected)
         hbox.addWidget(w)
         vbox.addLayout(hbox)
-
         vbox.addWidget(self.list)
-
         self.list.itemDoubleClicked.connect(self.show_marker)
     
     def show_marker(self, item: QTreeWidgetItem):
@@ -84,10 +114,19 @@ class MarkerListDialog(QDialog):
 
     def item_changed(self, item: QTreeWidgetItem):
         if isinstance(item, MarkerListItem):
-            item.marker.setVisible(item.checkState(0) == Qt.CheckState.Checked)
-        else:
+            visible = item.checkState(0) == Qt.CheckState.Checked
+            was_visible = item.marker.isVisible()
+            if not was_visible and visible:
+                item.group.number_of_checked += 1
+            elif was_visible and not visible:
+                item.group.number_of_checked -= 1
+            item.marker.setVisible(visible)
+            item.group.update_checked_state()
+        if isinstance(item, MarkerGroupListItem):
+            new_state = item.checkState(0)
+            if new_state == Qt.CheckState.PartiallyChecked: return
             for i in range(item.childCount()):
                 child = item.child(i)
                 if child is None: continue
-                child.setCheckState(0, item.checkState(0))
+                child.setCheckState(0, new_state)
     
