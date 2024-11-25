@@ -151,8 +151,6 @@ class PDMToolbar(QToolBar):
         elif name == "interlock_status":
             self.interlock_label.setText(f"Interlock status: {'opened' if value else 'closed'}")
 
-        self.laser.parameter_changed.connect(self.handle_parameter_changed)
-
     def reload_parameters(self):
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
