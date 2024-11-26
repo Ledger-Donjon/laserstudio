@@ -170,7 +170,7 @@ class StageInstrument(Instrument):
             for i, displacement in enumerate(displacement.data):
                 if abs(displacement) > self.guardrail:
                     logging.getLogger("laserstudio").error(
-                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}\xA0µm: {displacement}\xA0µm"
+                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}\xa0µm: {displacement}\xa0µm"
                     )
                     return
         # Move to actual destination
