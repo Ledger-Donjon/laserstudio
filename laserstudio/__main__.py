@@ -10,7 +10,8 @@ from .utils.util import resource_path
 import logging
 import argparse
 
-if __name__ == "__main__":
+
+def main():
     app = QApplication(sys.argv)
 
     parser = argparse.ArgumentParser(prog="laserstudio")
@@ -68,4 +69,8 @@ if __name__ == "__main__":
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())
     win.show()
-    sys.exit(app.exec())
+    return app.exec()
+
+
+if __name__ == "__main__":
+    main()
