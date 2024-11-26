@@ -113,7 +113,7 @@ class PDMToolbar(QToolBar):
         w.setMinimum(0.0)
         w.setMaximum(150.0)  # TODO read limit from pypdm if possible
         w.setDecimals(3)
-        w.setSuffix("mA")
+        w.setSuffix("\xA0mA")
         w.setValue(0)
         w.returnPressed.connect(
             lambda: self.laser.__setattr__(

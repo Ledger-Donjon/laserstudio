@@ -31,7 +31,7 @@ class CameraUSBInstrument(CameraInstrument):
             f"Camera's resolution {self.width}px; {self.height}px"
         )
         logging.getLogger("laserstudio").info(
-            f"Image's dimension {self.width_um}µm; {self.height_um}µm (without considering any magnifier)"
+            f"Image's dimension {self.width_um}\xA0µm; {self.height_um}\xA0µm (without considering any magnifier)"
         )
 
     def __del__(self):

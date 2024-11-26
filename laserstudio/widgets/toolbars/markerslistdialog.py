@@ -37,7 +37,7 @@ class MarkerListItem(QTreeWidgetItem):
         self.marker = marker
         visible = marker.isVisible()
         self.setCheckState(0, Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked)
-        self.setText(0, f"{x:.02f}µm {y:.02f}µm")
+        self.setText(0, f"{x:.02f}\xA0µm, {y:.02f}\xA0µm")
         self.setForeground(0, marker.fillcolor)
         if visible:
             group.number_of_checked += 1

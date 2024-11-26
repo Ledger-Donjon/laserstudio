@@ -32,7 +32,7 @@ class MarkersToolbar(QToolBar):
 
         # Markers' size
         self.marker_size_sp = w = ReturnSpinBox()
-        self.marker_size_sp.setSuffix(" µm")
+        self.marker_size_sp.setSuffix("\xA0µm")
         self.marker_size_sp.setToolTip("Markers' size")
         self.marker_size_sp.setMinimum(1)
         self.marker_size_sp.setSingleStep(10)

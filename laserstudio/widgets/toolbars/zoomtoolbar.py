@@ -91,4 +91,4 @@ class ZoomToolbar(QToolBar):
             self.position_signal.connect(self.update_position)
 
     def update_position(self, x: float, y: float):
-        self.position.setText(f"{x:.02f}µm {y:.02f}µm")
+        self.position.setText(f"{x:.02f}\xA0µm, {y:.02f}\xA0µm")

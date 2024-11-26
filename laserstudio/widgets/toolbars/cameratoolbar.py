@@ -94,7 +94,7 @@ class CameraToolbar(QToolBar):
         w.setLayout(hbox)
         hbox.addWidget(QLabel("Refresh interval:"))
         self.refresh_interval = w = ReturnSpinBox()
-        w.setSuffix("ms")
+        w.setSuffix("\xA0ms")
         w.setMinimum(20)
         w.setMaximum(10000)
         w.setSingleStep(10)
