@@ -7,23 +7,16 @@ from ..marker import Marker
 class MarkerGroupListItem(QTreeWidgetItem):
     def __init__(self, parent: QTreeWidget):
         super().__init__(parent)
-        self._number_of_checked = 0
-
-    @property
-    def number_of_checked(self):
-        return self._number_of_checked
-    
-    @number_of_checked.setter
-    def number_of_checked(self, value):
-        self._number_of_checked = value
+        self.number_of_checked = 0
 
     def update_checked_state(self):
+        # To prevent the itemChanged signal from being emitted
         self.treeWidget().blockSignals(True)
-        self.setToolTip(0, f"{self._number_of_checked} shown over {self.childCount()}")
+        self.setToolTip(0, f"{self.number_of_checked} shown over {self.childCount()}")
         self.treeWidget().blockSignals(False)
-        if self._number_of_checked == 0:
+        if self.number_of_checked == 0:
             self.setCheckState(0, Qt.CheckState.Unchecked)
-        elif self._number_of_checked == self.childCount():
+        elif self.number_of_checked == self.childCount():
             self.setCheckState(0, Qt.CheckState.Checked)
         else:
             self.setCheckState(0, Qt.CheckState.PartiallyChecked)
