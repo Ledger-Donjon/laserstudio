@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "laserstudio"
-version = "1.0.0dev3"
+version = "0.0.0"
 description = "Python3 software for hardware evaluation"
 authors = [
     "Olivier Hériveaux <olivier.heriveaux@ledger.fr>",
@@ -42,7 +42,17 @@ pytest = "7.0.1"
 pynit = { git = "https://github.com/Ledger-Donjon/pynit.git" }
 scipy = "1.13.1"
 
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
+[tool.poetry-dynamic-versioning.substitution]
+files = ["laserstudio/__init__.py"]
+
+[tool.poetry-dynamic-versioning.files."laserstudio/__init__.py"]
+persistent-substitution = true
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
