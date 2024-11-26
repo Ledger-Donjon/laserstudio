@@ -37,8 +37,9 @@ class CameraToolbar(QToolBar):
 
         w = QWidget()
         self.addWidget(w)
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        w.setLayout(grid)
 
         # Button to toggle off or on the camera image presentation in main viewer
         w = QPushButton(self)
@@ -57,25 +58,23 @@ class CameraToolbar(QToolBar):
             QIcon.State.Off,
         )
         w.setIcon(icon)
-        w.setIconSize(QSize(24, 24))
+        w.setIconSize(QSize(16, 16))
         w.toggled.connect(
             lambda b: laser_studio.viewer.stage_sight.__setattr__("show_image", b)
         )
-        hbox.addWidget(w)
+        grid.addWidget(w, 1, 1)
 
-        vbox2 = QVBoxLayout()
-        hbox.addLayout(vbox2)
-        w = QPushButton(self)
-        w.setText("Distortion Wizard")
+        # Distortion wizard button
+        w = QPushButton("Distortion Wizard")
         self.camera_distortion_wizard = CameraDistortionWizard(laser_studio, self)
         w.clicked.connect(lambda: self.camera_distortion_wizard.show())
-        vbox2.addWidget(w)
+        grid.addWidget(w, 2, 1)
 
+        # Probes wizard button
         self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
-        w = QPushButton(self)
-        w.setText("Probes/Spots Position Wizard")
+        w = QPushButton("Probes/Spots Wizard")
         w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
-        vbox2.addWidget(w)
+        grid.addWidget(w, 2, 2)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
             == 0
@@ -85,14 +84,11 @@ class CameraToolbar(QToolBar):
         stage_sight = StageSight(None, self.camera)
         w = StageSightViewer(stage_sight)
         w.setHidden(True)
-        self.addWidget(w)
+        grid.addWidget(w, 3, 1, 1, 2)
 
         # Refresh interval
         w = QWidget()
-        self.addWidget(w)
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
-        hbox.addWidget(QLabel("Refresh interval:"))
+        grid.addWidget(QLabel("Refresh interval:"), 3, 1)
         self.refresh_interval = w = ReturnSpinBox()
         w.setSuffix("ms")
         w.setMinimum(20)
@@ -106,7 +102,7 @@ class CameraToolbar(QToolBar):
                 "refresh_interval", self.refresh_interval.value()
             )
         )
-        hbox.addWidget(w)
+        grid.addWidget(w, 3, 2)
 
         self.image_dialog = QDialog()
         self.image_dialog.setWindowTitle("Image Adjustment")
@@ -115,7 +111,7 @@ class CameraToolbar(QToolBar):
         w.setToolTip(self.image_dialog.windowTitle())
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/sliders-solid.svg")))
         w.clicked.connect(lambda: self.image_dialog.exec())
-        self.addWidget(w)
+        grid.addWidget(w, 1, 2)
 
         grid = QGridLayout()
         # Image adjustment dialog (for USB camera)

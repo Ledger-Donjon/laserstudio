@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSpinBox,
     QDoubleSpinBox,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, QSize, QVariant
 from PyQt6.QtGui import QIcon, QPixmap
@@ -34,6 +35,8 @@ class PDMToolbar(QToolBar):
         self.setFloatable(True)
 
         w = self.on_off_button = QPushButton(self)
+        if self.laser.label is not None:
+            w.setText(self.laser.label)
         w.setToolTip("On/Off Laser")
         w.setCheckable(True)
         w.setChecked(False)
@@ -58,6 +61,7 @@ class PDMToolbar(QToolBar):
         self.addWidget(w)
 
         grid = QGridLayout()
+        grid.setContentsMargins(0, 4, 0, 0)
         row = 0
 
         # Laser pulsed power

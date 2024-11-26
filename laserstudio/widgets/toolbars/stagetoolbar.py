@@ -37,6 +37,7 @@ class StageToolbar(QToolBar):
 
         w = QWidget()
         vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
         w.setLayout(vbox)
         self.addWidget(w)
 
@@ -87,16 +88,8 @@ class StageToolbar(QToolBar):
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
-        # Keyboard box
-        self.keyboardbox = w = KeyboardBox(self.stage)
-        self.addWidget(w)
-
-        w = QWidget()
-        vbox = QVBoxLayout()
-        w.setLayout(vbox)
-        self.addWidget(w)
-
         hbox = QHBoxLayout()
+        hbox.setContentsMargins(0, 0, 0, 0)
         vbox.addLayout(hbox)
         # Move for
         self.move_for_selector = box = QComboBox()
@@ -108,6 +101,10 @@ class StageToolbar(QToolBar):
         box.activated.connect(self.move_for_selection)
         hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)
+
+        # Keyboard box
+        self.keyboardbox = w = KeyboardBox(self.stage)
+        vbox.addWidget(w)
 
         # Joysticks
         self.joystick: Optional[Union[JoystickInstrument, JoystickHIDInstrument]] = None

@@ -6,9 +6,10 @@ from PyQt6.QtCore import QLocale, Qt
 import sys
 import yaml
 import os.path
-from .utils.util import resource_path
 import logging
 import argparse
+from .utils.util import resource_path
+from .utils.colors import LedgerColors
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -42,12 +43,12 @@ if __name__ == "__main__":
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 25))
     palette.setColor(QPalette.ColorRole.WindowText, QColor(240, 240, 240))
-    palette.setColor(QPalette.ColorRole.Base, QColor(40, 40, 40))
+    palette.setColor(QPalette.ColorRole.Base, QColor(50, 50, 50))
     palette.setColor(QPalette.ColorRole.AlternateBase, Qt.GlobalColor.red)
     palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
     palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
     palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.lightGray)
-    palette.setColor(QPalette.ColorRole.Button, QColor(40, 40, 40))
+    palette.setColor(QPalette.ColorRole.Button, QColor(45, 45, 45))
     palette.setColor(
         QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, QColor(30, 30, 30)
     )
@@ -59,9 +60,15 @@ if __name__ == "__main__":
     )
     palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
     palette.setColor(QPalette.ColorRole.Link, Qt.GlobalColor.red)
-    palette.setColor(QPalette.ColorRole.Highlight, QColor(40, 120, 233))
+    palette.setColor(QPalette.ColorRole.Highlight, LedgerColors.SafetyOrange.value)
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
     app.setPalette(palette)
+    app.setStyleSheet("QToolBar { "
+        "border: 1px solid #252525;"
+        "border-radius: 4px;"
+        "margin: 3px;"
+        "padding: 6px;"
+        "background-color: #252525 }")
 
     QLocale.setDefault(QLocale.c())
 
