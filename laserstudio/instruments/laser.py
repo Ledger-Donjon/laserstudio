@@ -9,7 +9,6 @@ class LaserInstrument(ProbeInstrument):
         # Sweep parameters, in order to change the current_percentage
         # regularly, within a random value from sweep_min to sweep_max,
         # each sweep_freq applications
-        self.label = config.get("label")
         self.sweep_max = 100.0
         self.sweep_min = 0.0
         self.sweep_freq = 100

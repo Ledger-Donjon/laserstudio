@@ -5,7 +5,7 @@ from .instrument import Instrument
 
 class ProbeInstrument(Instrument):
     def __init__(self, config: dict):
-        super().__init__()
+        super().__init__(config=config)
         # Set manual position relative to the center position
         # of the camera, eg in the StageSight coordinates.
         self._fixed_pos: Optional[tuple[float, float]] = None
