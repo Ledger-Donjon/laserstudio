@@ -23,6 +23,7 @@ from .widgets.toolbars import (
     CameraToolbar,
     MainToolbar,
     MarkersToolbar,
+    MarkersListToolbar,
     PDMToolbar,
     LaserDriverToolbar,
     CameraNITToolBar,
@@ -85,6 +86,10 @@ class LaserStudio(QMainWindow):
         # Toolbar: Markers
         toolbar = MarkersToolbar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+        # Toolbar: Markers' List
+        toolbar = MarkersListToolbar(self.viewer)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # Toolbar: Stage positioning
         if self.instruments.stage is not None:
@@ -185,11 +190,11 @@ class LaserStudio(QMainWindow):
         if window_state is not None:
             self.restoreState(window_state)
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
-        super().closeEvent(event)
+        super().closeEvent(a0)
 
     def handle_go_next(self) -> dict:
         """Go Next operation.
@@ -248,13 +253,17 @@ class LaserStudio(QMainWindow):
 
     def handle_markers(self) -> list[dict]:
         """Handle a Markers API request to get the list of markers."""
-        
+
         return [
             {
                 "id": marker.id if isinstance(marker, IdMarker) else -1,
                 "pos": [marker.pos().x(), marker.pos().y()],
-                "color": 
-                    [marker.qfillcolor.redF(), marker.qfillcolor.greenF(), marker.qfillcolor.blueF(), marker.qfillcolor.alphaF()]
+                "color": [
+                    marker.qfillcolor.redF(),
+                    marker.qfillcolor.greenF(),
+                    marker.qfillcolor.blueF(),
+                    marker.qfillcolor.alphaF(),
+                ],
             }
             for marker in self.viewer.markers
         ]
