@@ -95,7 +95,7 @@ class Marker(QGraphicsItemGroup):
     def qfillcolor(self) -> QColor:
         """:return: Current fill color, as QColor."""
         return QColor(self.__fillcolor)
-    
+
     @property
     def fillcolor(self):
         """:return: Current fill color, as QColor."""
@@ -138,8 +138,8 @@ class ProbeMarker(Marker):
         else:
             self.setVisible(False)
 
-    def setToolTip(self, value: str):
-        self.__ellipse.setToolTip(value)
+    def setToolTip(self, toolTip: Optional[str]):
+        self.__ellipse.setToolTip(toolTip)
 
 
 class IdMarker(Marker):
