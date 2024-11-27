@@ -20,9 +20,11 @@ class MarkersGroupListItem(QTreeWidgetItem):
 
     def update_checked_state(self):
         # To prevent the itemChanged signal from being emitted
-        self.treeWidget().blockSignals(True)
+        tw = self.treeWidget()
+        assert tw is not None
+        tw.blockSignals(True)
         self.setToolTip(0, f"{self.number_of_checked} shown over {self.childCount()}")
-        self.treeWidget().blockSignals(False)
+        tw.blockSignals(False)
         if self.number_of_checked == 0:
             self.setCheckState(0, Qt.CheckState.Unchecked)
         elif self.number_of_checked == self.childCount():

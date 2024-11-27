@@ -4,7 +4,6 @@ from .pdmtoolbar import PDMToolbar
 from .laserdrivertoolbar import LaserDriverToolbar
 from .maintoolbar import MainToolbar
 from .markerstoolbar import MarkersToolbar
-from .markerslisttoolbar import MarkersListToolbar
 from .scantoolbar import ScanToolbar
 from .picturetoolbar import PictureToolbar
 from .stagetoolbar import StageToolbar
@@ -22,5 +21,4 @@ __all__ = [
     "LaserDriverToolbar",
     "PDMToolbar",
     "MarkersToolbar",
-    "MarkersListToolbar",
 ]
