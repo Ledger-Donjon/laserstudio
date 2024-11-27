@@ -65,7 +65,7 @@ class LaserStudio(QMainWindow):
 
         # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(self)
-        group.idClicked.connect(self.viewer.select_mode)
+        group.idClicked.connect(lambda mode: self.viewer.select_mode(mode, True))
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Toolbar: Main

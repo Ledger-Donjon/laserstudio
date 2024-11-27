@@ -228,16 +228,15 @@ class Viewer(QGraphicsView):
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
-    def select_mode(self, mode: Union[Mode, int]):
-        """Selects the Viewer's mode. In the case of a button click,
-        the mode is the button's id, in the case of a shortcut, the mode
-        is directly an instance of Mode.
-        """
+    def select_mode(self, mode: Union[Mode, int], toggle: bool = False):
+        """Selects the Viewer's mode. If toogle is set to true,
+        the function behaves as 'toggling',
+        meaning that the mode is reset to NONE if it is reselected."""
         if isinstance(mode, int):
             mode = Viewer.Mode(mode)
-            # If it has been requested to select the same mode, we deselect it.
-            if self.mode == mode:
-                mode = Viewer.Mode.NONE
+
+        if toggle and self.mode == mode:
+            mode = Viewer.Mode.NONE
 
         self.mode = mode
 
