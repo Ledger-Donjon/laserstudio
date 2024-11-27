@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QButtonGroup,
 )
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 from .widgets.viewer import Viewer
 from .instruments.instruments import (
@@ -65,9 +65,7 @@ class LaserStudio(QMainWindow):
 
         # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(self)
-        group.idClicked.connect(
-            lambda _id: self.viewer.__setattr__("mode", Viewer.Mode(_id))
-        )
+        group.idClicked.connect(self.viewer.select_mode)
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # Toolbar: Main
@@ -120,23 +118,15 @@ class LaserStudio(QMainWindow):
 
         # Create shortcuts
         shortcut = QShortcut(Qt.Key.Key_Escape, self)
-        shortcut.activated.connect(
-            lambda: self.viewer.__setattr__("mode", Viewer.Mode.NONE)
-        )
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.NONE))
         shortcut = QShortcut(Qt.Key.Key_R, self)
-        shortcut.activated.connect(
-            lambda: self.viewer.__setattr__("mode", Viewer.Mode.ZONE)
-        )
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.ZONE))
         # shortcut = QShortcut(Qt.Key_T, self)
         # shortcut.activated.connect(self.zone_rot_mode)
         shortcut = QShortcut(Qt.Key.Key_M, self)
-        shortcut.activated.connect(
-            lambda: self.viewer.__setattr__("mode", Viewer.Mode.STAGE)
-        )
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
-        shortcut.activated.connect(
-            lambda: self.viewer.__setattr__("mode", Viewer.Mode.PIN)
-        )
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.PIN))
         if (stage := self.instruments.stage) is not None:
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(

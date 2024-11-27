@@ -228,6 +228,19 @@ class Viewer(QGraphicsView):
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
+    def select_mode(self, mode: Union[Mode, int]):
+        """Selects the Viewer's mode. In the case of a button click,
+        the mode is the button's id, in the case of a shortcut, the mode
+        is directly an instance of Mode.
+        """
+        if isinstance(mode, int):
+            new_mode = Viewer.Mode(mode)
+            # If it has been requested to select the same mode, we deselect it.
+            if self.mode == new_mode:
+                new_mode = Viewer.Mode.NONE
+
+        self.mode = Viewer.Mode.NONE
+
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
         Retrieve the next point position from Scan Geometry
