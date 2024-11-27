@@ -23,7 +23,6 @@ from .widgets.toolbars import (
     CameraToolbar,
     MainToolbar,
     MarkersToolbar,
-    MarkersListToolbar,
     PDMToolbar,
     LaserDriverToolbar,
     CameraNITToolBar,
@@ -86,10 +85,7 @@ class LaserStudio(QMainWindow):
         # Toolbar: Markers
         toolbar = MarkersToolbar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-
-        # Toolbar: Markers' List
-        toolbar = MarkersListToolbar(self.viewer)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar.markers_list_toolbar)
 
         # Toolbar: Stage positioning
         if self.instruments.stage is not None:
