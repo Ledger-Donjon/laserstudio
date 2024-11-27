@@ -7,7 +7,13 @@ class CameraNITInstrument(CameraInstrument):
 
     def __init__(self, config: dict):
         super().__init__(config)
-        from pynit import PyNIT  # Lazy load the module
+        try:
+            from pynit import PyNIT  # Lazy load the module
+        except ImportError:
+            raise ImportError(
+                """The pynit module is required to use the NIT.
+                Please install it using 'pip install git+https://github.com/Ledger-Donjon/pynit.git'."""
+            )
 
         self.pynit = PyNIT(
             nuc_filepath=config.get(
