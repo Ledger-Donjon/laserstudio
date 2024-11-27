@@ -24,7 +24,7 @@ class MainToolbar(QToolBar):
         w = QLabel()
         w.setPixmap(
             QPixmap(resource_path(":/icons/logo.svg")).scaled(
-                64, 64, transformMode=Qt.TransformationMode.SmoothTransformation
+                32, 32, transformMode=Qt.TransformationMode.SmoothTransformation
             )
         )
         w.setAlignment(Qt.AlignmentFlag.AlignCenter)

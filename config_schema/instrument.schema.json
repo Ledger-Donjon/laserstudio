@@ -1,0 +1,14 @@
+{
+    "$id": "instrument.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+        "label": {
+            "type": "string",
+            "description": "The instrument personalized label."
+        },
+        "enable": {
+            "type": "boolean",
+            "description": "If the instrument is enabled or not."
+        }
+    }
+}

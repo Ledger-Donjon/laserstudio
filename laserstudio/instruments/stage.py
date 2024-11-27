@@ -31,7 +31,7 @@ class StageInstrument(Instrument):
         """
         :param config: YAML configuration object
         """
-        super().__init__()
+        super().__init__(config=config)
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time

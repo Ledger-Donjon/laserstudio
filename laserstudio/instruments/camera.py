@@ -16,7 +16,7 @@ class CameraInstrument(Instrument):
         """
         :param config: YAML configuration object
         """
-        super().__init__()
+        super().__init__(config=config)
 
         # To refresh image regularly, in real-time
         self.refresh_interval = cast(int, config.get("refresh_interval_ms", 200))

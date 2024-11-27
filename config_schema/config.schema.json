@@ -5,19 +5,23 @@
     "type": "object",
     "properties": {
         "camera": {
-            "$ref": "camera.schema.json"
+            "$ref": "camera.schema.json",
+            "description": "The main camera of the setup."
         },
         "stage": {
-            "$ref": "stage.schema.json"
+            "$ref": "stage.schema.json",
+            "description": "The main stage of the setup."
         },
         "lasers": {
             "type": "array",
+            "description": "The list of laser devices.",
             "items": {
                 "$ref": "laser.schema.json"
             }
         },
         "probes": {
             "type": "array",
+            "description": "The list of probes.",
             "items": {
                 "$ref": "probe.schema.json"
             }

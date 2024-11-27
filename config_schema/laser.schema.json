@@ -3,14 +3,12 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Laser",
     "type": "object",
-    "description": "A Laser device.",
-    "$ref": "probe.schema.json",
-    "properties": {
-        "enable": {
-            "type": "boolean",
-            "description": "If the device is enabled or not."
+    "description": "A Laser generator device.",
+    "allOf": [
+        {
+            "$ref": "probe.schema.json"
         }
-    },
+    ],
     "oneOf": [
         {
             "properties": {

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton
+from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel
 from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
 
@@ -73,22 +73,16 @@ class ZoomToolbar(QToolBar):
         self.addWidget(w)
 
         # Position tracking label
-        self.position = QPushButton("Cursor Position")
-        self.position.setToolTip(
-            "When activated, this button shows the cursor's position in the viewer"
-        )
-        self.position.setCheckable(True)
-        self.position.toggled.connect(self.activate_mouse_tracking)
-        self.position_signal = viewer.mouse_moved
+        self.position = QLabel("")
+        self.position.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.position.setStyleSheet("padding-left: 10px;padding-right: 10px")
+        viewer.mouse_moved.connect(self.update_position)
+        self.position.setToolTip("The cursor's position in the viewer")
         self.addWidget(self.position)
-        self.position.setChecked(True)
-
-    def activate_mouse_tracking(self, activate: bool):
-        if not activate:
-            self.position.setText("Cursor Position")
-            self.position_signal.disconnect(self.update_position)
-        else:
-            self.position_signal.connect(self.update_position)
 
     def update_position(self, x: float, y: float):
-        self.position.setText(f"{x:.02f}\xa0µm, {y:.02f}\xa0µm")
+        self.position.setText(f"{x:+.02f}\xa0µm, {y:+.02f}\xa0µm")
+        f = QFont("monospace")
+        f.setStyleHint(QFont.StyleHint.Monospace)
+        self.position.setFont(f)
+        self.position.setMinimumWidth(self.position.sizeHint().width())
