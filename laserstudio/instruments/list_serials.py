@@ -73,7 +73,11 @@ def get_serial_device(config: Union[str, dict]):
         raise ValueError("Invalid dev value")
 
 
-if __name__ == "__main__":
+def list_devices():
     for p in serial.tools.list_ports.comports():
         print(p)
         print(f" | sn: {p.serial_number}\n | info: {p.usb_info()}\n | path: {p.device}")
+
+
+if __name__ == "__main__":
+    list_devices()

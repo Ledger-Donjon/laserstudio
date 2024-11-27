@@ -11,30 +11,60 @@ and randomly go through these zones, by controlling motion devices.
 
 Laser Studio works on Python 3.9+.
 
-It requires following packages to run:
+It can be installed through PyPI with:
 
-- [PyQt6]
-- [Pillow]
-- [opencv-python]
-- [pystages]
-- [PyYAML]
-- [shapely]
-- [triangle]
+```shell
+pip install laserstudio
+```
 
-After cloning the repository, you can install those by using the `requirements.txt` file.
+Otherwise, you can clone and install the project with:
 
 ```shell
 git clone https://github.com/Ledger-Donjon/laserstudio.git
-python3 -m pip install --upgrade -r requirements.txt
+pip install ./laserstudio
+```
+
+### Package depedencies
+
+It depends following packages to run:
+
+- [PyQt6]
+- [pystages]
+- [Pillow]
+- [opencv-python]
+- [pyusb]
+- [PyYAML]
+- [shapely]
+- [triangle]
+- [requests]
+- [numpy]
+- [pypdm]
+- [flask]
+- [flask-restx]
+- [hidapi]
+
+Additionally, on Linux systems, the [pyNIT] package can be installed
+to support NIT cameras.
+
+```shell
+pip install git+https://github.com/Ledger-Donjon/pynit.git
+```
+
+On Mac with Apple Silicon chips, the [triangle] package fails to install with `pip`.
+Workaround is to install it from source before installing `laserstudio`:
+
+```shell
+pip install git+https://github.com/drufat/triangle.git
 ```
 
 ## Usage
 
 To run Laser Studio, tune your configuration file `config.yaml` with appropriate
-information about your hardware instruments, then a terminal and run Laser Studio as a module.
+information about your hardware instruments, then a terminal and run Laser Studio in the
+directory containing that `config.yaml`.
 
 ```shell
-python3 -m laserstudio
+laserstudio
 ```
 
 # Documentation
@@ -52,4 +82,11 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [pystages]: https://github.com/Ledger-Donjon/pystages
 [shapely]: https://shapely.readthedocs.io/en/stable/manual.html
 [triangle]: https://rufat.be/triangle/
+[pyusb]: https://pypi.org/project/pyusb/
+[requests]: https://pypi.org/project/requests/
+[numpy]: https://pypi.org/project/numpy
+[pypdm]: https://pypi.org/project/pypdm
+[flask]: https://pypi.org/project/flask
+[flask-restx]: https://pypi.org/project/flask-restx
+[hidapi]: https://pipy.org/project/hidapi
 [Read the Docs]: https://laserstudio.readthedocs.io/

@@ -9,6 +9,7 @@ from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
 from typing import Optional, cast, Any
+import sys
 import logging
 
 
@@ -50,6 +51,10 @@ class Instruments:
                         camera_config
                     )
                 elif device_type == "NIT":
+                    if sys.platform != "linux" and sys.platform != "win32":
+                        raise Exception(
+                            "The NIT camera is not supported on other platforms than Linux or Windows."
+                        )
                     self.camera: Optional[CameraInstrument] = CameraNITInstrument(
                         camera_config
                     )
