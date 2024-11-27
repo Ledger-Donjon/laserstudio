@@ -68,8 +68,13 @@ class Marker(QGraphicsItemGroup):
         self.__update_size()
 
     @property
-    def color(self):
+    def qcolor(self) -> QColor:
         """:return: Current color, as QColor."""
+        return QColor(self.__color)
+
+    @property
+    def color(self) -> Union[QColor, Qt.GlobalColor, int]:
+        """:return: Current color, as QColor, Qt.GlobalColor or int."""
         return self.__color
 
     @color.setter
@@ -85,6 +90,11 @@ class Marker(QGraphicsItemGroup):
         self.__line1.setPen(self.__pen)
         self.__line2.setPen(self.__pen)
         self.update()
+
+    @property
+    def qfillcolor(self) -> QColor:
+        """:return: Current fill color, as QColor."""
+        return QColor(self.__fillcolor)
 
     @property
     def fillcolor(self):
@@ -128,8 +138,8 @@ class ProbeMarker(Marker):
         else:
             self.setVisible(False)
 
-    def setToolTip(self, value: str):
-        self.__ellipse.setToolTip(value)
+    def setToolTip(self, toolTip: Optional[str]):
+        self.__ellipse.setToolTip(toolTip)
 
 
 class IdMarker(Marker):
@@ -139,7 +149,7 @@ class IdMarker(Marker):
     ID = 1
 
     def __init__(self, parent=None, color=QColorConstants.Red) -> None:
-        super().__init__(parent, color=QColorConstants.Transparent, fillcolor=color)
+        super().__init__(parent, color=color, fillcolor=color)
         self._id = IdMarker.ID
         IdMarker.ID += 1
 

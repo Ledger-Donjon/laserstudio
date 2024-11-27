@@ -74,9 +74,14 @@ class ScanGeometry(QGraphicsItemGroup):
             )
         else:
             for poly in self.__scan_geometry.geoms:
-                self.__scan_zones_group.addToGroup(
-                    ScanGeometry.__poly_to_path_item(poly)
-                )
+                if isinstance(poly, Polygon):
+                    self.__scan_zones_group.addToGroup(
+                        ScanGeometry.__poly_to_path_item(poly)
+                    )
+                else:
+                    logging.getLogger("laserstudio").error(
+                        "Unsupported geometry type in scan geometry."
+                    )
         self.addToGroup(self.__scan_zones_group)
 
         # Also, update the scan path with the new geometry
@@ -146,7 +151,7 @@ class ScanGeometry(QGraphicsItemGroup):
 
     @staticmethod
     def shapely_to_yaml(
-        geometry: Union[Polygon, MultiPolygon, GeometryCollection]
+        geometry: Union[Polygon, MultiPolygon, GeometryCollection],
     ) -> dict:
         """
         :return: A dict for YAML serialization.

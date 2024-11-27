@@ -57,6 +57,10 @@ class RestProxy(QObject):
     ):
         return QVariant(self.laser_studio.handle_add_markers(pos, color))
 
+    @pyqtSlot(result="QVariant")
+    def handle_markers(self):
+        return QVariant(self.laser_studio.handle_markers())
+
     @pyqtSlot(QVariant, result="QVariant")
     def handle_position(self, pos: Optional[List[float]]):
         return QVariant(self.laser_studio.handle_position(pos))
@@ -311,6 +315,11 @@ class AddMarker(Resource):
         qvar = RestServer.invoke("handle_add_markers", QVariant(pos), QVariant(color))
         return cast(dict, qvar)
 
+@annotations.route("/markers")
+class Markers(Resource):
+    def get(self):
+        qvar = RestServer.invoke("handle_markers")
+        return cast(List[dict], qvar)
 
 # instruments = flask_api.namespace("instruments", description="Control instruments")
 
