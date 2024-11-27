@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton
 from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
+from .markerslisttoolbar import MarkersListToolbar
 
 
 class MarkersToolbar(QToolBar):
@@ -18,7 +18,7 @@ class MarkersToolbar(QToolBar):
         w = QPushButton(self)
         w.setIcon(QIcon(colored_image(":/icons/location-pin-plus.svg")))
         w.setIconSize(QSize(24, 24))
-        w.setToolTip("Add markers")
+        w.setToolTip("Add marker")
         w.clicked.connect(lambda: viewer.add_marker())
         self.addWidget(w)
 
@@ -32,7 +32,7 @@ class MarkersToolbar(QToolBar):
 
         # Markers' size
         self.marker_size_sp = w = ReturnSpinBox()
-        self.marker_size_sp.setSuffix(" µm")
+        self.marker_size_sp.setSuffix("\xa0µm")
         self.marker_size_sp.setToolTip("Markers' size")
         self.marker_size_sp.setMinimum(1)
         self.marker_size_sp.setSingleStep(10)

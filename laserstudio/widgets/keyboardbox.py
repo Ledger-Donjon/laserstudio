@@ -62,7 +62,7 @@ class KeyboardBox(QGroupBox):
             w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
-            w.setSuffix(" µm")
+            w.setSuffix("\xa0µm")
             w.setSingleStep(5)
             grid.addWidget(w, 3, 1, 1, 3)
 
@@ -93,7 +93,7 @@ class KeyboardBox(QGroupBox):
             w.setDecimals(1)
             w.setValue(self.displacement_z)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
-            w.setSuffix(" µm")
+            w.setSuffix("\xa0µm")
             w.setSingleStep(10)
             grid.addWidget(w, 3, 4)
 
