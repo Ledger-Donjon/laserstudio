@@ -1,0 +1,58 @@
+[tool.poetry]
+name = "laserstudio"
+version = "0.0.0"
+description = "Python3 software for hardware evaluation"
+authors = [
+    "Olivier Hériveaux <olivier.heriveaux@ledger.fr>",
+    "Michaël Mouchous <michael.mouchous@ledger.fr>",
+]
+license = "LGPL-3.0-or-later"
+readme = "README.md"
+documentation = "https://laserstudio.readthedocs.org/"
+classifiers = [
+    # How mature is this project? Common values are
+    #   3 - Alpha
+    #   4 - Beta
+    #   5 - Production/Stable
+    "Development Status :: 4 - Beta",
+    # Indicate who your project is intended for
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+]
+[tool.poetry.scripts]
+laserstudio = 'laserstudio.__main__:main'
+laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pyqt6 = ">=6.0"
+pystages = "1.2"
+pillow = "10.4.0"
+opencv-python = "4.9.0.80"
+pyusb = "1.2.1"
+pyyaml = "6.0.1"
+shapely = "2.0.5"
+requests = "^2.32.3"
+numpy = "1.26.4"
+pypdm = "1.1"
+flask = "3.0.3"
+flask-restx = "1.3.0"
+hidapi = "0.14.0"
+pytest = "7.0.1"
+pynit = { git = "https://github.com/Ledger-Donjon/pynit.git" }
+scipy = "1.13.1"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
+[tool.poetry-dynamic-versioning.substitution]
+files = ["laserstudio/__init__.py"]
+
+[tool.poetry-dynamic-versioning.files."laserstudio/__init__.py"]
+persistent-substitution = true
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
