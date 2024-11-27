@@ -228,6 +228,18 @@ class Viewer(QGraphicsView):
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
+    def select_mode(self, mode: Union[Mode, int], toggle: bool = False):
+        """Selects the Viewer's mode. If toogle is set to true,
+        the function behaves as 'toggling',
+        meaning that the mode is reset to NONE if it is reselected."""
+        if isinstance(mode, int):
+            mode = Viewer.Mode(mode)
+
+        if toggle and self.mode == mode:
+            mode = Viewer.Mode.NONE
+
+        self.mode = mode
+
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
         Retrieve the next point position from Scan Geometry

@@ -4,11 +4,12 @@
     "title": "Stage",
     "type": "object",
     "description": "A Stage.",
+    "allOf": [
+        {
+            "$ref": "instrument.schema.json"
+        }
+    ],
     "properties": {
-        "enable": {
-            "type": "boolean",
-            "description": "If the device is enabled or not."
-        },
         "unit_factors": {
             "type": "array",
             "items": {

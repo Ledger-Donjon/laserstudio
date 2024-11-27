@@ -45,6 +45,7 @@ class CameraNITToolBar(QToolBar):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Gain:"))
+        vbox.setContentsMargins(0, 0, 0, 0)
         w = self.hist_low_input = ReturnSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)

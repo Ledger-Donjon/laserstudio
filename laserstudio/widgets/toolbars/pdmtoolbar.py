@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSpinBox,
     QDoubleSpinBox,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, QSize, QVariant
 from PyQt6.QtGui import QIcon, QPixmap
@@ -34,6 +35,8 @@ class PDMToolbar(QToolBar):
         self.setFloatable(True)
 
         w = self.on_off_button = QPushButton(self)
+        if self.laser.label is not None:
+            w.setText(self.laser.label)
         w.setToolTip("On/Off Laser")
         w.setCheckable(True)
         w.setChecked(False)
@@ -53,11 +56,8 @@ class PDMToolbar(QToolBar):
         w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))
         self.addWidget(w)
 
-        # Laser interlock status
-        self.interlock_label = w = QLabel("Interlock status: Unknown")
-        self.addWidget(w)
-
         grid = QGridLayout()
+        grid.setContentsMargins(0, 4, 0, 0)
         row = 0
 
         # Laser pulsed power
@@ -127,13 +127,19 @@ class PDMToolbar(QToolBar):
         grid.addWidget(w, row, 1)
         row += 1
 
+        # Laser interlock status
+        grid.addWidget(QLabel("Interlock status:"), row, 0)
+        self.interlock_label = w = QLabel("Unknown")
+        grid.addWidget(w, row, 1)
+        row += 1
+
         w = QWidget()
         w.setLayout(grid)
         self.addWidget(w)
 
         self.reload_parameters()
         self.laser.parameter_changed.connect(self.refresh_interface)
-    
+
     def refresh_interface(self, name: str, value: Any):
         """Refresh the Toolbar UI according to given parameter and value"""
         if name == "on_off":
@@ -149,7 +155,7 @@ class PDMToolbar(QToolBar):
             self.offset_current_input.setValue(value)
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
-            self.interlock_label.setText(f"Interlock status: {'opened' if value else 'closed'}")
+            self.interlock_label.setText('Opened' if value else 'Closed')
 
     def reload_parameters(self):
         self.sweep_min_input.setValue(self.laser.sweep_min)
