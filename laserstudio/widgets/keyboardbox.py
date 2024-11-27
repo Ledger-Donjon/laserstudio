@@ -41,9 +41,11 @@ class KeyboardBox(QGroupBox):
         self.displacement_xy = 100.0
 
         vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
 
         grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
         if num_axis > 0:
             w = QPushButton(Direction.left)
             w.setFixedWidth(30)
@@ -75,16 +77,15 @@ class KeyboardBox(QGroupBox):
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.down))
             grid.addWidget(w, 2, 2, alignment=Qt.AlignmentFlag.AlignCenter)
-            grid.setColumnStretch(2, 1)
         if num_axis > 2:
             w = QPushButton(Direction.zup)
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.zup))
-            grid.addWidget(w, 1, 4)
+            grid.addWidget(w, 1, 4, alignment=Qt.AlignmentFlag.AlignCenter)
             w = QPushButton(Direction.zdown)
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.zdown))
-            grid.addWidget(w, 2, 4)
+            grid.addWidget(w, 2, 4, alignment=Qt.AlignmentFlag.AlignCenter)
             grid.setColumnStretch(4, 1)
 
             w = QDoubleSpinBox()
@@ -97,9 +98,7 @@ class KeyboardBox(QGroupBox):
             w.setSingleStep(10)
             grid.addWidget(w, 3, 4)
 
-        w = QWidget()
-        w.setLayout(grid)
-        vbox.addWidget(w)
+        vbox.addLayout(grid)
 
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 

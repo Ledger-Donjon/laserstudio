@@ -5,10 +5,11 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSpinBox,
     QDoubleSpinBox,
+    QCheckBox,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QVariant
 from PyQt6.QtGui import QIcon, QPixmap
-
+from typing import Any
 from laserstudio.instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox
@@ -33,7 +34,9 @@ class PDMToolbar(QToolBar):
         )
         self.setFloatable(True)
 
-        w = QPushButton(self)
+        w = self.on_off_button = QPushButton(self)
+        if self.laser.label is not None:
+            w.setText(self.laser.label)
         w.setToolTip("On/Off Laser")
         w.setCheckable(True)
         w.setChecked(False)
@@ -54,6 +57,7 @@ class PDMToolbar(QToolBar):
         self.addWidget(w)
 
         grid = QGridLayout()
+        grid.setContentsMargins(0, 4, 0, 0)
         row = 0
 
         # Laser pulsed power
@@ -123,22 +127,40 @@ class PDMToolbar(QToolBar):
         grid.addWidget(w, row, 1)
         row += 1
 
+        # Laser interlock status
+        grid.addWidget(QLabel("Interlock status:"), row, 0)
+        self.interlock_label = w = QLabel("Unknown")
+        grid.addWidget(w, row, 1)
+        row += 1
+
         w = QWidget()
         w.setLayout(grid)
         self.addWidget(w)
 
         self.reload_parameters()
+        self.laser.parameter_changed.connect(self.refresh_interface)
+
+    def refresh_interface(self, name: str, value: Any):
+        """Refresh the Toolbar UI according to given parameter and value"""
+        if name == "on_off":
+            self.on_off_button.blockSignals(True)
+            self.on_off_button.setChecked(value)
+            self.on_off_button.blockSignals(False)
+        elif name == "current_percentage":
+            self.pulse_power_input.blockSignals(True)
+            self.pulse_power_input.setValue(value)
+            self.pulse_power_input.blockSignals(False)
+        elif name == "offset_current":
+            self.offset_current_input.blockSignals(True)
+            self.offset_current_input.setValue(value)
+            self.offset_current_input.blockSignals(False)
+        elif name == "interlock_status":
+            self.interlock_label.setText('Opened' if value else 'Closed')
 
     def reload_parameters(self):
-        # To prevent boxes changing to Blue
-        self.pulse_power_input.blockSignals(True)
-        self.offset_current_input.blockSignals(True)
-
-        self.pulse_power_input.setValue(self.laser.current_percentage)
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
         self.sweep_freq_input.setValue(self.laser.sweep_freq)
-        self.offset_current_input.setValue(self.laser.offset_current)
-
-        self.pulse_power_input.blockSignals(False)
-        self.offset_current_input.blockSignals(False)
+        self.refresh_interface("current_percentage", self.laser.current_percentage)
+        self.refresh_interface("offset_current", self.laser.offset_current)
+        self.refresh_interface("interlock_status", self.laser.interlock_status)

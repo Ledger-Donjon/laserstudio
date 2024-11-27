@@ -14,7 +14,7 @@ class ReturnLineEdit(QLineEdit):
         self.returnPressed.connect(self.reset)
 
     def highlight(self):
-        self.setStyleSheet("background: #344266;")
+        self.setStyleSheet("background: #b86a45;")
 
     def reset(self):
         self.setStyleSheet("")

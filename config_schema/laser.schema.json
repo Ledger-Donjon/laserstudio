@@ -3,27 +3,29 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Laser",
     "type": "object",
-    "description": "A Laser device.",
-    "$ref": "probe.schema.json",
-    "properties": {
-        "enable": {
-            "type": "boolean",
-            "description": "If the device is enabled or not."
+    "description": "A Laser generator device.",
+    "allOf": [
+        {
+            "$ref": "probe.schema.json"
         }
-    },
+    ],
     "oneOf": [
         {
             "properties": {
                 "type": {
                     "const": "PDM",
                     "description": "Pulse-on-Demand Module from ALPhANOV."
+                },
+                "refresh_interval_ms": {
+                    "type": "integer",
+                    "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update."
+                },
+                "num": {
+                    "type": "integer",
+                    "description": "The index of the PDM device"
                 }
             },
             "$ref": "serial.schema.json",
-            "num": {
-                "type": "integer",
-                "description": "The index of the PDM device"
-            },
             "required": [
                 "num"
             ]

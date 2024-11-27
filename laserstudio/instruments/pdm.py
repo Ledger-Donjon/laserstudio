@@ -1,7 +1,9 @@
+from PyQt6.QtCore import QTimer, QVariant, Qt
 from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
+from typing import Optional, cast
 
 
 class PDMInstrument(LaserInstrument):
@@ -13,6 +15,9 @@ class PDMInstrument(LaserInstrument):
         :param config: YAML configuration object
         """
         super().__init__(config=config)
+
+        # To refresh stage position in the view, in real-time
+        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
 
         device_type = config.get("type")
         dev = config.get("dev")
@@ -26,7 +31,7 @@ class PDMInstrument(LaserInstrument):
             dev = get_serial_device(dev)
         except DeviceSearchError as e:
             logging.getLogger("laserstudio").error(
-                f"Laser is enabled but {device_type} is not found: {str(e)}...  Skipping."
+                f"Laser is enabled but {device_type} is not found: {str(e)}... Skipping."
             )
             raise
 
@@ -46,7 +51,7 @@ class PDMInstrument(LaserInstrument):
         self.pdm = pdm = PDM(config["num"], link)
         # Switch off the laser as soon as possible
         logging.getLogger("laserstudio").debug("Deactivate laser")
-        pdm.activation = False
+        pdm.activation = self._activation = False
         pdm.apply()
         # Set some default settings
         logging.getLogger("laserstudio").debug("Setting some default values")
@@ -56,15 +61,41 @@ class PDMInstrument(LaserInstrument):
         pdm.apply()
         logging.getLogger("laserstudio").debug("Finishing discussion with PDM")
 
-    @property
-    def on_off(self):
-        return self.pdm.activation
+        self._interlock_status = None
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
+            )
 
+    @property
+    def interlock_status(self) -> bool:
+        """Get the laser interlock status, emits a signal when it changes"""
+        state = self.pdm.interlock_status
+        if state != self._interlock_status:
+            self._interlock_status = state
+            self.parameter_changed.emit("interlock_status", QVariant(state))
+            if state == True:
+                # The interlock has been opened, it may have changed the state of the
+                # activation
+                _ = self.on_off
+        return state
+    
+    @property
+    def on_off(self) -> bool:
+        """This property is volatile, the PDM may change its state"""
+        value = self.pdm.activation
+        if self._activation != value:
+            self.parameter_changed.emit("on_off", QVariant(value))
+            self._activation = value
+        return value
+    
     @on_off.setter
     def on_off(self, value: bool):
         self.pdm.activation = value
         self.pdm.apply()
+        self._activation = value
         assert LaserInstrument.on_off.fset is not None
+        # This call will emit the new state
         LaserInstrument.on_off.fset(self, value)
 
     @property
@@ -93,3 +124,12 @@ class PDMInstrument(LaserInstrument):
         # On deletion of the object, we force the deactivation of the PDM
         self.pdm.activation = False
         self.pdm.apply()
+
+    def refresh_pdm(self):
+        """Called regularly to get laser state which can change externally (interlock)"""
+        _ = self.interlock_status
+
+        if self.refresh_interval is not None:
+            QTimer.singleShot(
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
+            )
