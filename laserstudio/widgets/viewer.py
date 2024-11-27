@@ -234,12 +234,12 @@ class Viewer(QGraphicsView):
         is directly an instance of Mode.
         """
         if isinstance(mode, int):
-            new_mode = Viewer.Mode(mode)
+            mode = Viewer.Mode(mode)
             # If it has been requested to select the same mode, we deselect it.
-            if self.mode == new_mode:
-                new_mode = Viewer.Mode.NONE
+            if self.mode == mode:
+                mode = Viewer.Mode.NONE
 
-        self.mode = Viewer.Mode.NONE
+        self.mode = mode
 
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
