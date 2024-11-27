@@ -11,7 +11,23 @@ and randomly go through these zones, by controlling motion devices.
 
 Laser Studio works on Python 3.9+.
 
-It requires following packages to run:
+It can be installed through PyPI with:
+
+```shell
+pip install laserstudio
+```
+
+Otherwise, you can clone and install the project with:
+
+```shell
+git clone https://github.com/Ledger-Donjon/laserstudio.git
+python3 -m pip install ./laserstudio
+```
+
+
+### Package depedencies
+
+It depends following packages to run:
 
 - [PyQt6]
 - [pystages]
@@ -27,7 +43,10 @@ It requires following packages to run:
 - [flask]
 - [flask-restx]
 
-After cloning the repository, you can install those by using the `requirements.txt` file.
+Those packages should install automatically when installing the mod
+
+Additionally, the [pyNIT] package may be installed, on Linux systems,
+to support NIT cameras.
 
 ```shell
 git clone https://github.com/Ledger-Donjon/laserstudio.git
