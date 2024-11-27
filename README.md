@@ -21,9 +21,8 @@ Otherwise, you can clone and install the project with:
 
 ```shell
 git clone https://github.com/Ledger-Donjon/laserstudio.git
-python3 -m pip install ./laserstudio
+pip install ./laserstudio
 ```
-
 
 ### Package depedencies
 
@@ -44,20 +43,25 @@ It depends following packages to run:
 - [flask-restx]
 - [hidapi]
 
-Those packages should install automatically when installing the mod
-
-Additionally, the [pyNIT] package may be installed, on Linux systems,
+Additionally, on Linux systems, the [pyNIT] package can be installed
 to support NIT cameras.
 
 ```shell
-git clone https://github.com/Ledger-Donjon/laserstudio.git
-python3 -m pip install --upgrade -r requirements.txt
+pip install git+https://github.com/Ledger-Donjon/pynit.git
+```
+
+On Mac with Apple Silicon chips, the [triangle] package fails to install with `pip`.
+Workaround is to install it from source before installing `laserstudio`:
+
+```shell
+pip install git+https://github.com/drufat/triangle.git
 ```
 
 ## Usage
 
 To run Laser Studio, tune your configuration file `config.yaml` with appropriate
-information about your hardware instruments, then a terminal and run Laser Studio:
+information about your hardware instruments, then a terminal and run Laser Studio in the
+directory containing that `config.yaml`.
 
 ```shell
 laserstudio
