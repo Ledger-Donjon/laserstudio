@@ -42,6 +42,7 @@ It depends following packages to run:
 - [pypdm]
 - [flask]
 - [flask-restx]
+- [hidapi]
 
 Those packages should install automatically when installing the mod
 
@@ -83,4 +84,5 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [pypdm]: https://pypi.org/project/pypdm
 [flask]: https://pypi.org/project/flask
 [flask-restx]: https://pypi.org/project/flask-restx
+[hidapi]: https://pipy.org/project/hidapi
 [Read the Docs]: https://laserstudio.readthedocs.io/
