@@ -1,27 +1,30 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/config.schema.json
 camera:
-  type: NIT
   enable: true
+  label: "NIT IR Camera"
+  type: NIT
   pixel_size_in_um: [15.115, 15.115]
   refresh_interval_ms: 50
   nuc_filepath: "/home/mmo/Work/Gits/***REMOVED***/donjon/laserstudio/nuc/25mhz/NUCFactory_2000us.yml"
   bpr_filepath: "/home/mmo/Work/Gits/***REMOVED***/donjon/laserstudio/nuc/25mhz/BPM.yml"
   objective: 20.0
 stage:
+  enable: true
+  label: "Main Stage"
   refresh_interval_ms: 100
   type: Corvus
-  enable: true
   dev:
     sn: "A600AANB"
 lasers:
   - enable: true
+    label: "Laser 980nm"
     type: PDM
-    num: 2
+    num: 1
     dev:
       sn: "FTA1BR1D"
   - enable: true
+    label: "Laser 1064nm"
     type: PDM
     num: 2
     dev:
       sn: "FTA1BWEV"
-probes:
-  - enable: true

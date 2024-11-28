@@ -1,16 +1,19 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/config.schema.json
 camera:
   enable: true
-  label: "Front side Camera"
+  label: "Dinolite"
   type: USB
   refresh_interval_ms: 50
   index: 0
 stage:
   enable: true
-  label: "Dummy stage"
+  label: "CNC Router 3018"
   refresh_interval_ms: 100
-  type: Dummy
+  type: CNC
+  dev:
+    vid: "1A86"
+    pid: "7523"
   unit_factor: 1000
 probes:
   - enable: true
-    label: "Dummy Probe"
+    label: "SiliconToaster"
