@@ -14,17 +14,19 @@ classifiers = [
     #   3 - Alpha
     #   4 - Beta
     #   5 - Production/Stable
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     # Indicate who your project is intended for
-    "Intended Audience :: Developers",
-    "Topic :: Software Development :: Build Tools",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Security",
+    "Topic :: System :: Hardware",
 ]
 [tool.poetry.scripts]
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 
 [tool.poetry.dependencies]
-python = ">=3.9 <3.11"
+python = ">=3.9 <3.13"
 pyqt6 = ">=6.0"
 pystages = "1.2"
 pillow = "10.4.0"
