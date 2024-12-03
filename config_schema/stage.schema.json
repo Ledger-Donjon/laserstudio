@@ -3,7 +3,6 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Stage",
     "type": "object",
-    "description": "A Stage.",
     "allOf": [
         {
             "$ref": "instrument.schema.json"
@@ -22,21 +21,34 @@
     },
     "oneOf": [
         {
-            "properties": {
-                "type": {
-                    "const": "Corvus",
-                    "description": "Corvus Stage."
+            "allOf": [
+                {
+                    "properties": {
+                        "type": {
+                            "const": "Corvus",
+                            "description": "A Corvus Stage."
+                        }
+                    }
+                },
+                {
+                    "$ref": "serial.schema.json"
                 }
-            },
-            "$ref": "serial.schema.json"
+            ]
         },
         {
-            "properties": {
-                "type": {
-                    "const": "CNC",
-                    "description": "CNC Stage."
+            "allOf": [
+                {
+                    "properties": {
+                        "type": {
+                            "const": "CNC",
+                            "description": "A CNC Stage."
+                        }
+                    }
+                },
+                {
+                    "$ref": "serial.schema.json"
                 }
-            }
+            ]
         },
         {
             "properties": {
@@ -53,7 +65,11 @@
                     "description": "A Stage responding to a Rest API."
                 }
             },
-            "$ref": "rest.schema.json"
+            "allOf": [
+                {
+                    "$ref": "rest.schema.json"
+                }
+            ]
         }
     ],
     "required": [

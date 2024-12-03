@@ -5,12 +5,24 @@
     "type": "object",
     "properties": {
         "camera": {
-            "$ref": "camera.schema.json",
-            "description": "The main camera of the setup."
+            "allOf": [
+                {
+                    "$ref": "camera.schema.json"
+                },
+                {
+                    "description": "The main camera of the setup."
+                }
+            ]
         },
         "stage": {
-            "$ref": "stage.schema.json",
-            "description": "The main stage of the setup."
+            "allOf": [
+                {
+                    "$ref": "stage.schema.json"
+                },
+                {
+                    "description": "The main stage of the setup."
+                }
+            ]
         },
         "lasers": {
             "type": "array",

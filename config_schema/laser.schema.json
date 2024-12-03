@@ -11,6 +11,11 @@
     ],
     "oneOf": [
         {
+            "allOf": [
+                {
+                    "$ref": "serial.schema.json"
+                }
+            ],
             "properties": {
                 "type": {
                     "const": "PDM",
@@ -25,7 +30,6 @@
                     "description": "The index of the PDM device"
                 }
             },
-            "$ref": "serial.schema.json",
             "required": [
                 "num"
             ]
