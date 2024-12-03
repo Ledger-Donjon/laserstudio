@@ -52,7 +52,11 @@
                     "description": "A Camera responding to a Rest API."
                 }
             },
-            "$ref": "rest.schema.json"
+            "allOf": [
+                {
+                    "$ref": "rest.schema.json"
+                }
+            ]
         },
         {
             "properties": {
