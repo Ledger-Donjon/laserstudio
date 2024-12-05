@@ -1,7 +1,6 @@
 import json
 from jsonschema import validate, ValidationError
-from prompt_toolkit import prompt
-from typing import Any
+from typing import Any, Optional, Union
 from .ref_resolve import set_base_url, resolve_references
 import logging
 import sys
@@ -28,6 +27,26 @@ def blue(s: str) -> str:
 
 def red(s: str) -> str:
     return Fore.RED + s + Fore.RESET
+
+
+def describe_schema_properties(schema: dict[str, Any], name: str) -> str:
+    res = ""
+    if "properties" in schema:
+        res += f"Properties for {bold(name)}:\n"
+
+        for key, subschema in schema["properties"].items():
+            # Name of property
+            res += f"  - {bold(key)}:"
+            # Description of property
+            if "description" in subschema:
+                res += " " + subschema["description"]
+            # Type of property or Constant value
+            if "const" in subschema:
+                res += f" ('{subschema['const']}' fixed value)"
+            elif "type" in subschema:
+                res += f" (as {subschema['type']})"
+            res += "\n"
+    return res
 
     item_schema = schema.get("items", {})
 
