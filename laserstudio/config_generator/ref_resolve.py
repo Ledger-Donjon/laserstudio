@@ -2,6 +2,10 @@ import requests
 from referencing import Registry, Resource
 from referencing._core import Resolver
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # Fetch the JSON schema from the URL
 BASE_URL = (
@@ -42,11 +46,12 @@ def _resolve(schema, resolver: Resolver):
         schema["allOf"] = [
             _resolve(subschema, resolver) for subschema in schema["allOf"]
         ]
+        schema = _flatten(schema)
 
     if "$ref" in schema:
         ref = schema["$ref"]
         del schema["$ref"]
-        print("Resolving reference:", ref)
+        logger.info(f"Resolving reference: {ref}")
         resolved = resolver.lookup(ref).contents
         resolved = _resolve(resolved, resolver)
         return resolved
