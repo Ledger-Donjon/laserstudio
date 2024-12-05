@@ -116,17 +116,6 @@ def generate_json_interactive(schema: dict[str, Any], key: str = "???", ask_user
 
     # Array of objects
     if element_type == "array":
-
-    if element_type == "object":
-        obj = result
-        for key, subschema in schema.get("properties", {}).items():
-            logger.info(
-                f"Instantiation of property '{key}'"
-                + (f" (of type {subschema['type']})" if "type" in subschema else "")
-                + ":"
-            )
-            obj[key] = generate_json_interactive(subschema, key)
-        return obj
         array = generate_array_interactive(schema, key)
         if array is None:
             return None
@@ -147,6 +136,20 @@ def generate_json_interactive(schema: dict[str, Any], key: str = "???", ask_user
 
     elif element_type == "string":
         return prompt("Enter a string value: ")
+    # Handle object by generating its properties
+    if element_type == "object":
+        for key, subschema in schema.get("properties", {}).items():
+            logger.info(
+                f"Instantiation of property '{key}'"
+                + (f" (of type {subschema['type']})" if "type" in subschema else "")
+                + ":"
+            )
+            generated_item = generate_json_interactive(subschema, key)
+            if generated_item is not None:
+                result[key] = generated_item
+        if name:
+            print(f"{bold(name)} instanciated.\n")
+        return result
 
     elif element_type == "integer":
         return int(prompt("Enter an integer value: "))
