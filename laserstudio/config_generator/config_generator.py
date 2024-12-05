@@ -5,6 +5,7 @@ from typing import Any
 import ref_resolve
 from .ref_resolve import set_base_url, resolve_references
 import logging
+import sys
 from colorama import init as colorama_init
 from colorama import Fore, Style
 import yaml
@@ -133,15 +134,19 @@ def generate_json_interactive(schema: dict[str, Any], key: str = "???", ask_user
     elif element_type == "boolean":
         value = prompt("Enter a boolean value (true/false): ").lower()
         return value == "true"
-
-    else:
-        raise ValueError(f"Unsupported schema type: {element_type}")
-
-
 def main(
-    schema_uri: str = "config.schema.json",
-    base_url: str = "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/",
+    schema_uri="config.schema.json",
+    base_url="https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/",
 ):
+    # Check if -D flag is present
+    if "-D" in sys.argv:
+        logging.basicConfig(level=logging.DEBUG)
+
+    if "-L" in sys.argv:
+        base_url = "/Volumes/Work/Gits/Ledger-Donjon/laserstudio/config_schema/"
+
+    logger.info("Starting config generator")
+
     colorama_init()
 
     set_base_url(base_url)
@@ -165,6 +170,7 @@ def main(
         logger.info("Generated JSON is valid according to the schema")
     except ValidationError as e:
         logger.error(f"Generated JSON is not valid: {e.message}")
+        return -1
 
     # Print the generated JSON data
     logger.debug(json.dumps(generated_json, indent=2))
@@ -172,6 +178,4 @@ def main(
 
 
 if __name__ == "__main__":
-    logger.setLevel(logging.CRITICAL)
-    logger.info("Starting config generator")
-    main(base_url="/Volumes/Work/Gits/Ledger-Donjon/laserstudio/config_schema/")
+    sys.exit(main())
