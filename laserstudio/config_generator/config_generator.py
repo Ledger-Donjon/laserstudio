@@ -3,6 +3,7 @@ from jsonschema import validate, ValidationError
 from prompt_toolkit import prompt
 from typing import Any
 import ref_resolve
+from .ref_resolve import set_base_url, resolve_references
 import logging
 from colorama import init as colorama_init
 from colorama import Fore, Style
@@ -141,11 +142,11 @@ def main(
     schema_uri: str = "config.schema.json",
     base_url: str = "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/",
 ):
-    ref_resolve.set_base_url(base_url)
     colorama_init()
 
+    set_base_url(base_url)
     # Fetch the JSON schema from the URL
-    schema = ref_resolve.resolve_references(schema_uri)
+    schema = resolve_references(schema_uri)
     logger.info("Schema loaded successfully")
     logger.debug(json.dumps(schema, indent=2))
     input(f"Press {green(bold('Enter'))} to continue...")
