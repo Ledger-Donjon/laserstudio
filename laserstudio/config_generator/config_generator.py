@@ -11,7 +11,6 @@ import yaml
 logger = logging.getLogger("Config Generator")
 
 
-def generate_array_interactive(schema: dict[str, Any], key: str = "???"):
 
 def bold(s: str) -> str:
     return Style.BRIGHT + s + Style.RESET_ALL
@@ -48,6 +47,8 @@ def describe_schema_properties(schema: dict[str, Any], name: str) -> str:
             res += "\n"
     return res
 
+
+def generate_array_interactive(schema: dict[str, Any], key: str):
     item_schema = schema.get("items", {})
 
     if item_schema.get("type") == "object":
@@ -115,7 +116,6 @@ def generate_json_interactive(schema: dict[str, Any], key: str = "???", ask_user
 
     # Array of objects
     if element_type == "array":
-        return generate_array_interactive(schema, key)
 
     if element_type == "object":
         obj = result
@@ -127,6 +127,11 @@ def generate_json_interactive(schema: dict[str, Any], key: str = "???", ask_user
             )
             obj[key] = generate_json_interactive(subschema, key)
         return obj
+        array = generate_array_interactive(schema, key)
+        if array is None:
+            return None
+        else:
+            return array
 
     # Handle enums and constants
     if "enum" in schema:
