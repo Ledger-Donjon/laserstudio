@@ -6,6 +6,7 @@ import ref_resolve
 import logging
 from colorama import init as colorama_init
 from colorama import Fore, Style
+import yaml
 
 logger = logging.getLogger("Config Generator")
 
@@ -152,6 +153,10 @@ def main(
 
     # Generate JSON data interactively based on the schema
     generated_json = generate_json_interactive(schema)
+
+    # Print the generated JSON data
+    print("\nGenerated config.yaml:")
+    print(yaml.dump(generated_json, indent=2))
 
     # Validate the generated JSON data against the schema
     try:
