@@ -5,7 +5,7 @@ from typing import Any
 import ref_resolve
 import logging
 
-logger = logging.Logger("config_generator")
+logger = logging.getLogger("Config Generator")
 
 
 def generate_array_interactive(schema: dict[str, Any], key: str = "???"):

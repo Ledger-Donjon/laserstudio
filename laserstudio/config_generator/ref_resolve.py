@@ -4,7 +4,7 @@ from referencing._core import Resolver
 import json
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("Config Generator")
 
 
 # Fetch the JSON schema from the URL
