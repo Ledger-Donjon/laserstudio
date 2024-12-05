@@ -4,11 +4,29 @@ from prompt_toolkit import prompt
 from typing import Any
 import ref_resolve
 import logging
+from colorama import init as colorama_init
+from colorama import Fore, Style
 
 logger = logging.getLogger("Config Generator")
 
 
 def generate_array_interactive(schema: dict[str, Any], key: str = "???"):
+
+def bold(s: str) -> str:
+    return Style.BRIGHT + s + Style.RESET_ALL
+
+
+def green(s: str) -> str:
+    return Fore.GREEN + s + Fore.RESET
+
+
+def blue(s: str) -> str:
+    return Fore.BLUE + s + Fore.RESET
+
+
+def red(s: str) -> str:
+    return Fore.RED + s + Fore.RESET
+
     item_schema = schema.get("items", {})
 
     if item_schema.get("type") == "object":
@@ -123,12 +141,13 @@ def main(
     base_url: str = "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/",
 ):
     ref_resolve.set_base_url(base_url)
+    colorama_init()
 
     # Fetch the JSON schema from the URL
     schema = ref_resolve.resolve_references(schema_uri)
     logger.info("Schema loaded successfully")
     logger.debug(json.dumps(schema, indent=2))
-    prompt("Press Enter to continue...")
+    input(f"Press {green(bold('Enter'))} to continue...")
     logger.info("\n" * 2)
 
     # Generate JSON data interactively based on the schema
