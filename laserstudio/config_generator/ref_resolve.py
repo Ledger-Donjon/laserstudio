@@ -61,3 +61,30 @@ def _resolve(schema, resolver: Resolver):
     elif "items" in schema:
         schema["items"] = _resolve(schema["items"], resolver)
     return schema
+
+
+def _flatten(schema):
+    # Combine 'allOf's into one schema
+    if "allOf" in schema:
+        allOf = schema["allOf"]
+        del schema["allOf"]
+        for subschema in allOf:
+            # Merge properties
+            if "properties" in subschema:
+                schema["properties"] = {
+                    **schema.get("properties", {}),
+                    **subschema.get("properties", {}),
+                }
+                del subschema["properties"]
+
+            # Merge required list
+            if "required" in subschema:
+                req = schema.get("required", []) + subschema.get("required", [])
+                if len(req):
+                    schema["required"] = req
+                del subschema["required"]
+
+            # Merge everything else, with schema taking precedence
+            schema = {**subschema, **schema}
+
+    return schema
