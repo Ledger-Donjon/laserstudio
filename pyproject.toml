@@ -24,6 +24,7 @@ classifiers = [
 [tool.poetry.scripts]
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
+laserstudio_generate_config = 'laserstudio.config_generator.config_generator:main'
 
 [tool.poetry.dependencies]
 python = ">=3.9 <3.13"
