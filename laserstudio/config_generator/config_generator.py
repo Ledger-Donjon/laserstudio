@@ -2,7 +2,6 @@ import json
 from jsonschema import validate, ValidationError
 from prompt_toolkit import prompt
 from typing import Any
-import ref_resolve
 from .ref_resolve import set_base_url, resolve_references
 import logging
 import sys
