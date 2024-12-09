@@ -88,8 +88,8 @@ def describe_schema_properties(schema: dict[str, Any], name: str) -> str:
 
 def generate_array_interactive(schema: dict[str, Any], key: str):
     item_schema = schema.get("items", {})
-
-    if item_schema.get("type") == "object":
+    element_type = item_schema.get("type", "string")
+    if element_type == "object":
         name = item_schema.get("title", key)
         result = []
         while True:
@@ -103,10 +103,39 @@ def generate_array_interactive(schema: dict[str, Any], key: str):
         result = input(
             f"For property {bold(key)}, give a list of {bold(item_schema.get('type'))}s, with comma-separated values: "
         )
-        # TODO Validate the input according to type
-        if result == "":
-            return None
-        return result.split(",")
+        # Check if the user wants to see the description
+        if result.startswith("?"):
+            print(
+                f"Description: {hint}"
+                if hint is not None
+                else f"No description for property {bold(key)} is available."
+            )
+        else:
+            break
+
+    # If the user does not provide any value, return None
+    if result == "":
+        return None
+
+    # Convert all elements in the array, and check if they are valid
+    values = []
+    for i, x in enumerate(result.split(",")):
+        try:
+            if element_type == "integer":
+                x = int(x)
+            elif element_type == "number":
+                x = float(x)
+            elif element_type == "boolean":
+                if x.lower() not in ["true", "false"]:
+                    raise ValueError(f"{x} is an invalid boolean value")
+                x = x.lower() == "true"
+            values.append(x)
+
+        except Exception as e:
+            logger.error(f"The {i+1}th value for property {bold(key)} is invalid: {e}")
+            return generate_array_interactive(schema, key)
+
+    return values
 
 
 # Function to generate JSON data interactively based on the schema
