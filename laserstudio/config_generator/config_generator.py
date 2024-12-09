@@ -131,9 +131,11 @@ def generate_array_interactive(schema: dict[str, Any], key: str):
             assert type(subresult) is dict
             result.append(subresult)
         return result
-    else:
+
+    hint = item_schema.get("description")
+    while True:
         result = input(
-            f"For property {bold(key)}, give a list of {bold(item_schema.get('type'))}s, with comma-separated values: "
+            f"For property {bold(key)}, give a list of {bold(element_type)}s, with comma-separated values: "
         )
         # Check if the user wants to see the description
         if result.startswith("?"):
