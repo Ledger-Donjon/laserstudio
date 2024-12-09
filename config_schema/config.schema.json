@@ -10,7 +10,7 @@
                     "$ref": "camera.schema.json"
                 },
                 {
-                    "description": "The main camera of the setup."
+                    "description": "The main Camera of the setup."
                 }
             ]
         },
@@ -20,20 +20,20 @@
                     "$ref": "stage.schema.json"
                 },
                 {
-                    "description": "The main stage of the setup."
+                    "description": "The main Stage of the setup."
                 }
             ]
         },
         "lasers": {
             "type": "array",
-            "description": "The list of laser devices.",
+            "description": "The list of Laser devices.",
             "items": {
                 "$ref": "laser.schema.json"
             }
         },
         "probes": {
             "type": "array",
-            "description": "The list of probes.",
+            "description": "The list of Probes.",
             "items": {
                 "$ref": "probe.schema.json"
             }

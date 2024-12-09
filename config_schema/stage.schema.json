@@ -10,6 +10,7 @@
     ],
     "properties": {
         "unit_factors": {
+            "description": "The conversion factors for the stage's units, for each axis. Give one value if it is the same for all axes.",
             "type": "array",
             "items": {
                 "type": "number"

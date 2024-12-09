@@ -11,18 +11,25 @@
     "properties": {
         "width": {
             "type": "integer",
+            "default": 640,
             "description": "Image width, in pixel."
         },
         "height": {
             "type": "integer",
+            "default": 512,
             "description": "Image height, in pixel."
         },
         "refresh_interval_ms": {
             "type": "integer",
-            "description": "Refreshing rate, in milliseconds."
+            "description": "Refreshing rate, in milliseconds.",
+            "default": 200
         },
         "pixel_size_in_um": {
             "type": "array",
+            "default": [
+                1,
+                1
+            ],
             "items": {
                 "type": "number"
             },
@@ -30,6 +37,7 @@
         },
         "objective": {
             "type": "number",
+            "default": 1.0,
             "description": "If there is a optical magnifier, specify the zooming factor of the objective."
         }
     },
@@ -41,6 +49,7 @@
                 },
                 "index": {
                     "type": "integer",
+                    "default": 0,
                     "description": "Index of the camera (a used in OpenCV)."
                 }
             }
@@ -50,6 +59,11 @@
                 "type": {
                     "const": "REST",
                     "description": "A Camera responding to a Rest API."
+                },
+                "api_command": {
+                    "type": "string",
+                    "default": "images/camera",
+                    "description": "The command in the Rest API."
                 }
             },
             "allOf": [
@@ -62,14 +76,16 @@
             "properties": {
                 "type": {
                     "const": "NIT",
-                    "description": "A Camera from New Imaging Technologies."
+                    "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems."
                 },
                 "nuc_filepath": {
                     "type": "string",
+                    "default": "./nuc/25mhz/NUCFactory_2000us.yml",
                     "description": "The file path pointing to the NUC settings of the camera."
                 },
                 "bpr_filepath": {
                     "type": "string",
+                    "default": "./nuc/25mhz/BPM.yml",
                     "description": "The file path pointing to the BPR settings of the camera."
                 }
             }

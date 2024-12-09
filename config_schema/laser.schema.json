@@ -27,7 +27,7 @@
                 },
                 "num": {
                     "type": "integer",
-                    "description": "The index of the PDM device"
+                    "description": "The hardware index of the PDM device."
                 }
             },
             "required": [
