@@ -14,6 +14,16 @@ logger = logging.getLogger("Config Generator")
 def prompt_key(
     key: str, type: str, hint: Optional[str], required=False
 ) -> Optional[Union[Union[Union[str, int], float], bool]]:
+    """
+    Prompt the user to enter a value for a given key/property, with the given type and hint.
+    The function will recursively call itself if the user enters an invalid value.
+
+    :param key: The name of the property.
+    :param type: The type, which can be "string", "integer", "number", or "boolean".
+    :param hint: The content of the "description" field in the schema.
+    :param required: Indicates if the field is contained in the 'required' list, defaults to False
+    :return: The value entered by the user, or None if the user did not provide any value.
+    """
     if type not in ["string", "integer", "number", "boolean"]:
         raise ValueError(f"Unsupported schema type: {type}")
 
@@ -51,22 +61,42 @@ def prompt_key(
 
 
 def bold(s: str) -> str:
+    """
+    Convenience function to make a string bold.
+    """
     return Style.BRIGHT + s + Style.RESET_ALL
 
 
 def green(s: str) -> str:
+    """
+    Convenience function to make a string green.
+    """
     return Fore.GREEN + s + Fore.RESET
 
 
 def blue(s: str) -> str:
+    """
+    Convenience function to make a string blue.
+    """
     return Fore.BLUE + s + Fore.RESET
 
 
 def red(s: str) -> str:
+    """
+    Convenience function to make a string red.
+    """
     return Fore.RED + s + Fore.RESET
 
 
 def describe_schema_properties(schema: dict[str, Any], name: str) -> str:
+    """
+    Generate a description of the properties of a schema, by providing the list of
+    properties and their types, and a description if available.
+
+    :param schema: The schema to describe.
+    :param name: The name of the current object from which the schema is comming from.
+    :return: A string describing the properties of the schema.
+    """
     res = ""
     if "properties" in schema:
         res += f"Properties for {bold(name)}:\n"
