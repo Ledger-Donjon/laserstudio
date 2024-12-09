@@ -338,9 +338,9 @@ def main(
     # Validate the generated JSON data against the schema
     try:
         validate(instance=generated_json, schema=schema)
-        logger.info("Generated JSON is valid according to the schema")
+        print("Generated JSON is " + bold(green("valid")) + " according to the schema")
     except ValidationError as e:
-        logger.error(f"Generated JSON is not valid: {e.message}")
+        print("Generated JSON is " + bold(red("invalid")) + ": " + e.message)
         return -1
 
     return 0
