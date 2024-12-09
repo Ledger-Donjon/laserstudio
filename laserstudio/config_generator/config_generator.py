@@ -51,8 +51,6 @@ def prompt_key(
             if x.lower() not in ["true", "false"]:
                 raise ValueError(f"{x} is an invalid boolean value")
             x = x.lower() == "true"
-        else:
-            return x
         return x
 
     except Exception as e:
