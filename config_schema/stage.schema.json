@@ -15,9 +15,6 @@
             "items": {
                 "type": "number"
             }
-        },
-        "unit_factor": {
-            "type": "number"
         }
     },
     "oneOf": [
