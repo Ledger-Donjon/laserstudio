@@ -105,11 +105,15 @@ def describe_schema_properties(schema: dict[str, Any], name: str) -> str:
             # Description of property
             if "description" in subschema:
                 res += " " + subschema["description"]
-            # Type of property or Constant value
+            # Type of property or constant value
             if "const" in subschema:
                 res += f" ('{subschema['const']}' fixed value)"
             elif "type" in subschema:
                 res += f" (as {subschema['type']})"
+            if "examples" in subschema:
+                res += f" Examples: {subschema['examples']}"
+            if "default" in subschema:
+                res += f" Default: {subschema['default']}"
             res += "\n"
     return res
 
