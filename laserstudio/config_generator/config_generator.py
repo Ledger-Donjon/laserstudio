@@ -23,10 +23,10 @@ def prompt_with_hint(
         hint = f"No description for property {fproperty(key)} is available."
 
     if is_array:
-        question = f"For property {fproperty(key, is_required)}, give a list of {bold(type)}s, with comma-separated values: "
+        question = f"For property {fproperty(key, is_required)}, give a list of {bold(type)}s, with comma-separated values {dim('optional') if is_required else ''}: "
         x = prompt(question, hint)
     else:
-        question = f"For property {fproperty(key, is_required)}, enter a{'n' if type=='integer' else ''} {bold(type)} value: "
+        question = f"For property {fproperty(key, is_required)}, enter a{'n' if type=='integer' else ''} {bold(type)} value {dim('optional') if is_required else ''}: "
         if type == "boolean":
             x = prompt(question, hint, ["true", "false"], allow_empty=not is_required)
         else:
@@ -106,6 +106,13 @@ def prompt_key(
     return x
 
 
+def dim(s: str) -> str:
+    """
+    Convenience function to make a string dimmed.
+    """
+    return Style.DIM + s + Style.RESET_ALL
+
+
 def bold(s: str) -> str:
     """
     Convenience function to make a string bold.
@@ -151,13 +158,22 @@ def describe_property(schema: dict[str, Any], key: str, is_required: bool) -> st
     if "const" in schema:
         res += f" ({bold(schema['const'])} fixed value)"
     elif "type" in schema and schema["type"] != "object":
-        res += f" as {schema['type']}"
+        if (
+            schema["type"] == "array"
+            and "items" in schema
+            and "type" in schema["items"]
+        ):
+            res += f" as list of {schema['items']['type']}s"
+        else:
+            res += f" as {schema['type']}"
     if "examples" in schema:
         res += f". Examples: {schema['examples']}"
     if "default" in schema:
         res += f". Default value: {schema['default']}"
     if "pattern" in schema:
         res += f". Must match the regular expression '{schema['pattern']}'"
+    if not is_required:
+        res += f". {dim('optional')}"
     return res
 
 
@@ -255,7 +271,7 @@ def generate_array_interactive(
             result.append(subresult)
         return result
 
-    hint = describe_property(item_schema, key, key in required_keys)
+    hint = describe_property(schema, key, key in required_keys)
     result = prompt_with_hint(
         key, element_type, hint, is_array=True, is_required=key in required_keys
     )
@@ -486,14 +502,14 @@ def main(
     input(f"""Welcome to {bold('Laser Studio')} config.yaml file generator.
           
 This tool permits you to create a configuration file for the Laser Studio software to describe your bench setup.
-You will be prompted to instanciate (or not) some {bold(blue('instruments'))} and their {bold(green('properties'))}.
+You will be prompted to instanciate (or not) some {bold(blue('instruments'))} and their {fproperty('properties')}.
 Enter values for each requested {bold('property')}.
 
-For some {bold(green('properties'))} or {blue(bold('instruments'))}, you may have to choose between several options (called schemas).
+For some {fproperty('properties')} or {blue(bold('instruments'))}, you may have to choose between several options (called schemas).
 
-If you need help, type {bold('?')} and you will be provided with a description of the {bold(green('property'))}.
-If the {bold('property')} is required, it will be marked with a {red('*')}.
-If you want to skip a {bold('property')}, just press {bold(yellow('Enter'))} without any value.
+If you need help, type {bold(yellow('?'))} and you will be provided with a description of the {fproperty('property')}.
+If the {fproperty('property')} is required, it will be marked with a {bold(red('*'))}.
+If you want to skip a {fproperty('property')}, just press {bold(yellow('Enter'))} without any value.
 
 Press {bold(yellow('Enter'))} when you are ready...
 """)
