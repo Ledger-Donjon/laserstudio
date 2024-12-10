@@ -339,7 +339,7 @@ class ProbePositionPage(CameraPositionPage):
         super().set_position(xy)
         self.viewer.stage_sight.pause_image_update = False
         if self.clicked_point is not None:
-            self.probe.fixed_pos = self.clicked_point.x(), self.clicked_point.y()
+            self.probe.offset_pos = self.clicked_point.x(), self.clicked_point.y()
 
 
 class CameraWizard(QWizard):

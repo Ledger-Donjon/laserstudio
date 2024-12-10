@@ -10,9 +10,9 @@
     ],
     "description": "A Probe device.",
     "properties": {
-        "fixed_pos": {
+        "offset_pos": {
             "type": "array",
-            "description": "The relative position of the probe, in micrometers.",
+            "description": "The relative position from the center of the camera, in micrometers.",
             "items": {
                 "type": "integer"
             }
