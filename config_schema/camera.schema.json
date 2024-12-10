@@ -45,6 +45,24 @@
         {
             "properties": {
                 "type": {
+                    "const": "NIT",
+                    "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems."
+                },
+                "nuc_filepath": {
+                    "type": "string",
+                    "default": "./nuc/25mhz/NUCFactory_2000us.yml",
+                    "description": "The file path pointing to the NUC settings of the camera."
+                },
+                "bpr_filepath": {
+                    "type": "string",
+                    "default": "./nuc/25mhz/BPM.yml",
+                    "description": "The file path pointing to the BPR settings of the camera."
+                }
+            }
+        },
+        {
+            "properties": {
+                "type": {
                     "const": "USB"
                 },
                 "index": {
@@ -71,24 +89,6 @@
                     "$ref": "rest.schema.json"
                 }
             ]
-        },
-        {
-            "properties": {
-                "type": {
-                    "const": "NIT",
-                    "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems."
-                },
-                "nuc_filepath": {
-                    "type": "string",
-                    "default": "./nuc/25mhz/NUCFactory_2000us.yml",
-                    "description": "The file path pointing to the NUC settings of the camera."
-                },
-                "bpr_filepath": {
-                    "type": "string",
-                    "default": "./nuc/25mhz/BPM.yml",
-                    "description": "The file path pointing to the BPR settings of the camera."
-                }
-            }
         }
     ],
     "required": [
