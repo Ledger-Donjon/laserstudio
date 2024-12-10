@@ -3,6 +3,7 @@ from referencing import Registry, Resource
 from referencing._core import Resolver
 import json
 import logging
+import os.path
 
 logger = logging.getLogger("Config Generator")
 
@@ -24,7 +25,7 @@ def resolve_references(uri: str):
 
 def _retrieve(uri: str):
     if BASE_URL.startswith("/"):
-        with open(BASE_URL + uri) as f:
+        with open(os.path.join(BASE_URL, uri)) as f:
             return Resource.from_contents(json.load(f))
     elif BASE_URL.startswith("http"):
         response = requests.get(BASE_URL + uri)
