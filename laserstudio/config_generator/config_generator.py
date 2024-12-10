@@ -444,15 +444,14 @@ def generate_json_interactive(
         while True:
             x = prompt_key(key, element_type, hint, key in required_keys)
             assert type(x) is str
-            if re.match(schema["pattern"], x) is None:
-                return x
-                logger.error(
-                    f"Invalid value for property {fproperty(key)}: does not match the pattern '{schema['pattern']}'"
-                )
-                x = prompt_key(key, element_type, hint, key in required_keys)
-                assert type(x) is str
 
-        return x
+            if re.match(schema["pattern"], x) is not None:
+                # The value matches the regular expression pattern
+                return x
+
+            logger.error(
+                f"Invalid value for property {fproperty(key)}: does not match the regular expression pattern '{schema['pattern']}'"
+            )
 
     return prompt_key(key, element_type, hint, key in required_keys)
 
