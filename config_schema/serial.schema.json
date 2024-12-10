@@ -15,7 +15,7 @@
             "properties": {
                 "dev": {
                     "type": "object",
-                    "description": "Filters to get a serial device.",
+                    "description": "Filters to retrieve dynamically a serial device (serial number, vid/pid, ...).",
                     "anyOf": [
                         {
                             "properties": {
