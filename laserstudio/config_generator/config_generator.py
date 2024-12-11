@@ -7,7 +7,6 @@ import sys
 from colorama import init as colorama_init
 from colorama import Fore, Style
 import yaml
-import re
 import os.path
 
 
@@ -507,20 +506,19 @@ class ConfigGenerator:
         # Handle simple types (string, integer, number, boolean)
         hint = ConfigGenerator.describe_property(schema, key, key in required_keys)
 
-        if element_type == "string" and "pattern" in schema:
-            while True:
-                x = self.prompt_key(key, element_type, hint, key in required_keys)
-                assert type(x) is str
+        while True:
+            x = self.prompt_key(key, element_type, hint, key in required_keys)
+            if (key not in required_keys) and x is None:
+                return None
 
-                if re.match(schema["pattern"], x) is not None:
-                    # The value matches the regular expression pattern
-                    return x
-
+            try:
+                validate(x, schema)
+                return x
+            except ValidationError as e:
                 self.logger.error(
-                    f"Invalid value for property {ConfigGenerator.fproperty(key)}: does not match the regular expression pattern '{schema['pattern']}'"
+                    f"Invalid value for property {ConfigGenerator.fproperty(key)}: {e.message}"
                 )
-
-        return self.prompt_key(key, element_type, hint, key in required_keys)
+                continue
 
     def get_flags(self):
         # Check if -V flag is present for augmenting log level to VERBOSE
