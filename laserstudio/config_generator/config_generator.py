@@ -203,6 +203,15 @@ class ConfigGenerator:
             res += f" Default value: {schema['default']}."
         if "pattern" in schema:
             res += f" Must match the regular expression '{schema['pattern']}'."
+        if "minimum" in schema:
+            res += f" Minimum value: {schema['minimum']}."
+        if "maximum" in schema:
+            res += f" Maximum value: {schema['maximum']}."
+        if "exclusiveMinimum" in schema:
+            res += f" Minimum value (exclusive): {schema['exclusiveMinimum']}."
+        if "exclusiveMaximum" in schema:
+            res += f" Maximum value (exclusive): {schema['exclusiveMaximum']}."
+
         if not is_required:
             res += f" {ConfigGenerator.dim('optional')}"
         return res
