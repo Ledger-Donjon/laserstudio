@@ -93,10 +93,10 @@ class ConfigGenerator:
             hint = f"No description for property {ConfigGenerator.fproperty(key)} is available."
 
         if is_array:
-            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, give a list of {ConfigGenerator.finput(type)}s, with comma-separated values {ConfigGenerator.dim('optional') if is_required else ''}: "
+            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, give a list of {ConfigGenerator.finput(type)}s, with comma-separated values{ConfigGenerator.dim(' optional') if not is_required else ''}: "
             x = ConfigGenerator.prompt(question, hint)
         else:
-            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if type=='integer' else ''} {ConfigGenerator.finput(type)} value {ConfigGenerator.dim('optional') if is_required else ''}: "
+            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if type=='integer' else ''} {ConfigGenerator.finput(type)} value{ConfigGenerator.dim(' optional') if not is_required else ''}: "
             if type == "boolean":
                 x = ConfigGenerator.prompt(
                     question, hint, ["true", "false"], allow_empty=not is_required
