@@ -1,7 +1,12 @@
 import json
 from jsonschema import validate, ValidationError
 from typing import Any, Optional, Union
-from .ref_resolve import set_base_url, resolve_references
+
+try:
+    from .ref_resolve import set_base_url, resolve_references
+except ImportError:
+    from ref_resolve import set_base_url, resolve_references
+
 import logging
 import sys
 from colorama import init as colorama_init

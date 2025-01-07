@@ -4,14 +4,20 @@
     "type": "object",
     "oneOf": [
         {
+            "description": "Path",
             "properties": {
                 "dev": {
                     "type": "string",
-                    "description": "Direct path to the serial device (on unix system) or COM port name (on Windows system)."
+                    "description": "Direct path to the serial device (on unix system) or COM port name (on Windows system).",
+                    "examples": [
+                        "/dev/ttyUSB0",
+                        "COM3"
+                    ]
                 }
             }
         },
         {
+            "description": "Filters",
             "properties": {
                 "dev": {
                     "type": "object",
@@ -32,12 +38,12 @@
                             "properties": {
                                 "vid": {
                                     "type": "string",
-                                    "pattern": "^[A-Fa-f0-9]{4}$",
+                                    "pattern": "[A-Fa-f0-9]{4}",
                                     "description": "VID of the serial device, in hexadecimal"
                                 },
                                 "pid": {
                                     "type": "string",
-                                    "pattern": "^[A-Fa-f0-9]{4}$",
+                                    "pattern": "[A-Fa-f0-9]{4}",
                                     "description": "PID of the serial device, in hexadecimal"
                                 }
                             },

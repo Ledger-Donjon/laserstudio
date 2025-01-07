@@ -11,6 +11,7 @@
     ],
     "oneOf": [
         {
+            "description": "PDM",
             "allOf": [
                 {
                     "$ref": "serial.schema.json"
@@ -23,7 +24,9 @@
                 },
                 "refresh_interval_ms": {
                     "type": "integer",
-                    "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update."
+                    "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update.",
+                    "minimum": 1,
+                    "suffix": "ms"
                 },
                 "num": {
                     "type": "integer",
@@ -35,6 +38,7 @@
             ]
         },
         {
+            "description": "DonjonLaser",
             "properties": {
                 "type": {
                     "const": "DonjonLaser",

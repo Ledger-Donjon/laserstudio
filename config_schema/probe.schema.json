@@ -12,9 +12,12 @@
     "properties": {
         "offset_pos": {
             "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
             "description": "The relative position from the center of the camera, in micrometers.",
             "items": {
-                "type": "integer"
+                "type": "integer",
+                "suffix": "um"
             }
         }
     }

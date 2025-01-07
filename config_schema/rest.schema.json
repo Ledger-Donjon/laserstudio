@@ -5,11 +5,18 @@
     "properties": {
         "host": {
             "type": "string",
-            "description": "IP or hostname Rest device."
+            "description": "IP or hostname REST device.",
+            "examples": [
+                "localhost",
+                "127.0.0.1"
+            ]
         },
         "port": {
             "type": "integer",
-            "description": "Port to connect to the Rest device."
+            "description": "Port to connect to the REST device.",
+            "minimum": 1,
+            "maximum": 65535,
+            "example": 4000
         },
         "api_command": {
             "type": "string",
