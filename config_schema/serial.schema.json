@@ -4,7 +4,7 @@
     "type": "object",
     "oneOf": [
         {
-            "description": "Path",
+            "title": "Identify device by path",
             "properties": {
                 "dev": {
                     "type": "string",
@@ -17,13 +17,14 @@
             }
         },
         {
-            "description": "Filters",
+            "title": "Identify device by filters",
             "properties": {
                 "dev": {
                     "type": "object",
                     "description": "Filters to retrieve dynamically a serial device (serial number, vid/pid, ...).",
                     "anyOf": [
                         {
+                            "title": "Serial number",
                             "properties": {
                                 "sn": {
                                     "type": "string",
@@ -35,15 +36,16 @@
                             ]
                         },
                         {
+                            "title": "VID/PID",
                             "properties": {
                                 "vid": {
                                     "type": "string",
-                                    "pattern": "[A-Fa-f0-9]{4}",
+                                    "pattern": "^[A-Fa-f0-9]{4}$",
                                     "description": "VID of the serial device, in hexadecimal"
                                 },
                                 "pid": {
                                     "type": "string",
-                                    "pattern": "[A-Fa-f0-9]{4}",
+                                    "pattern": "^[A-Fa-f0-9]{4}$",
                                     "description": "PID of the serial device, in hexadecimal"
                                 }
                             },
@@ -53,6 +55,7 @@
                             ]
                         },
                         {
+                            "title": "Location",
                             "properties": {
                                 "location": {
                                     "type": "string"

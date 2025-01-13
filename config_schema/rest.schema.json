@@ -9,18 +9,25 @@
             "examples": [
                 "localhost",
                 "127.0.0.1"
-            ]
+            ],
+            "default": "localhost"
         },
         "port": {
             "type": "integer",
             "description": "Port to connect to the REST device.",
             "minimum": 1,
             "maximum": 65535,
-            "example": 4000
+            "example": 4000,
+            "default": 4000
         },
         "api_command": {
             "type": "string",
-            "description": "Default API command."
+            "description": "Default API command.",
+            "default": "/device",
+            "examples": [
+                "images/camera",
+                "/motion"
+            ]
         }
     },
     "required": [

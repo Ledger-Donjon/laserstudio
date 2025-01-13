@@ -11,7 +11,7 @@
     ],
     "oneOf": [
         {
-            "description": "PDM",
+            "title": "PDM",
             "allOf": [
                 {
                     "$ref": "serial.schema.json"
@@ -38,7 +38,7 @@
             ]
         },
         {
-            "description": "DonjonLaser",
+            "title": "DonjonLaser",
             "properties": {
                 "type": {
                     "const": "DonjonLaser",

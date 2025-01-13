@@ -4,11 +4,19 @@
     "properties": {
         "label": {
             "type": "string",
-            "description": "The instrument's personalized label."
+            "description": "The instrument's personalized label.",
+            "examples": [
+                "Camera",
+                "Stage",
+                "Laser 1",
+                "Laser 2",
+                "Probe"
+            ]
         },
         "enable": {
             "type": "boolean",
-            "description": "Set to False of the instrument should not be used by Laser Studio."
+            "description": "Set to False of the instrument should not be used by Laser Studio.",
+            "default": true
         }
     }
 }

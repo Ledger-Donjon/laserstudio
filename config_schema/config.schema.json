@@ -26,6 +26,7 @@
         },
         "lasers": {
             "type": "array",
+            "title": "Lasers",
             "description": "The list of Laser devices.",
             "items": {
                 "$ref": "laser.schema.json"
@@ -33,6 +34,7 @@
         },
         "probes": {
             "type": "array",
+            "title": "Probes",
             "description": "The list of Probes.",
             "items": {
                 "$ref": "probe.schema.json"
