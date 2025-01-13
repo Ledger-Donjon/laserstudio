@@ -552,6 +552,7 @@ class ConfigGenerator:
 
     def load_schema(self):
         # Fetch the JSON schema from the URL
+        set_base_url(self.base_url)
         print("Loading schemas... ", end="")
         sys.stdout.flush()
         schema = resolve_references(self.schema_uri)

@@ -64,28 +64,47 @@ def _resolve(schema, resolver: Resolver):
     return schema
 
 
-def _flatten(schema):
+def _flatten(schema: dict):
     # Combine 'allOf's into one schema
-    if "allOf" in schema:
-        allOf = schema["allOf"]
-        del schema["allOf"]
-        for subschema in allOf:
-            # Merge properties
-            if "properties" in subschema:
-                schema["properties"] = {
-                    **schema.get("properties", {}),
-                    **subschema.get("properties", {}),
-                }
-                del subschema["properties"]
+    keys = list(schema.keys())
+    # Get the position of "allOf" in the keys
+    try:
+        allOf_index = keys.index("allOf")
+    except ValueError:
+        allOf_index = None
+    if allOf_index is None:
+        return schema
+    # Get the position of "properties" in the keys
+    try:
+        properties_index = keys.index("properties")
+    except ValueError:
+        properties_index = None
 
-            # Merge required list
-            if "required" in subschema:
-                req = schema.get("required", []) + subschema.get("required", [])
-                if len(req):
-                    schema["required"] = req
-                del subschema["required"]
+    allOfFirst = (
+        allOf_index < properties_index if properties_index is not None else True
+    )
 
-            # Merge everything else, with schema taking precedence
-            schema = {**subschema, **schema}
+    allOf = schema["allOf"]
+    del schema["allOf"]
+    for subschema in allOf:
+        # Keep order according to the position of "allOf" in the keys
+        first, second = (subschema, schema) if allOfFirst else (schema, subschema)
+        # Merge properties
+        if "properties" in subschema:
+            schema["properties"] = {
+                **first.get("properties", {}),
+                **second.get("properties", {}),
+            }
+            del subschema["properties"]
+
+        # Merge required list
+        if "required" in subschema:
+            req = first.get("required", []) + second.get("required", [])
+            if len(req):
+                schema["required"] = req
+            del subschema["required"]
+
+        # Merge everything else, with schema taking precedence
+        schema = {**subschema, **schema}
 
     return schema
