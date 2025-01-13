@@ -6,7 +6,7 @@ A configuration file is a YAML structured file giving information about the stru
 
 The file `config.yaml` is first retrieved from the working directory. If it is not found, the program will look to each parent directory until it reaches the Home directory. If the file is not found, the program will prompt the user to generate a new configuration file.
 
-This permits to have a default configuration file for your bench, that you place at your Home directory, and specific configuration files for peculiar projects, placed in your project directory.
+This permits to have a default configuration file for your bench, that you place at your Home directory, and specific configuration files for particular projects, placed in your project directory.
 
 You can also specify the location of the configuration, by providing the path at startup of Laser Studio
 
@@ -66,9 +66,9 @@ probes:
 
 ## Schema validation
 
-`yaml-language-server` at first line permits to use schema validation in your editor. Usage of schema is available [on JSON Schema](https://json-schema.org/).
+The `yaml-language-server` directive at first line permits to use schema validation in your editor. Usage of schema is available [on JSON Schema](https://json-schema.org/).
 
-For Visual Studio Code, you can use the following extension: `redhat.vscode-yaml`
+In Visual Studio Code, you can use the following extension: `redhat.vscode-yaml` that uses the `yaml-language-server` to provide schema validation.
 
 This extension permits to give you a visual feedback on the correctness of your configuration file, and also a description about the instruments and their properties.
 

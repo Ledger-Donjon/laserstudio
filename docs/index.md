@@ -1,5 +1,4 @@
-Welcome to Laser Studio's documentation!
-========================================
+# Welcome to Laser Studio's documentation!
 
 Laser Studio is an open source tool developed by the Product Security Team of Ledger, the Donjon.
 
@@ -14,19 +13,20 @@ Camera and stages (or actuators) are used to synchronize the spatial positioning
 elements permitting to conduct the hardware evaluation: injection probes, laser beam...
 on devices under test.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-   
-   getting_started
-   instruments
-   viewer
-   scan
-   api
+```{toctree}
+:maxdepth: 2
+:caption: Contents
 
-Indices and tables
-==================
+getting_started
+instruments
+viewer
+scan
+lsapi
+rest
+```
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+# Indices and tables
+
+- {ref}`genindex`
+- {ref}`modindex`
+- {ref}`search`
