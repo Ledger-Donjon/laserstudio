@@ -40,7 +40,35 @@ except ImportError:
 from PyQt6.QtWidgets import QApplication
 
 
+class ConfigGeneratorWizard(QWizard):
+    def __init__(self, schema: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Configuration File Generator")
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+
+        # Initiate the presentation/introduction page
+        self.addPage(ConfigGeneratorIntroductionPage(self))
+
+        self.schema = schema
+        # To be more readable, we will create a page for each top-property of the schema
+        self.config_generation_pages = list[ConfigPresentationPage]()
+        top_properties = schema.get("properties", {})
+        for key, subschema in top_properties.items():
+            self.config_generation_pages.append(
+                ConfigPresentationPage(self, key, subschema)
+            )
+        [self.addPage(p) for p in self.config_generation_pages]
+
+        # Add the result page
+        self.config_result_page = ConfigResultPage(self)
+        self.addPage(self.config_result_page)
+
+
 class AnyOf:
+    """
+    The AnyOf widget is compound on the given title of the option to select (via the checkbox) and the widget permitting to enter the value.
+    """
+
     def __init__(self, schema, required_keys: list[str] = []) -> None:
         self.cb = QCheckBox(schema.get("title"))
         self.schema_widget = SchemaWidget(
@@ -53,29 +81,13 @@ class AnyOf:
 
     @property
     def selected(self):
+        """Indication to know if the element is selected, and thus must be included in the Configuration File"""
         return self.cb.isChecked()
 
     @selected.setter
     def selected(self, value: bool):
         self.cb.setChecked(value)
         self.schema_widget.setEnabled(value)
-
-
-class ConfigGeneratorWizard(QWizard):
-    def __init__(self, schema: dict, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Configuration File Generator")
-        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
-        self.schema = schema
-        self.config_generation_pages = list[ConfigPresentationPage]()
-        top_properties = schema.get("properties", {})
-        for key, subschema in top_properties.items():
-            self.config_generation_pages.append(
-                ConfigPresentationPage(self, key, subschema)
-            )
-        self.addPage(ConfigGeneratorIntroductionPage(self))
-        [self.addPage(p) for p in self.config_generation_pages]
-        self.addPage(ConfigResultPage(self))
 
 
 class KeyLabel(QWidget):
@@ -124,6 +136,12 @@ class SchemaWidget(QGroupBox):
         - a list of SchemaWidget objects for its properties.
     If the element's schema includes a "oneOf" it includes a QStackedWidget to permit the selection of the different options.
     If the element's schema includes a "anyOf" it includes a QFormLayout with checkboxes to permit the selection of one (or more) different options.
+
+    If the element is a simple value/property to configure (integer, string, boolean, etc.), it includes
+        - A KeyLabel (checkbox + title of key)
+        - A QLineEdit, QSpinBox, QDoubleSpinBox, QCheckBox or QLabel which is called a "value_widget" to permit the user to enter/see the value.
+
+    If the element is an array of simple values/properties, there is also a +/- button to add/remove elements in the array.
     """
 
     def __init__(
@@ -194,6 +212,11 @@ class SchemaWidget(QGroupBox):
             self.enable_property(True)
 
     def enable_property(self, state: bool = True):
+        """
+        Change the appearance of the SchemaWidget (KeyLabel and Value_Widget) when it is configuring an optional property.
+
+        :param state: The selection state to be changed, defaults to True
+        """
         if self.value_widget is not None:
             self.value_widget.setEnabled(state)
         if self.keylabel_widget is not None:
@@ -201,9 +224,16 @@ class SchemaWidget(QGroupBox):
             self.keylabel_widget.cb.setChecked(state)
 
     def create_keylabel_widget(self):
+        """
+        Create a keylabel when the current element has a value of key.
+        In case of the element is an object, the KeyLabel may not be included in the views, but it should still exist.
+
+        :return: The KeyLabel of the element being configured.
+        """
         if not self.key:
             # Having self.key to "" or None means that we do not want to have any key label
             return None
+
         name_or_key = self.name or self.key
         self.keylabel_widget = KeyLabel(
             name_or_key, required=self.key in self.required_keys
@@ -265,6 +295,9 @@ class SchemaWidget(QGroupBox):
                 hbox.setContentsMargins(0, 0, 0, 0)
 
             def add_child():
+                """
+                Action to perform if the user wants to add a new element in the array.
+                """
                 self._children.append(
                     c := SchemaWidget(
                         schema["items"],
@@ -290,6 +323,9 @@ class SchemaWidget(QGroupBox):
                 minus_button.setEnabled(len(self._children) > minItems)
 
             def remove_child():
+                """
+                Action to perform if the user wants to remove the last element of the array.
+                """
                 if not self._children:
                     return
                 c = self._children.pop()
@@ -349,6 +385,8 @@ class SchemaWidget(QGroupBox):
         return value_widget
 
     def add_oneOf_widget(self):
+        """The schema includes a 'oneOf' section, which permits to select one of the multiple configuration schemas.
+        A list of radio buttons is displayed to select the option, and the selected configuration option is displayed in the QStackedWidget."""
         self.oneOf_stacked_widget = None
         if one_of := self.schema.get("oneOf"):
             layout = QVBoxLayout()
@@ -390,11 +428,16 @@ class SchemaWidget(QGroupBox):
                 b.setChecked(True)
 
     def add_anyOf_widget(self):
+        """The schema includes a 'anyOf' section, which permits to select one or more of the multiple configuration schemas.
+        Note that at least one must be selected.
+        A list of checkboxes is displayed to select the option(s), and the selected configuration option(s) widgets are enabled if selected.
+        The overall presentation is a QFormLayout like."""
         self.anyOfs: list[AnyOf] = []
         self.anyOf_buttonGroup = QButtonGroup()
         self.anyOf_buttonGroup.setExclusive(False)
 
         def anyOf_buttonToggled(button: QAbstractButton):
+            """Take action to make sure that at least one option is selected"""
             checked: list[QAbstractButton] = []
             for b in self.anyOf_buttonGroup.buttons():
                 b.setEnabled(True)

@@ -53,9 +53,10 @@ def main():
     if args.conf_file is not None:
         stream = args.conf_file
     else:
-        # Search existing configuration file
+        # Search existing configuration file, from current folder to root
         current_dir = os.path.realpath((os.curdir))
         while not os.path.exists(os.path.join(current_dir, "config.yaml")):
+            # Search for the config file in the parent directory
             parent_dir = os.path.dirname(current_dir)
             if current_dir == parent_dir:
                 break
@@ -64,19 +65,26 @@ def main():
         if os.path.exists(path := os.path.join(current_dir, "config.yaml")):
             stream = open(path, "r")
 
+    yaml_config = None
     if stream is not None:
+        # Load the found or given configuration file
         yaml_config = yaml.load(stream, yaml.FullLoader)
-    else:
+
+        # Check if the configuration file is valid
+        if type(yaml_config) is not dict:
+            print("Error: Invalid configuration file: it is not a dictionary")
+            yaml_config = None
+
+    if yaml_config is None:
+        # No configuration file found, generate one
         config_generator = ConfigGenerator()
-        sys.argv.append("-L")
+        sys.argv.append("-L")  # Force to load the schema from the local files
         config_generator.get_flags()
         config_generator.load_schema()
 
         wizard = ConfigGeneratorWizard(config_generator.schema)
         wizard.exec()
-        # config_generator.print_intro()
-        # yaml_config = config_generator.generate_json_interactive()
-        # assert yaml_config is None or type(yaml_config) is dict
+        yaml_config = wizard.config_result_page.config
 
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())
