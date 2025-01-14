@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-from PyQt6.QtCore import Qt, QRegularExpression, QSize
+from PyQt6.QtCore import Qt, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtWidgets import QButtonGroup
 from typing import Optional, Union
@@ -23,7 +23,6 @@ from PyQt6.QtWidgets import (
     QAbstractButton,
     QStackedWidget,
     QRadioButton,
-    QWidgetItem,
 )
 import sys
 import yaml
@@ -33,8 +32,12 @@ try:
     from .config_generator import ConfigGenerator, validate, ValidationError
     from ..utils.colors import LedgerPalette, LedgerStyle
 except ImportError:
-    from ref_resolve import set_base_url
-    from config_generator import ConfigGenerator, validate, ValidationError
+    from laserstudio.config_generator.ref_resolve import set_base_url
+    from laserstudio.config_generator.config_generator import (
+        ConfigGenerator,
+        validate,
+        ValidationError,
+    )
     from laserstudio.utils.colors import LedgerPalette, LedgerStyle
 
 from PyQt6.QtWidgets import QApplication

@@ -1,53 +1,49 @@
 {
-    "$id": "laser.schema.json",
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Laser",
-    "type": "object",
-    "description": "A Laser generator device.",
-    "allOf": [
+  "$id": "laser.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Laser",
+  "type": "object",
+  "description": "A Laser generator device.",
+  "allOf": [
+    {
+      "$ref": "probe.schema.json"
+    }
+  ],
+  "oneOf": [
+    {
+      "title": "PDM",
+      "allOf": [
         {
-            "$ref": "probe.schema.json"
+          "$ref": "serial.schema.json"
         }
-    ],
-    "oneOf": [
-        {
-            "title": "PDM",
-            "allOf": [
-                {
-                    "$ref": "serial.schema.json"
-                }
-            ],
-            "properties": {
-                "type": {
-                    "const": "PDM",
-                    "description": "Pulse-on-Demand Module from ALPhANOV."
-                },
-                "refresh_interval_ms": {
-                    "type": "integer",
-                    "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update.",
-                    "minimum": 1,
-                    "suffix": "ms"
-                },
-                "num": {
-                    "type": "integer",
-                    "description": "The hardware index of the PDM device."
-                }
-            },
-            "required": [
-                "num"
-            ]
+      ],
+      "properties": {
+        "type": {
+          "const": "PDM",
+          "description": "Pulse-on-Demand Module from ALPhANOV."
         },
-        {
-            "title": "DonjonLaser",
-            "properties": {
-                "type": {
-                    "const": "DonjonLaser",
-                    "description": "Donjon's Laser Driver."
-                }
-            }
+        "refresh_interval_ms": {
+          "type": "integer",
+          "description": "Refreshing rate, in milliseconds. If not set, there is no auto-update.",
+          "minimum": 1,
+          "suffix": "ms"
+        },
+        "num": {
+          "type": "integer",
+          "description": "The hardware index of the PDM device."
         }
-    ],
-    "required": [
-        "type"
-    ]
+      },
+      "required": ["num"]
+    },
+    {
+      "title": "DonjonLaser",
+      "properties": {
+        "type": {
+          "const": "DonjonLaser",
+          "description": "Donjon's Laser Driver."
+        }
+      }
+    }
+  ],
+  "required": ["type"]
 }

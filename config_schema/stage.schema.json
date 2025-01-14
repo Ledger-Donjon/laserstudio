@@ -1,83 +1,81 @@
 {
-    "$id": "stage.schema.json",
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Stage",
-    "type": "object",
-    "allOf": [
+  "$id": "stage.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "instrument.schema.json"
+    }
+  ],
+  "properties": {
+    "unit_factors": {
+      "description": "The conversion factors for the stage's units, for each axis. Give one value if it is the same for all axes. Extra values are ignored and lacking values are set to last provided value.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "suffix": "um/unit",
+        "default": 1.0
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Corvus",
+      "allOf": [
         {
-            "$ref": "instrument.schema.json"
-        }
-    ],
-    "properties": {
-        "unit_factors": {
-            "description": "The conversion factors for the stage's units, for each axis. Give one value if it is the same for all axes. Extra values are ignored and lacking values are set to last provided value.",
-            "type": "array",
-            "minItems": 1,
-            "items": {
-                "type": "number",
-                "suffix": "um/unit",
-                "default": 1.0
+          "properties": {
+            "type": {
+              "const": "Corvus",
+              "description": "A Corvus Stage."
             }
+          }
+        },
+        {
+          "$ref": "serial.schema.json"
         }
+      ]
     },
-    "oneOf": [
+    {
+      "title": "CNC",
+      "allOf": [
         {
-            "title": "Corvus",
-            "allOf": [
-                {
-                    "properties": {
-                        "type": {
-                            "const": "Corvus",
-                            "description": "A Corvus Stage."
-                        }
-                    }
-                },
-                {
-                    "$ref": "serial.schema.json"
-                }
-            ]
-        },
-        {
-            "title": "CNC",
-            "allOf": [
-                {
-                    "properties": {
-                        "type": {
-                            "const": "CNC",
-                            "description": "A CNC Stage."
-                        }
-                    }
-                },
-                {
-                    "$ref": "serial.schema.json"
-                }
-            ]
-        },
-        {
-            "title": "Dummy",
-            "properties": {
-                "type": {
-                    "const": "Dummy",
-                    "description": "A Dummy Stage."
-                }
+          "properties": {
+            "type": {
+              "const": "CNC",
+              "description": "A CNC Stage."
             }
+          }
         },
         {
-            "title": "REST",
-            "properties": {
-                "type": {
-                    "const": "REST",
-                    "description": "A Stage responding to a Rest API."
-                }
-            },
-            "allOf": [
-                {
-                    "$ref": "rest.schema.json"
-                }
-            ]
+          "$ref": "serial.schema.json"
         }
-    ],
-    "required": [
-        "type"
-    ]
+      ]
+    },
+    {
+      "title": "Dummy",
+      "properties": {
+        "type": {
+          "const": "Dummy",
+          "description": "A Dummy Stage."
+        }
+      }
+    },
+    {
+      "title": "REST",
+      "properties": {
+        "type": {
+          "const": "REST",
+          "description": "A Stage responding to a Rest API."
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "rest.schema.json"
+        }
+      ]
+    }
+  ],
+  "required": ["type"]
 }

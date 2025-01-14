@@ -327,7 +327,7 @@ class ProbePositionPage(CameraPositionPage):
         else:
             what = "Probe"
             self.viewer.clicked_point_marker.color = QColorConstants.Blue
-        self.setTitle(f"{what} {probe_index+1} positioning")
+        self.setTitle(f"{what} {probe_index + 1} positioning")
         self.setSubTitle(
             f"Indicate in the image the position of the {what}."
             f" This operation will permit {QCoreApplication.applicationName()} to move accordingly to"

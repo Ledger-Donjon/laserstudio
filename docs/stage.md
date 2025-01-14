@@ -37,7 +37,7 @@ For instance, if your 2-axis stage gives values in millimeters instead of microm
 
 ```yaml
 stage:
-    enable: true
-    type: Corvus
-    units_factors: [1000.0, 1000.0]
+  enable: true
+  type: Corvus
+  units_factors: [1000.0, 1000.0]
 ```

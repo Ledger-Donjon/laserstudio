@@ -5,7 +5,10 @@ from typing import Any, Optional, Union
 try:
     from .ref_resolve import set_base_url, resolve_references
 except ImportError:
-    from ref_resolve import set_base_url, resolve_references
+    from laserstudio.config_generator.ref_resolve import (
+        set_base_url,
+        resolve_references,
+    )
 
 import logging
 import sys
@@ -100,7 +103,7 @@ class ConfigGenerator:
             question = f"For property {ConfigGenerator.fproperty(key, is_required)}, give a list of {ConfigGenerator.finput(type)}s, with comma-separated values{ConfigGenerator.dim(' optional') if not is_required else ''}: "
             x = ConfigGenerator.prompt(question, hint)
         else:
-            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if type=='integer' else ''} {ConfigGenerator.finput(type)} value{ConfigGenerator.dim(' optional') if not is_required else ''}: "
+            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if type == 'integer' else ''} {ConfigGenerator.finput(type)} value{ConfigGenerator.dim(' optional') if not is_required else ''}: "
             if type == "boolean":
                 x = ConfigGenerator.prompt(
                     question, hint, ["true", "false"], allow_empty=not is_required
@@ -135,7 +138,7 @@ class ConfigGenerator:
 
                 except Exception as e:
                     self.logger.error(
-                        f"The {i+1}th value for property {ConfigGenerator.fproperty(key)} is invalid: {e}"
+                        f"The {i + 1}th value for property {ConfigGenerator.fproperty(key)} is invalid: {e}"
                     )
                     return self.prompt_with_hint(key, type, hint, is_array)
             return values
@@ -425,7 +428,7 @@ class ConfigGenerator:
                     for i, option in enumerate(schema["anyOf"]):
                         if (
                             self.prompt(
-                                f"Do you want to instanciate {ConfigGenerator.bold(f'Schema {i+1}')}?",
+                                f"Do you want to instanciate {ConfigGenerator.bold(f'Schema {i + 1}')}?",
                                 hint="",
                                 answers=["y", "n"],
                             )
@@ -563,19 +566,19 @@ class ConfigGenerator:
 
     @staticmethod
     def print_intro():
-        input(f"""Welcome to {ConfigGenerator.finstrument('Laser Studio')} config.yaml file generator.
+        input(f"""Welcome to {ConfigGenerator.finstrument("Laser Studio")} config.yaml file generator.
             
     This tool permits you to create a configuration file for the Laser Studio software to describe your bench setup.
-    You will be prompted to instanciate (or not) some {ConfigGenerator.finstrument('instruments')} and their {ConfigGenerator.fproperty('properties')}.
-    Enter values for each requested {ConfigGenerator.fproperty('property')}.
+    You will be prompted to instanciate (or not) some {ConfigGenerator.finstrument("instruments")} and their {ConfigGenerator.fproperty("properties")}.
+    Enter values for each requested {ConfigGenerator.fproperty("property")}.
 
-    For some {ConfigGenerator.fproperty('properties')} or {ConfigGenerator.finstrument('instruments')}, you may have to choose between several options (called schemas).
+    For some {ConfigGenerator.fproperty("properties")} or {ConfigGenerator.finstrument("instruments")}, you may have to choose between several options (called schemas).
 
-    If you need help, type {ConfigGenerator.finput('?')} and you will be provided with a description of the {ConfigGenerator.fproperty('property')}.
-    If the {ConfigGenerator.fproperty('property')} is required, it will be marked with a {ConfigGenerator.bold(ConfigGenerator.red('*'))}.
-    If you want to skip a {ConfigGenerator.fproperty('property')}, just press {ConfigGenerator.finput('Enter')} without any value.
+    If you need help, type {ConfigGenerator.finput("?")} and you will be provided with a description of the {ConfigGenerator.fproperty("property")}.
+    If the {ConfigGenerator.fproperty("property")} is required, it will be marked with a {ConfigGenerator.bold(ConfigGenerator.red("*"))}.
+    If you want to skip a {ConfigGenerator.fproperty("property")}, just press {ConfigGenerator.finput("Enter")} without any value.
 
-    Press {ConfigGenerator.finput('Enter')} when you are ready...
+    Press {ConfigGenerator.finput("Enter")} when you are ready...
     """)
 
 

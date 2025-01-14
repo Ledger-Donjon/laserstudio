@@ -1,6 +1,5 @@
 from PyQt6.QtCore import pyqtSignal, QObject, QThread
 from enum import Enum, auto
-from typing import Optional
 import hid
 
 

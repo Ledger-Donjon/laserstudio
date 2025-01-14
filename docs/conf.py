@@ -19,10 +19,12 @@ author = "Olivier Hériveaux, Michaël Mouchous"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.autodoc",
-            "sphinx.ext.autosummary", 
-            "myst_parser",
-            "sphinx.ext.autosectionlabel"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "myst_parser",
+    "sphinx.ext.autosectionlabel",
+]
 
 # Make sure the target is unique
 autosectionlabel_prefix_document = True

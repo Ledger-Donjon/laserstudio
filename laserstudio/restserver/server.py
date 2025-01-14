@@ -315,11 +315,13 @@ class AddMarker(Resource):
         qvar = RestServer.invoke("handle_add_markers", QVariant(pos), QVariant(color))
         return cast(dict, qvar)
 
+
 @annotations.route("/markers")
 class Markers(Resource):
     def get(self):
         qvar = RestServer.invoke("handle_markers")
         return cast(List[dict], qvar)
+
 
 # instruments = flask_api.namespace("instruments", description="Control instruments")
 

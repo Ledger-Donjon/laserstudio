@@ -1,13 +1,12 @@
 # Getting started
 
-
 ## Installation
 
 Laser Studio needs an environment with Python 3.9+, and some extra packages.
 
 It is commonly used on Ubuntu 22.04 and macOS, but should also run on Windows.
 
-You can get Laser Studio installed on your computer by creating a specific python environment and using ``pip``:
+You can get Laser Studio installed on your computer by creating a specific python environment and using `pip`:
 
 ```sh
 python3 -m venv laserstudio
@@ -21,7 +20,7 @@ Laser Studio can then be run following command:
 laserstudio
 ```
 
-At first run, Laser Studio will prompt you to generate a configuration file to describe your bench. 
+At first run, Laser Studio will prompt you to generate a configuration file to describe your bench.
 You can get more information on this page: {doc}`conf_file`.
 
 ## Main interface

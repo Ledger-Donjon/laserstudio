@@ -8,6 +8,7 @@ from typing import Optional, cast
 
 class PDMInstrument(LaserInstrument):
     "PDM device links dict. Used for link sharing between different lasers."
+
     __PDM_LINKS = {}
 
     def __init__(self, config: dict):
@@ -74,12 +75,12 @@ class PDMInstrument(LaserInstrument):
         if state != self._interlock_status:
             self._interlock_status = state
             self.parameter_changed.emit("interlock_status", QVariant(state))
-            if state == True:
+            if state is True:
                 # The interlock has been opened, it may have changed the state of the
                 # activation
                 _ = self.on_off
         return state
-    
+
     @property
     def on_off(self) -> bool:
         """This property is volatile, the PDM may change its state"""
@@ -88,7 +89,7 @@ class PDMInstrument(LaserInstrument):
             self.parameter_changed.emit("on_off", QVariant(value))
             self._activation = value
         return value
-    
+
     @on_off.setter
     def on_off(self, value: bool):
         self.pdm.activation = value

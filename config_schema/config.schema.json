@@ -1,44 +1,44 @@
 {
-    "$id": "config.schema.json",
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Laser Studio Configuration File",
-    "type": "object",
-    "properties": {
-        "camera": {
-            "allOf": [
-                {
-                    "$ref": "camera.schema.json"
-                },
-                {
-                    "description": "The main Camera of the setup."
-                }
-            ]
+  "$id": "config.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Laser Studio Configuration File",
+  "type": "object",
+  "properties": {
+    "camera": {
+      "allOf": [
+        {
+          "$ref": "camera.schema.json"
         },
-        "stage": {
-            "allOf": [
-                {
-                    "$ref": "stage.schema.json"
-                },
-                {
-                    "description": "The main Stage of the setup."
-                }
-            ]
-        },
-        "lasers": {
-            "type": "array",
-            "title": "Lasers",
-            "description": "The list of Laser devices.",
-            "items": {
-                "$ref": "laser.schema.json"
-            }
-        },
-        "probes": {
-            "type": "array",
-            "title": "Probes",
-            "description": "The list of Probes.",
-            "items": {
-                "$ref": "probe.schema.json"
-            }
+        {
+          "description": "The main Camera of the setup."
         }
+      ]
+    },
+    "stage": {
+      "allOf": [
+        {
+          "$ref": "stage.schema.json"
+        },
+        {
+          "description": "The main Stage of the setup."
+        }
+      ]
+    },
+    "lasers": {
+      "type": "array",
+      "title": "Lasers",
+      "description": "The list of Laser devices.",
+      "items": {
+        "$ref": "laser.schema.json"
+      }
+    },
+    "probes": {
+      "type": "array",
+      "title": "Probes",
+      "description": "The list of Probes.",
+      "items": {
+        "$ref": "probe.schema.json"
+      }
     }
+  }
 }

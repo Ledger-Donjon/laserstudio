@@ -1,24 +1,24 @@
 {
-    "$id": "probe.schema.json",
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Probe",
-    "type": "object",
-    "allOf": [
-        {
-            "$ref": "instrument.schema.json"
-        }
-    ],
-    "description": "A Probe device.",
-    "properties": {
-        "offset_pos": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "description": "The relative position from the center of the camera, in micrometers.",
-            "items": {
-                "type": "integer",
-                "suffix": "um"
-            }
-        }
+  "$id": "probe.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Probe",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "instrument.schema.json"
     }
+  ],
+  "description": "A Probe device.",
+  "properties": {
+    "offset_pos": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "The relative position from the center of the camera, in micrometers.",
+      "items": {
+        "type": "integer",
+        "suffix": "um"
+      }
+    }
+  }
 }

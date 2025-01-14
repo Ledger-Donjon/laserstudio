@@ -9,8 +9,6 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSlider,
     QLabel,
-    QHBoxLayout,
-    QVBoxLayout,
 )
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
