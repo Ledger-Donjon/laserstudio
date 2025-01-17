@@ -29,7 +29,7 @@ laserstudio_generate_config
 Here is an example of a configuration file:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/config.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/config.schema.json
 camera:
   enable: true
   label: "NIT IR Camera"

@@ -8,12 +8,8 @@ authors = [
 ]
 license = "LGPL-3.0-or-later"
 readme = "README.md"
-documentation = "https://laserstudio.readthedocs.org/"
+documentation = "https://laserstudio.readthedocs.io/"
 classifiers = [
-    # How mature is this project? Common values are
-    #   3 - Alpha
-    #   4 - Beta
-    #   5 - Production/Stable
     "Development Status :: 5 - Production/Stable",
     # Indicate who your project is intended for
     "Intended Audience :: Science/Research",
@@ -24,7 +20,8 @@ classifiers = [
 [tool.poetry.scripts]
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
-laserstudio_generate_config = 'laserstudio.config_generator.config_generator:main'
+laserstudio_generate_config_cli = 'laserstudio.config_generator.config_generator:main_cli'
+laserstudio_generate_config_gui = 'laserstudio.config_generator.config_generator:main_gui'
 
 [tool.poetry.dependencies]
 python = ">=3.9 <3.13"

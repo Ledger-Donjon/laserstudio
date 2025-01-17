@@ -22,11 +22,12 @@ class ConfigGenerator:
     def __init__(
         self,
         schema_uri="config.schema.json",
-        base_url="https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/",
+        base_url="https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/",
     ):
         self.schema_uri = schema_uri
         self.base_url = base_url
         self.logger = logging.getLogger("Config Generator")
+        self.use_local = True
         colorama_init()
 
     @staticmethod
@@ -548,18 +549,16 @@ class ConfigGenerator:
 
         # Check if -L flag is present for retrieve schema from local directory
         if "-L" in sys.argv:
-            __dirname = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-            )
-            self.base_url = os.path.join(__dirname, "config_schema")
+            __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            self.use_local = True
 
-    def load_schema(self):
+    def load_schema(self, local=True):
         # Fetch the JSON schema from the URL
+        if self.use_local:
+            __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+            self.base_url = os.path.join(__dirname, "config_schema")
         set_base_url(self.base_url)
-        print("Loading schemas... ", end="")
-        sys.stdout.flush()
         schema = resolve_references(self.schema_uri)
-        print("done.")
         self.logger.info("Schema loaded successfully")
         self.logger.debug(json.dumps(schema, indent=2))
         self.schema = schema

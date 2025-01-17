@@ -20,8 +20,8 @@
     "api_command": {
       "type": "string",
       "description": "Default API command.",
-      "default": "/device",
-      "examples": ["images/camera", "/motion"]
+      "default": "",
+      "examples": ["/images/camera", "/motion"]
     }
   },
   "required": ["api_command"]

@@ -9,9 +9,7 @@ logger = logging.getLogger("Config Generator")
 
 
 # Fetch the JSON schema from the URL
-BASE_URL = (
-    "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/config_schema/"
-)
+BASE_URL = "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/"
 
 
 def set_base_url(url: str):
