@@ -68,7 +68,8 @@ class ConfigGeneratorIntroductionPage(QWizardPage):
             "<p>You can make optional properties not to be added in the file by unchecking the checkbox next to the field name.</p>"
             "<p>If you need an information about a property, hover the cursor over its name to see the description.</p>"
             "<p>At the end the Configuration File will be shown for you and you can save it.</p>"
-            "<p>Get more details about the schema in <a href='https://laserstudio.readthedocs.io/en/latest/'>the documentation</a>.</p>"
+            "<p>Get more details about the schema in <a href='https://laserstudio.readthedocs.io/en/stable/"
+            "conf_file.html#file-generation'>the documentation</a>.</p>"
         )
         label.setTextFormat(Qt.TextFormat.RichText)
         label.setWordWrap(True)
