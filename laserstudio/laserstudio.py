@@ -115,7 +115,7 @@ class LaserStudio(QMainWindow):
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
-        self.rest_proxy = RestProxy(self)
+        self.rest_proxy = RestProxy(self, config.get("restserver", {}))
 
         # Create shortcuts
         shortcut = QShortcut(Qt.Key.Key_Escape, self)

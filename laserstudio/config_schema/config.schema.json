@@ -39,6 +39,16 @@
       "items": {
         "$ref": "probe.schema.json"
       }
+    },
+    "restserver": {
+      "allOf": [
+        {
+          "$ref": "restserver.schema.json"
+        },
+        {
+          "description": "The REST server configuration."
+        }
+      ]
     }
   }
 }

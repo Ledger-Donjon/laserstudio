@@ -26,11 +26,11 @@ class RestProxy(QObject):
     laser studio.
     """
 
-    def __init__(self, laser_studio: "LaserStudio"):
+    def __init__(self, laser_studio: "LaserStudio", config: dict):
         super().__init__()
         self.laser_studio: LaserStudio = laser_studio
         self.rest_object = RestServer(self)
-        self._thread = RestThread()
+        self._thread = RestThread(config)
         self.rest_object.moveToThread(self._thread)
         self._thread.start()
 
@@ -92,8 +92,13 @@ class RestThread(QThread):
     Subclass of QThread where to launch the Rest server.
     """
 
+    def __init__(self, config: dict, parent=None) -> None:
+        super().__init__(parent)
+        self.host = config.get("host", "localhost")
+        self.port = config.get("port", LSAPI.PORT)
+
     def run(self):
-        RestServer.serve(LSAPI.PORT)
+        RestServer.serve(self.host, self.port)
         super(RestThread, self).run()
 
 
@@ -117,13 +122,13 @@ class RestServer(QObject):
         RestServer._shared = self
 
     @staticmethod
-    def serve(port: int):
+    def serve(host: str, port: int):
         """
         Launch flask's REST server on the given port
 
         :param port: The HTTP port to listen
         """
-        flask_app.run(host="localhost", port=port)
+        flask_app.run(host=host, port=port)
 
     @staticmethod
     def invoke(member: str, *args) -> QVariant:
