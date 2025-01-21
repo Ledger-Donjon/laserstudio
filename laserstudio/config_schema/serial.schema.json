@@ -4,11 +4,11 @@
   "type": "object",
   "oneOf": [
     {
-      "title": "Identify device by path",
+      "title": "Identify device by path (Unix) or COM port name (Windows)",
       "properties": {
         "dev": {
           "type": "string",
-          "description": "Direct path to the serial device (on unix system) or COM port name (on Windows system).",
+          "description": "Direct path to the serial device node (on unix system) or COM port name (on Windows system).",
           "examples": ["/dev/ttyUSB0", "COM3"]
         }
       }
