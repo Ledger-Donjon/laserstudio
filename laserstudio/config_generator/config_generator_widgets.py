@@ -17,10 +17,30 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QRadioButton,
     QButtonGroup,
+    QComboBox,
 )
 from PyQt6.QtGui import QRegularExpressionValidator
 from jsonschema import validate, ValidationError
 from typing import Optional, Union
+from serial.tools.list_ports import comports
+from serial.tools.list_ports_common import ListPortInfo
+
+
+class DeviceSelector(QComboBox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.populate()
+
+    def populate(self):
+        self.clear()
+        self.addItem("Select device", None)
+        for p in comports():
+            r = f"{p} | sn: {p.serial_number} | info: {p.usb_info()} | path: {p.device}"
+            self.addItem(r, p)
+
+    def dev_path(self) -> Optional[str]:
+        selected = self.currentData()
+        return selected.device if type(selected) is ListPortInfo else None
 
 
 class AnyOf:
@@ -229,6 +249,8 @@ class SchemaWidget(QGroupBox):
             value_widget = w = QCheckBox()
             if "default" in schema:
                 w.setChecked(schema["default"])
+        elif self.key == "dev" and element_type == "string":
+            value_widget = w = DeviceSelector()
         elif element_type == "string":
             value_widget = w = QLineEdit()
             if "pattern" in schema:
@@ -473,6 +495,8 @@ class SchemaWidget(QGroupBox):
 
         if type(self.value_widget) is QCheckBox:
             return self.value_widget.isChecked()
+        elif type(self.value_widget) is DeviceSelector:
+            return self.value_widget.currentData().device
         elif type(self.value_widget) is QLineEdit:
             return self.value_widget.text()
         elif type(self.value_widget) is QSpinBox:
