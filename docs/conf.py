@@ -53,4 +53,4 @@ html_theme = "sphinx_rtd_theme"
 # html_theme = "sphinx_book_theme"
 html_static_path = []
 
-html_logo = "../laserstudio/icons/logo.png"
+html_logo = "images/logo.png"
