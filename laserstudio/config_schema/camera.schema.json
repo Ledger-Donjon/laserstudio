@@ -52,11 +52,24 @@
   },
   "oneOf": [
     {
+      "title": "USB",
+      "properties": {
+        "type": {
+          "const": "USB"
+        },
+        "index": {
+          "type": "integer",
+          "default": 0,
+          "description": "Index of the camera (a used in OpenCV)."
+        }
+      }
+    },
+    {
       "title": "NIT",
       "properties": {
         "type": {
           "const": "NIT",
-          "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems."
+          "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems. PyNIT package is also required."
         },
         "nuc_filepath": {
           "type": "string",
@@ -67,19 +80,6 @@
           "type": "string",
           "default": "./nuc/25mhz/BPM.yml",
           "description": "The file path pointing to the BPR settings of the camera."
-        }
-      }
-    },
-    {
-      "title": "USB",
-      "properties": {
-        "type": {
-          "const": "USB"
-        },
-        "index": {
-          "type": "integer",
-          "default": 0,
-          "description": "Index of the camera (a used in OpenCV)."
         }
       }
     },
