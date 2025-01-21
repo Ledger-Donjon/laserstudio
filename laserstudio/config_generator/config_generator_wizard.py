@@ -97,6 +97,8 @@ class ConfigResultPage(QWizardPage):
 
         layout.addWidget(save)
 
+        self.config = {}
+
     def initializePage(self):
         wiz = self.wizard()
         assert isinstance(wiz, ConfigGeneratorWizard)
