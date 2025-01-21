@@ -21,8 +21,8 @@ getting_started
 instruments
 viewer
 scan
-lsapi
 rest
+lsapi
 ```
 
 # Indices and tables

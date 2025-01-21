@@ -55,6 +55,8 @@ optional = true
 sphinx = "*"
 sphinx-rtd-theme = "*"
 myst_parser = "*"
+# sphinx-togglebutton = "*"
+# sphinx-book-theme = "*"
 
 [tool.poetry-dynamic-versioning]
 enable = true
