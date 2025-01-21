@@ -50,7 +50,8 @@
               "title": "Location",
               "properties": {
                 "location": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Specific physical USB location of the serial device"
                 }
               },
               "required": ["location"]
