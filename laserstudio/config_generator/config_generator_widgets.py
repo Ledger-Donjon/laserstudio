@@ -297,17 +297,15 @@ class SchemaWidget(QGroupBox):
                         make_flat=(items_type == "object"),
                     )
                 )
-
-                if type(value_widget) is QTabWidget:
-                    value_widget.addTab(c, c.name)
-                    value_widget.setHidden(False)
-                    # self.enable_property(True)
-                    # c.enable_property(True)
-                    # c.setChecked(True)
-                    value_widget.setCurrentIndex(value_widget.count() - 1)
+                _value_widget = self.value_widget
+                if type(_value_widget) is QTabWidget:
+                    _value_widget.addTab(c, c.name)
+                    _value_widget.setHidden(False)
+                    self.enable_property(True)
+                    _value_widget.setCurrentIndex(_value_widget.count() - 1)
                 elif (
-                    value_widget is not None
-                    and (layout := value_widget.layout()) is not None
+                    _value_widget is not None
+                    and (layout := _value_widget.layout()) is not None
                 ):
                     layout.addWidget(c.value_widget or c)
 
@@ -322,14 +320,15 @@ class SchemaWidget(QGroupBox):
                 if not self._children:
                     return
                 c = self._children.pop()
-                if type(value_widget) is QTabWidget:
-                    value_widget.removeTab(value_widget.indexOf(c))
+                _value_widget = self.value_widget
+                if type(_value_widget) is QTabWidget:
+                    _value_widget.removeTab(_value_widget.indexOf(c))
                     if len(self._children) == 0:
-                        value_widget.setHidden(True)
-                        # self.enable_property(False)
+                        _value_widget.setHidden(True)
+                        self.enable_property(False)
                 elif (
-                    value_widget is not None
-                    and (layout := value_widget.layout()) is not None
+                    _value_widget is not None
+                    and (layout := _value_widget.layout()) is not None
                 ):
                     layout.removeWidget(c.value_widget or c)
                 (c.value_widget or c).deleteLater()
@@ -367,6 +366,8 @@ class SchemaWidget(QGroupBox):
                 self._layout.addLayout(hbox)
             self._layout.addWidget(value_widget)
 
+            # self.value_widget must be set before adding children
+            self.value_widget = value_widget
             for _ in range(minItems):
                 add_child()
 
