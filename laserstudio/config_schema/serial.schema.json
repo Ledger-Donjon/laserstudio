@@ -4,7 +4,7 @@
   "type": "object",
   "oneOf": [
     {
-      "title": "Identify device by path (Unix) or COM port name (Windows)",
+      "title": "Identify device by devpath or COM Port",
       "properties": {
         "dev": {
           "type": "string",

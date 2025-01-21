@@ -40,6 +40,7 @@ myst_enable_extensions = [
 # togglebutton_hint = ""
 # togglebutton_hint_hide = ""
 
+version = "1.1.0"
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
