@@ -270,6 +270,9 @@ class SchemaWidget(QGroupBox):
                 if type(value_widget) is QTabWidget:
                     value_widget.addTab(c, c.name)
                     value_widget.setHidden(False)
+                    # self.enable_property(True)
+                    # c.enable_property(True)
+                    # c.setChecked(True)
                     value_widget.setCurrentIndex(value_widget.count() - 1)
                 elif (
                     value_widget is not None
@@ -292,6 +295,7 @@ class SchemaWidget(QGroupBox):
                     value_widget.removeTab(value_widget.indexOf(c))
                     if len(self._children) == 0:
                         value_widget.setHidden(True)
+                        # self.enable_property(False)
                 elif (
                     value_widget is not None
                     and (layout := value_widget.layout()) is not None
@@ -486,7 +490,7 @@ class SchemaWidget(QGroupBox):
     def selected(self):
         if type(self.keylabel_widget) is KeyLabel:
             return self.keylabel_widget.cb.isChecked()
-        return self.isChecked()
+        return self.isChecked() if self.isCheckable() else True
 
     def json(self):
         if self.schema.get("type") == "array":
