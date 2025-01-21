@@ -30,17 +30,26 @@ class DeviceSelector(QComboBox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.populate()
+        self.setEditable(True)
+        self.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        assert (line_edit := self.lineEdit()) is not None
+        line_edit.setClearButtonEnabled(True)
+        line_edit.setPlaceholderText("Select device or enter direct dev path")
+        self.setCurrentIndex(-1)
 
     def populate(self):
         self.clear()
-        self.addItem("Select device", None)
         for p in comports():
-            r = f"{p} | sn: {p.serial_number} | info: {p.usb_info()} | path: {p.device}"
+            r = f"{p.device} [sn: {p.serial_number} | info: {p.usb_info()}]"
             self.addItem(r, p)
 
     def dev_path(self) -> Optional[str]:
         selected = self.currentData()
-        return selected.device if type(selected) is ListPortInfo else None
+        if type(selected) is ListPortInfo:
+            return selected.device
+        return self.currentText()
 
 
 class AnyOf:
@@ -496,7 +505,7 @@ class SchemaWidget(QGroupBox):
         if type(self.value_widget) is QCheckBox:
             return self.value_widget.isChecked()
         elif type(self.value_widget) is DeviceSelector:
-            return self.value_widget.currentData().device
+            return self.value_widget.dev_path()
         elif type(self.value_widget) is QLineEdit:
             return self.value_widget.text()
         elif type(self.value_widget) is QSpinBox:
