@@ -105,7 +105,7 @@ class LSAPI:
             else:
                 list_positions = [list(position) for position in positions]
             params["pos"] = list_positions
-        return self.send("annotation/add_marker", params).json()
+        return self.send("annotation/add_marker", params, is_put=True).json()
 
     def go_to(self, index: int) -> List[float]:
         """

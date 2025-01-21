@@ -309,7 +309,7 @@ marker = flask_api.model(
 @annotations.route("/add_measurement", doc={"description": "Alias for /add_marker"})
 class AddMarker(Resource):
     @annotations.expect(marker)
-    def post(self):
+    def put(self):
         if not flask.request.is_json:
             return "Given value is not a JSON", 415
         json = flask.request.json
