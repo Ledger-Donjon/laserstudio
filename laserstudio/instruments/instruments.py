@@ -23,7 +23,7 @@ class Instruments:
         # Main stage
         self.stage = None
         stage_config = config.get("stage", None)
-        if stage_config is not None and stage_config.get("enable", False):
+        if stage_config is not None and stage_config.get("enable", True):
             try:
                 self.stage = StageInstrument(stage_config)
             except DeviceSearchError as e:
@@ -39,7 +39,7 @@ class Instruments:
         # Main camera
         self.camera = None
         camera_config = config.get("camera", None)
-        if camera_config is not None and camera_config.get("enable", False):
+        if camera_config is not None and camera_config.get("enable", True):
             device_type = camera_config.get("type")
             try:
                 if device_type == "USB":
@@ -69,7 +69,7 @@ class Instruments:
         lasers_config = cast(list[dict], config.get("lasers", None))
         if lasers_config is not None:
             for laser_config in lasers_config:
-                if not laser_config.get("enable", False):
+                if not laser_config.get("enable", True):
                     continue
                 device_type = laser_config.get("type")
                 try:
@@ -92,7 +92,7 @@ class Instruments:
         probes_config = cast(list[dict], config.get("probes", None))
         if probes_config is not None:
             for probe_config in probes_config:
-                if not probe_config.get("enable", False):
+                if not probe_config.get("enable", True):
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
