@@ -43,18 +43,17 @@ It depends following packages to run:
 - [flask-restx]
 - [hidapi]
 
-Additionally, on Linux systems, the [pyNIT] package can be installed
+Additionally, on Linux systems, the [donjon-pynit] package can be installed
 to support NIT cameras.
 
 ```shell
-pip install git+https://github.com/Ledger-Donjon/pynit.git
+pip install laserstudio[nit]
 ```
 
-On Mac with Apple Silicon chips, the [triangle] package fails to install with `pip`.
-Workaround is to install it from source before installing `laserstudio`:
+or
 
 ```shell
-pip install git+https://github.com/drufat/triangle.git
+pip install donjon-pynit
 ```
 
 ## Usage
@@ -89,4 +88,5 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [flask]: https://pypi.org/project/flask
 [flask-restx]: https://pypi.org/project/flask-restx
 [hidapi]: https://pipy.org/project/hidapi
+[donjon-pynit]: https://pipy.org/project/donjon-pynit/
 [Read the Docs]: https://laserstudio.readthedocs.io/
