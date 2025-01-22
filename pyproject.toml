@@ -61,7 +61,7 @@ myst_parser = "*"
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
-style = "semver"
+style = "pep440"
 
 [tool.poetry-dynamic-versioning.substitution]
 files = ["laserstudio/__init__.py"]
