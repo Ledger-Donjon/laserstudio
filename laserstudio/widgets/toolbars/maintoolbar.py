@@ -50,7 +50,8 @@ class MainToolbar(QToolBar):
         settings_menu.addAction("Save settings", laser_studio.save_settings)
         settings_menu.addAction("Load settings", laser_studio.reload_settings)
         settings_menu.addAction(
-            "Save configuration file", save_configuration_file(laser_studio.config)
+            "Save configuration file",
+            lambda: save_configuration_file(laser_studio.config),
         )
         w.setMenu(settings_menu)
         self.addWidget(w)
