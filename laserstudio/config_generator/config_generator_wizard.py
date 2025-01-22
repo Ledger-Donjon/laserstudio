@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QApplication,
     QWizardPage,
     QWizard,
     QVBoxLayout,
     QLabel,
     QScrollArea,
     QPushButton,
-    QFileDialog,
 )
 import sys
 import yaml
@@ -26,8 +26,7 @@ except ImportError:
     )
     from laserstudio.config_generator.config_generator_widgets import SchemaWidget
     from laserstudio.utils.colors import LedgerPalette, LedgerStyle
-
-from PyQt6.QtWidgets import QApplication
+from ..utils.util import save_configuration_file
 
 
 class ConfigGeneratorWizard(QWizard):
@@ -89,7 +88,7 @@ class ConfigResultPage(QWizardPage):
         )
         layout = QVBoxLayout()
         save = QPushButton("Save Configuration File")
-        save.clicked.connect(self.save_config)
+        save.clicked.connect(lambda: save_configuration_file(self.config))
 
         self.setLayout(layout)
         self.result_label = QLabel()
@@ -123,17 +122,6 @@ class ConfigResultPage(QWizardPage):
                 + e.message
             )
             return False
-
-    def save_config(self):
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Configuration File",
-            "config.yaml",
-            "YAML Files (*.yaml);;All Files (*)",
-        )
-        if filename:
-            with open(filename, "w") as f:
-                f.write(yaml.dump(self.config, indent=2))
 
 
 class ConfigPresentationPage(QWizardPage):

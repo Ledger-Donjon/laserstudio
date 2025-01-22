@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence
-from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QFileDialog
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup
 from typing import Optional, Any
 
 from .widgets.viewer import Viewer, IdMarker
@@ -379,18 +379,3 @@ class LaserStudio(QMainWindow):
         viewer = data.get("viewer")
         if viewer is not None:
             self.viewer.yaml = viewer
-
-    def save_configuration_file(self):
-        """
-        Save the configuration file.
-        """
-        # Prompt the user for a file through a dialog window
-        file_name, _ = QFileDialog.getSaveFileName(
-            None,
-            "Save Configuration File",
-            "config.yaml",
-            "YAML Files (*.yaml);;All Files (*)",
-        )
-        if file_name:
-            with open(file_name, "w") as file:
-                yaml.dump(self.config, file)
