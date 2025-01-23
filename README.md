@@ -43,24 +43,9 @@ It depends following packages to run:
 - [flask-restx]
 - [hidapi]
 
-Additionally, on Linux systems, the [donjon-pynit] package can be installed
-to support NIT cameras.
-
-```shell
-pip install laserstudio[nit]
-```
-
-or
-
-```shell
-pip install donjon-pynit
-```
-
 ## Usage
 
-To run Laser Studio, tune your configuration file `config.yaml` with appropriate
-information about your hardware instruments, then a terminal and run Laser Studio in the
-directory containing that `config.yaml`.
+To run Laser Studio, open a terminal and run Laser Studio with the following command:
 
 ```shell
 laserstudio
@@ -88,5 +73,4 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [flask]: https://pypi.org/project/flask
 [flask-restx]: https://pypi.org/project/flask-restx
 [hidapi]: https://pipy.org/project/hidapi
-[donjon-pynit]: https://pipy.org/project/donjon-pynit/
 [Read the Docs]: https://laserstudio.readthedocs.io/
