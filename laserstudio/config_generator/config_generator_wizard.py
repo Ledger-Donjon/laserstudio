@@ -35,6 +35,7 @@ class ConfigGeneratorWizard(QWizard):
         super().__init__(parent)
         self.setWindowTitle("Configuration File Generator")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        self.resize(800, 600)
 
         # Initiate the presentation/introduction page
         self.addPage(ConfigGeneratorIntroductionPage(self))
