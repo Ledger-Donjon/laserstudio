@@ -174,12 +174,11 @@ class SchemaWidget(QGroupBox):
         self.required_keys = required_keys + schema.get("required", [])
 
         if make_flat:
-            self.setChecked(True)
             self.setCheckable(False)
             self.setFlat(True)
-            # self.setTitle(None)
         else:
             self.setCheckable(key not in required_keys)
+            self.setChecked(False)
             self.setTitle(name or key)
 
         self.name = name
@@ -270,7 +269,7 @@ class SchemaWidget(QGroupBox):
                 w.setText(schema["default"])
             if "examples" in schema:
                 w.setPlaceholderText(
-                    " or ".join(str(example) for example in schema["examples"])
+                    " or ".join(str(example) for example in schema["examples"]) + "..."
                 )
         elif element_type == "array":
             items_type = schema.get("items", {}).get("type", "object")
@@ -486,7 +485,7 @@ class SchemaWidget(QGroupBox):
         for key in properties.keys():
             subschema = properties[key]
             child = SchemaWidget(
-                subschema, key, required_keys=self.required_keys, make_flat=True
+                subschema, key, required_keys=self.required_keys, make_flat=False
             )
             if child.value_widget is not None:
                 if child.hbox_plus_minus and child.keylabel_widget:
@@ -522,9 +521,11 @@ class SchemaWidget(QGroupBox):
 
     @property
     def selected(self):
-        if type(self.keylabel_widget) is KeyLabel:
+        if self.isCheckable():
+            return self.isChecked()
+        if self.keylabel_widget is not None:
             return self.keylabel_widget.cb.isChecked()
-        return self.isChecked() if self.isCheckable() else True
+        return True
 
     def json(self):
         if self.schema.get("type") == "array":
