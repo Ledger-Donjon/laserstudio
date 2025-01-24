@@ -106,6 +106,8 @@ class ConfigResultPage(QWizardPage):
         assert isinstance(wiz, ConfigGeneratorWizard)
         configs = {}
         for config_page in wiz.config_generation_pages:
+            if not config_page.schema_widget.selected:
+                continue
             configs[config_page.schema_widget.key] = config_page.schema_widget.json()
         self.config = configs
         self.result_label.setText(yaml.dump(self.config, indent=2))
@@ -143,7 +145,7 @@ class ConfigPresentationPage(QWizardPage):
         self.setLayout(layout)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        self.schema_widget = SchemaWidget(schema, key, make_flat=True)
+        self.schema_widget = SchemaWidget(schema, key, make_flat=False)
         scroll.setWidget(self.schema_widget)
         layout.addWidget(scroll)
         self.setTitle(schema.get("title"))
