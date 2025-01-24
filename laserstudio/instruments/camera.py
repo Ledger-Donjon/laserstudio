@@ -4,6 +4,7 @@ from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
+from .shutter import ShutterInstrument
 
 
 class CameraInstrument(Instrument):
@@ -38,6 +39,11 @@ class CameraInstrument(Instrument):
 
         # Correction matrix
         self.correction_matrix: Optional[QTransform] = None
+
+        # Shutter
+        shutter = config.get("shutter")
+        if shutter is not None:
+            self.shutter = ShutterInstrument(shutter)
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
