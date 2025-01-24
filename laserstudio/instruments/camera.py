@@ -44,6 +44,8 @@ class CameraInstrument(Instrument):
         shutter = config.get("shutter")
         if shutter is not None:
             self.shutter = ShutterInstrument(shutter)
+        else:
+            self.shutter = None
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.

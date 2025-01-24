@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
@@ -9,8 +9,6 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSlider,
     QLabel,
-    QHBoxLayout,
-    QVBoxLayout,
 )
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
@@ -153,3 +151,24 @@ class CameraToolbar(QToolBar):
         grid.addWidget(w, i + 1, 1)
 
         self.image_dialog.setLayout(grid)
+
+        if self.camera.shutter is not None:
+            w = QPushButton("Shutter")
+            w.setCheckable(True)
+            w.setChecked(self.camera.shutter.open)
+            w.clicked.connect(lambda b: self.camera.shutter.__setattr__("open", b))
+            icon = QIcon()
+            icon.addPixmap(
+                QPixmap(colored_image(":/icons/fontawesome-free/eye-solid.svg")),
+                QIcon.Mode.Normal,
+                QIcon.State.On,
+            )
+            icon.addPixmap(
+                QPixmap(colored_image(":/icons/fontawesome-free/eye-slash-solid.svg")),
+                QIcon.Mode.Normal,
+                QIcon.State.Off,
+            )
+            w.setIcon(icon)
+            w.setIconSize(QSize(24, 24))
+
+            grid.addWidget(w, i + 2, 0, 1, 2)
