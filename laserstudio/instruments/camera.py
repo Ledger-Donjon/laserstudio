@@ -5,6 +5,7 @@ from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
 from .shutter import ShutterInstrument
+import logging
 
 
 class CameraInstrument(Instrument):
@@ -42,10 +43,14 @@ class CameraInstrument(Instrument):
 
         # Shutter
         shutter = config.get("shutter")
-        if shutter is not None:
-            self.shutter = ShutterInstrument(shutter)
-        else:
-            self.shutter = None
+        self.shutter: Optional[ShutterInstrument] = None
+        if type(shutter) is dict and shutter.get("enable", False):
+            try:
+                self.shutter = ShutterInstrument(shutter)
+            except Exception as e:
+                logging.getLogger("laserstudio").warning(
+                    f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
+                )
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
