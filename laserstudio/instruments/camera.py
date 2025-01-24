@@ -44,7 +44,7 @@ class CameraInstrument(Instrument):
         # Shutter
         shutter = config.get("shutter")
         self.shutter: Optional[ShutterInstrument] = None
-        if type(shutter) is dict and shutter.get("enable", False):
+        if type(shutter) is dict and shutter.get("enable", True):
             try:
                 self.shutter = ShutterInstrument(shutter)
             except Exception as e:
