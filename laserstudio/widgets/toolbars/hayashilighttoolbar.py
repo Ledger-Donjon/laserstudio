@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QPushButton, QToolBar, QSlider, QHBoxLayout, QWidget
+from PyQt6.QtWidgets import QPushButton, QToolBar, QSlider, QHBoxLayout, QWidget, QLabel
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from ...utils.util import colored_image
@@ -61,3 +61,8 @@ class HayashiLightToolbar(QToolBar):
             lambda v: self.hyshlr.hyslr.__setattr__("intensity", float(v) / 100.0)
         )
         hbox.addWidget(w)
+
+        w = self.label_burnout = QLabel("Lamp burnout!")
+        w.setStyleSheet("color: red")
+        self.addWidget(w)
+        self.setVisible(self.hyshlr.hyslr.burnout)
