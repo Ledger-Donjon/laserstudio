@@ -7,7 +7,11 @@ import logging
 class HayashiLRInstrument(Instrument):
     def __init__(self, config: dict):
         super().__init__(config=config)
+        self.label = config.get("label", "Hayashi Light")
         dev = config.get("dev")
+        if dev == "":
+            dev = None
+
         if dev is not None:
             dev = get_serial_device(dev)
 

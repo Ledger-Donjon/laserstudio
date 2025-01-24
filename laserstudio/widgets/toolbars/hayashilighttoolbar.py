@@ -14,7 +14,7 @@ class HayashiLightToolbar(QToolBar):
         """
         self.hyshlr = hyshlr
 
-        super().__init__("Hayashi Light")
+        super().__init__(hyshlr.label)
         self.setObjectName("toolbar-hayashi-light")  # For settings save and restore
 
         self.setAllowedAreas(Qt.ToolBarArea.AllToolBarAreas)
