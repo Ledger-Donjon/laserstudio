@@ -522,7 +522,7 @@ class SchemaWidget(QGroupBox):
         for key in properties.keys():
             subschema = properties[key]
             child = SchemaWidget(
-                subschema, key, required_keys=self.required_keys, make_flat=False
+                subschema, key, required_keys=self.required_keys, make_flat=True
             )
             if child.value_widget is not None:
                 if child.hbox_plus_minus and child.keylabel_widget:
