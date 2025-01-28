@@ -64,5 +64,5 @@ class HayashiLightToolbar(QToolBar):
 
         w = self.label_burnout = QLabel("Lamp burnout!")
         w.setStyleSheet("color: red")
+        w.setVisible(self.hyshlr.hyslr.burnout)
         self.addWidget(w)
-        self.setVisible(self.hyshlr.hyslr.burnout)
