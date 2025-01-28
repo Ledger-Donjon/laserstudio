@@ -73,11 +73,13 @@
         },
         "nuc_filepath": {
           "type": "string",
+          "subtype": "file",
           "default": "./nuc/25mhz/NUCFactory_2000us.yml",
           "description": "The file path pointing to the NUC settings of the camera."
         },
         "bpr_filepath": {
           "type": "string",
+          "subtype": "file",
           "default": "./nuc/25mhz/BPM.yml",
           "description": "The file path pointing to the BPR settings of the camera."
         }

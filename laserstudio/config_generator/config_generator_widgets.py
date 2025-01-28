@@ -18,12 +18,33 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QComboBox,
+    QFileDialog,
 )
 from PyQt6.QtGui import QRegularExpressionValidator
 from jsonschema import validate, ValidationError
 from typing import Optional, Union
 from serial.tools.list_ports import comports
 from serial.tools.list_ports_common import ListPortInfo
+
+
+class FileSelector(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setLayout(hbox := QHBoxLayout())
+        hbox.setContentsMargins(0, 0, 0, 0)
+        self.le = QLineEdit()
+        hbox.addWidget(self.le)
+        self.pb = QPushButton("Browse")
+        hbox.addWidget(self.pb)
+        self.pb.clicked.connect(self.select_file)
+
+    def select_file(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*)")
+        if file:
+            self.le.setText(file)
+
+    def text(self):
+        return self.le.text()
 
 
 class DeviceSelector(QComboBox):
@@ -237,6 +258,7 @@ class SchemaWidget(QGroupBox):
     ) -> Union[QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QWidget, None]:
         schema = self.schema
         element_type = self.element_type
+        element_subtype = schema.get("subtype")
 
         if "const" in schema:
             value_widget = w = QLabel(str(schema["const"]))
@@ -257,18 +279,25 @@ class SchemaWidget(QGroupBox):
             value_widget = w = QCheckBox()
             if "default" in schema:
                 w.setChecked(schema["default"])
-        elif self.key == "dev" and element_type == "string":
-            value_widget = w = DeviceSelector()
         elif element_type == "string":
-            value_widget = w = QLineEdit()
+            if element_subtype == "file":
+                value_widget = w = FileSelector()
+                line_edit = w.le
+            elif element_subtype == "device":
+                value_widget = w = DeviceSelector()
+                line_edit = w.lineEdit()
+                assert line_edit is not None
+            else:
+                value_widget = w = QLineEdit()
+                line_edit = w
             if "pattern" in schema:
-                w.setValidator(
+                line_edit.setValidator(
                     QRegularExpressionValidator(QRegularExpression(schema["pattern"]))
                 )
             if "default" in schema:
-                w.setText(schema["default"])
+                line_edit.setText(schema["default"])
             if "examples" in schema:
-                w.setPlaceholderText(
+                line_edit.setPlaceholderText(
                     " or ".join(str(example) for example in schema["examples"]) + "..."
                 )
         elif element_type == "array":
@@ -506,6 +535,8 @@ class SchemaWidget(QGroupBox):
             return self.value_widget.isChecked()
         elif type(self.value_widget) is DeviceSelector:
             return self.value_widget.dev_path()
+        elif type(self.value_widget) is FileSelector:
+            return self.value_widget.text()
         elif type(self.value_widget) is QLineEdit:
             return self.value_widget.text()
         elif type(self.value_widget) is QSpinBox:
