@@ -31,6 +31,16 @@
         "objective": {
             "type": "number",
             "description": "If there is a optical magnifier, specify the zooming factor of the objective."
+        },
+        "shutter": {
+            "allOf": [
+                {
+                    "$ref": "instrument.schema.json"
+                },
+                {
+                    "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
+                }
+            ]
         }
     },
     "oneOf": [
