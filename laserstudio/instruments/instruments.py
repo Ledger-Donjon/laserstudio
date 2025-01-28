@@ -100,7 +100,7 @@ class Instruments:
         # Hayashi Light Remote
         self.hayashi_light: Optional[HayashiLRInstrument] = None
         hayashi_config = config.get("hayashi", None)
-        if hayashi_config is not None and hayashi_config.get("enable", False):
+        if hayashi_config is not None and hayashi_config.get("enable", True):
             try:
                 self.hayashi_light = HayashiLRInstrument(hayashi_config)
             except Exception as e:
