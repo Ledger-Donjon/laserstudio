@@ -1,0 +1,52 @@
+{
+    "$id": "config.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Laser Studio Configuration File",
+    "type": "object",
+    "properties": {
+        "camera": {
+            "allOf": [
+                {
+                    "$ref": "camera.schema.json"
+                },
+                {
+                    "description": "The main camera of the setup."
+                }
+            ]
+        },
+        "stage": {
+            "allOf": [
+                {
+                    "$ref": "stage.schema.json"
+                },
+                {
+                    "description": "The main stage of the setup."
+                }
+            ]
+        },
+        "lasers": {
+            "type": "array",
+            "description": "The list of laser devices.",
+            "items": {
+                "$ref": "laser.schema.json"
+            }
+        },
+        "probes": {
+            "type": "array",
+            "description": "The list of probes.",
+            "items": {
+                "$ref": "probe.schema.json"
+            }
+        },
+        "hayashi": {
+            "allOf": [
+                {
+                    "$ref": "hayashi.schema.json"
+                },
+                {
+                    "description": "Hayashi light controlled through a dongle from https://github.com/Ledger-Donjon/hayashi-light-remote"
+                }
+            ]
+        }
+    }
+}
