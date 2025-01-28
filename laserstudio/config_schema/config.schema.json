@@ -40,6 +40,16 @@
         "$ref": "probe.schema.json"
       }
     },
+    "hayashi": {
+      "allOf": [
+        {
+          "$ref": "hayashi.schema.json"
+        },
+        {
+          "description": "Hayashi light controlled through a dongle from https://github.com/Ledger-Donjon/hayashi-light-remote"
+        }
+      ]
+    },
     "restserver": {
       "allOf": [
         {

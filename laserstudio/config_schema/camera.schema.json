@@ -48,6 +48,16 @@
       "exclusiveMinimum": 0.0,
       "description": "If there is a optical magnifier, specify the zooming factor of the objective.",
       "suffix": "x"
+    },
+    "shutter": {
+      "allOf": [
+        {
+          "$ref": "instrument.schema.json"
+        },
+        {
+          "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
+        }
+      ]
     }
   },
   "oneOf": [
