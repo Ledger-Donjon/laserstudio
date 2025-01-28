@@ -59,6 +59,8 @@ class DeviceSelector(QComboBox):
         line_edit.setClearButtonEnabled(True)
         line_edit.setPlaceholderText("Select device or enter direct dev path")
         self.setCurrentIndex(-1)
+        # Called when the user selects a device from the list
+        self.textActivated.connect(self.on_selection)
 
     def populate(self):
         self.clear()
@@ -71,6 +73,12 @@ class DeviceSelector(QComboBox):
         if type(selected) is ListPortInfo:
             return selected.device
         return self.currentText()
+
+    def on_selection(self):
+        # When the user selects an element from the list,
+        # we want to set the displayed text in the line edit
+        # to the device path only, not the full description
+        self.setEditText(self.dev_path())
 
 
 class AnyOf:
