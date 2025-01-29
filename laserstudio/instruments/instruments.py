@@ -1,3 +1,4 @@
+from pystages import Autofocus, Vector
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
@@ -97,19 +98,22 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
-        # Hayashi Light Remote
-        self.hayashi_light: Optional[HayashiLRInstrument] = None
-        hayashi_config = config.get("hayashi", None)
-        if hayashi_config is not None and hayashi_config.get("enable", True):
-            try:
-                self.hayashi_light = HayashiLRInstrument(hayashi_config)
-            except Exception as e:
-                logging.getLogger("laserstudio").warning(
-                    f"Hayashi Light Remote is enabled but device could not be created: {str(e)}... Skipping."
-                )
+        # Autofocus helper: stores registered position in order to do automatic camera
+        # focusing. This can be considered as an abstract instrument.
+        self.autofocus_helper = Autofocus()
 
     def go_next(self) -> dict[str, Any]:
         results = []
         for laser in self.lasers:
             results.append(laser.go_next())
         return {"lasers": results}
+
+    def autofocus(self):
+        if self.stage is None:
+            return
+        if len(self.autofocus_helper.registered_points) < 3:
+            return
+        pos = self.stage.position
+        z = self.autofocus_helper.focus(pos.x, pos.y)
+        assert abs(z - pos.z) < 500
+        self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
