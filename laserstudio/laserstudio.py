@@ -1,10 +1,7 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence
-from PyQt6.QtWidgets import (
-    QMainWindow,
-    QButtonGroup,
-)
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QFileDialog
 from typing import Optional, Any
 
 from .widgets.viewer import Viewer, IdMarker
@@ -45,6 +42,9 @@ class LaserStudio(QMainWindow):
 
         if config is None:
             config = {}
+
+        # Configuration file
+        self.config = config
 
         # User settings
         self.settings = QSettings("ledger", "laserstudio")
@@ -122,7 +122,7 @@ class LaserStudio(QMainWindow):
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
-        self.rest_proxy = RestProxy(self)
+        self.rest_proxy = RestProxy(self, config.get("restserver", {}))
 
         # Create shortcuts
         shortcut = QShortcut(Qt.Key.Key_Escape, self)
@@ -386,3 +386,18 @@ class LaserStudio(QMainWindow):
         viewer = data.get("viewer")
         if viewer is not None:
             self.viewer.yaml = viewer
+
+    def save_configuration_file(self):
+        """
+        Save the configuration file.
+        """
+        # Prompt the user for a file through a dialog window
+        file_name, _ = QFileDialog.getSaveFileName(
+            None,
+            "Save Configuration File",
+            "config.yaml",
+            "YAML Files (*.yaml);;All Files (*)",
+        )
+        if file_name:
+            with open(file_name, "w") as file:
+                yaml.dump(self.config, file)

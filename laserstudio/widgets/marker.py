@@ -117,7 +117,7 @@ class ProbeMarker(Marker):
         super().__init__(parent)
         self.stage_sight = parent
         self.probe = probe
-        probe.fixed_pos_changed.connect(self.update_pos)
+        probe.offset_pos_changed.connect(self.update_pos)
         self.color = (
             QColorConstants.Red
             if isinstance(self.probe, LaserInstrument)
@@ -127,7 +127,7 @@ class ProbeMarker(Marker):
 
     def update_pos(self):
         """Update position and color."""
-        if (pos := self.probe.fixed_pos) is not None:
+        if (pos := self.probe.offset_pos) is not None:
             if self.stage_sight is not None:
                 self.setPos(
                     self.stage_sight.mapFromItem(self.stage_sight.image_group, *pos)

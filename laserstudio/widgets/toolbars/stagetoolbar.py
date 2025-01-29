@@ -95,9 +95,9 @@ class StageToolbar(QToolBar):
         self.move_for_selector = box = QComboBox()
         box.addItem("Camera", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
         for i in range(len(laser_studio.instruments.lasers)):
-            box.addItem(f"Laser {i+1}", userData=MoveFor(MoveFor.Type.LASER, i))
+            box.addItem(f"Laser {i + 1}", userData=MoveFor(MoveFor.Type.LASER, i))
         for i in range(len(laser_studio.instruments.probes)):
-            box.addItem(f"Probe {i+1}", userData=MoveFor(MoveFor.Type.PROBE, i))
+            box.addItem(f"Probe {i + 1}", userData=MoveFor(MoveFor.Type.PROBE, i))
         box.activated.connect(self.move_for_selection)
         hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)

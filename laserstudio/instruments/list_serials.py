@@ -4,13 +4,14 @@ import serial.tools.list_ports
 
 
 class DeviceSearchError(Exception):
-    def __init__(self, sn=None, vid_pid=None, location=None):
+    def __init__(self, sn=None, vid_pid=None, location=None, dev=None):
         self.sn = sn
         if vid_pid is not None and vid_pid[0] is not None:
             self.vid_pid = vid_pid
         else:
             self.vid_pid = None
         self.location = location
+        self.dev = dev
 
     def __str__(self) -> str:
         desc = []
@@ -20,6 +21,8 @@ class DeviceSearchError(Exception):
             desc += [f"vid:pid {self.vid_pid[0]}:{self.vid_pid[1]}"]
         if self.location:
             desc += [f"location: {self.location}"]
+        if self.dev:
+            desc += [f"device path: {self.dev}"]
         return " ".join(desc)
 
 
@@ -40,7 +43,10 @@ def get_serial_device(config: Union[str, dict]):
         such as the serial number.
     """
     if isinstance(config, str):
-        return config
+        for port in serial.tools.list_ports.comports():
+            if port.device == config:
+                return config
+        raise DeviceNotFoundError(dev=config)
     elif isinstance(config, dict):
         possible_matches = []
         sn = None

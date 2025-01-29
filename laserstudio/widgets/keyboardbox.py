@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QGridLayout,
     QPushButton,
-    QWidget,
     QApplication,
     QDoubleSpinBox,
 )

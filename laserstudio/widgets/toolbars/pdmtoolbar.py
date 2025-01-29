@@ -5,9 +5,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSpinBox,
     QDoubleSpinBox,
-    QCheckBox,
 )
-from PyQt6.QtCore import Qt, QSize, QVariant
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from typing import Any
 from laserstudio.instruments.pdm import PDMInstrument
@@ -155,7 +154,7 @@ class PDMToolbar(QToolBar):
             self.offset_current_input.setValue(value)
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
-            self.interlock_label.setText('Opened' if value else 'Closed')
+            self.interlock_label.setText("Opened" if value else "Closed")
 
     def reload_parameters(self):
         self.sweep_min_input.setValue(self.laser.sweep_min)

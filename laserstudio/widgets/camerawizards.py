@@ -327,7 +327,7 @@ class ProbePositionPage(CameraPositionPage):
         else:
             what = "Probe"
             self.viewer.clicked_point_marker.color = QColorConstants.Blue
-        self.setTitle(f"{what} {probe_index+1} positioning")
+        self.setTitle(f"{what} {probe_index + 1} positioning")
         self.setSubTitle(
             f"Indicate in the image the position of the {what}."
             f" This operation will permit {QCoreApplication.applicationName()} to move accordingly to"
@@ -339,7 +339,7 @@ class ProbePositionPage(CameraPositionPage):
         super().set_position(xy)
         self.viewer.stage_sight.pause_image_update = False
         if self.clicked_point is not None:
-            self.probe.fixed_pos = self.clicked_point.x(), self.clicked_point.y()
+            self.probe.offset_pos = self.clicked_point.x(), self.clicked_point.y()
 
 
 class CameraWizard(QWizard):

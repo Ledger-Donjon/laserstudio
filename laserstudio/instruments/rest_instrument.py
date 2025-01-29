@@ -15,7 +15,7 @@ class RestInstrument:
         self.session = requests.Session()
         self.host = cast(str, config.get("host", "localhost"))
         self.port = cast(int, config.get("port", 4444))
-        self.api_command = cast(str, config.get("api_command", "position"))
+        self.api_command = cast(str, config.get("api_command", ""))
 
     def get(self) -> requests.Response:
         """Convenience function for addressing a GET request on default API command.
