@@ -343,6 +343,7 @@ class SchemaWidget(QGroupBox):
                     _value_widget is not None
                     and (layout := _value_widget.layout()) is not None
                 ):
+                    c.setChecked(True)
                     layout.addWidget(c.value_widget or c)
 
                 if maxItems is not None:
