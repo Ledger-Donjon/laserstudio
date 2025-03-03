@@ -11,8 +11,9 @@ class CameraNITInstrument(CameraInstrument):
             from pynit import PyNIT  # Lazy load the module # type: ignore
         except ImportError:
             raise ImportError(
-                """The pynit module is required to use the NIT.
-                Please install it using 'pip install git+https://github.com/Ledger-Donjon/pynit.git'."""
+                "The pynit module is required to use the NIT."
+                " Please install it using 'pip install git+https://github.com/Ledger-Donjon/pynit.git'."
+                " Note that this repository is private to Ledger's Donjon organization."
             )
 
         self.pynit = PyNIT(

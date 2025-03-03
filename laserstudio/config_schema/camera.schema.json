@@ -79,7 +79,7 @@
       "properties": {
         "type": {
           "const": "NIT",
-          "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems. PyNIT package is also required."
+          "description": "A Camera from New Imaging Technologies. This camera is only availabe on Linux systems. An internal package (donjon-pynit) is required. This package is not public because contains libraries from NIT"
         },
         "nuc_filepath": {
           "type": "string",

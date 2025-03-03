@@ -1,8 +1,10 @@
 import os
 from PyQt6.QtGui import QTransform, QPixmap, QColor
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt
 from typing import Union
 from .colors import LedgerColors
+import yaml
 
 __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -49,3 +51,30 @@ def colored_image(
     pixmap.fill(color)
     pixmap.setMask(mask)
     return pixmap
+
+
+def save_configuration_file(config: dict):
+    """
+    Save the configuration file.
+    """
+    default_file_name = "config.yaml"
+
+    # Open a file dialog to select the file to save the configuration
+    file_name, _ = QFileDialog.getSaveFileName(
+        None,
+        "Save Configuration File",
+        default_file_name,
+        "YAML Files (*.yaml);;All Files (*)",
+    )
+
+    # If a file name was selected
+    if file_name:
+        try:
+            # Save the configuration to the file
+            with open(file_name, "w") as file:
+                yaml.dump(config, file, indent=2)
+            QMessageBox.information(
+                None, "Success", f"Configuration saved to {file_name}"
+            )
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Failed to save configuration: {e}")

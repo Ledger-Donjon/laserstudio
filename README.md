@@ -45,25 +45,9 @@ It depends following packages to run:
 - [flask-restx]
 - [hidapi]
 
-Additionally, on Linux systems, the [pyNIT] package can be installed
-to support NIT cameras.
-
-```shell
-pip install git+https://github.com/Ledger-Donjon/pynit.git
-```
-
-On Mac with Apple Silicon chips, the [triangle] package fails to install with `pip`.
-Workaround is to install it from source before installing `laserstudio`:
-
-```shell
-pip install git+https://github.com/drufat/triangle.git
-```
-
 ## Usage
 
-To run Laser Studio, tune your configuration file `config.yaml` with appropriate
-information about your hardware instruments, then a terminal and run Laser Studio in the
-directory containing that `config.yaml`.
+To run Laser Studio, open a terminal and run Laser Studio with the following command:
 
 ```shell
 laserstudio

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
-from ...utils.util import resource_path, colored_image
+from ...utils.util import resource_path, colored_image, save_configuration_file
 from ..coloredbutton import ColoredPushButton
 
 if TYPE_CHECKING:
@@ -50,7 +50,8 @@ class MainToolbar(QToolBar):
         settings_menu.addAction("Save settings", laser_studio.save_settings)
         settings_menu.addAction("Load settings", laser_studio.reload_settings)
         settings_menu.addAction(
-            "Save configuration file", laser_studio.save_configuration_file
+            "Save configuration file",
+            lambda: save_configuration_file(laser_studio.config),
         )
         w.setMenu(settings_menu)
         self.addWidget(w)

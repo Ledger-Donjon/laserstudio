@@ -47,9 +47,6 @@ laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 laserstudio_generate_config_cli = 'laserstudio.config_generator:main_cli'
 laserstudio_generate_config = 'laserstudio.config_generator:main_gui'
 
-[project.optional-dependencies]
-nit = ["pynit; os_name == 'linux'"]
-
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.0"
 
@@ -66,7 +63,7 @@ myst_parser = "*"
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
-style = "semver"
+style = "pep440"
 
 [tool.poetry-dynamic-versioning.substitution]
 files = ["laserstudio/__init__.py"]
