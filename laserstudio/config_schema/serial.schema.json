@@ -1,0 +1,66 @@
+{
+  "$id": "serial.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "Identify device by devpath or COM Port",
+      "properties": {
+        "dev": {
+          "type": "string",
+          "subtype": "device",
+          "description": "Direct path to the serial device node (on unix system) or COM port name (on Windows system).",
+          "examples": ["/dev/ttyUSB0", "COM3"]
+        }
+      }
+    },
+    {
+      "title": "Identify device by filters",
+      "properties": {
+        "dev": {
+          "type": "object",
+          "description": "Filters to retrieve dynamically a serial device (serial number, vid/pid, ...).",
+          "anyOf": [
+            {
+              "title": "Serial number",
+              "properties": {
+                "sn": {
+                  "type": "string",
+                  "description": "Serial number of the serial device"
+                }
+              },
+              "required": ["sn"]
+            },
+            {
+              "title": "VID/PID",
+              "properties": {
+                "vid": {
+                  "type": "string",
+                  "pattern": "^[A-Fa-f0-9]{4}$",
+                  "description": "VID of the serial device, in hexadecimal"
+                },
+                "pid": {
+                  "type": "string",
+                  "pattern": "^[A-Fa-f0-9]{4}$",
+                  "description": "PID of the serial device, in hexadecimal"
+                }
+              },
+              "required": ["vid", "pid"]
+            },
+            {
+              "title": "Location",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "Specific physical USB location of the serial device"
+                }
+              },
+              "required": ["location"]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "required": ["dev"]
+}

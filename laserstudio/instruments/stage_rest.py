@@ -1,5 +1,6 @@
 from pystages import Stage, Vector
 from .rest_instrument import RestInstrument
+from typing import cast
 
 
 class StageRest(RestInstrument, Stage):
@@ -11,6 +12,7 @@ class StageRest(RestInstrument, Stage):
         """
         Stage.__init__(self)
         RestInstrument.__init__(self, config)
+        self.api_command = cast(str, config.get("api_command", "position"))
 
         # Try a communication, will raise if the connection cannot be
         # done

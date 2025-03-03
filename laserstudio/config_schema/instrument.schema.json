@@ -1,0 +1,16 @@
+{
+  "$id": "instrument.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "label": {
+      "type": "string",
+      "description": "The instrument's personalized label.",
+      "examples": ["Camera", "Stage", "Laser 1", "Laser 2", "Probe"]
+    },
+    "enable": {
+      "type": "boolean",
+      "description": "Set to False of the instrument should not be used by Laser Studio.",
+      "default": true
+    }
+  }
+}

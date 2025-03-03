@@ -1,15 +1,16 @@
 #!/usr/bin/python3
 from .laserstudio import LaserStudio
-from PyQt6.QtWidgets import QApplication, QStyleFactory
-from PyQt6.QtGui import QPalette, QColor, QIcon
-from PyQt6.QtCore import QLocale, Qt
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QLocale
 import sys
 import yaml
 import os.path
 import logging
 import argparse
 from .utils.util import resource_path
-from .utils.colors import LedgerColors
+from .utils.colors import LedgerPalette, LedgerStyle
+from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 
 
 def main():
@@ -19,7 +20,7 @@ def main():
     parser.add_argument(
         "--log", choices=list(logging._nameToLevel.keys()), required=False
     )
-    parser.add_argument("--conf_file", type=open, required=False)
+    parser.add_argument("--conf_file", type=argparse.FileType("r"), required=False)
     args = parser.parse_args()
 
     if args.log is not None:
@@ -31,47 +32,59 @@ def main():
             print("Warning, error during setting log level:", e)
             pass
 
-    # Get existing configuration file
-    if os.path.exists("config.yaml"):
-        yaml_config = yaml.load(open("config.yaml", "r"), yaml.FullLoader)
-    else:
-        yaml_config = None
-
     app.setApplicationName("Laser Studio")
     app.setApplicationDisplayName("Laser Studio")
     app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
-    app.setStyle(QStyleFactory.create("Fusion"))
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 25))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor(240, 240, 240))
-    palette.setColor(QPalette.ColorRole.Base, QColor(50, 50, 50))
-    palette.setColor(QPalette.ColorRole.AlternateBase, Qt.GlobalColor.red)
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(25, 25, 25))
-    palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
-    palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.lightGray)
-    palette.setColor(QPalette.ColorRole.Button, QColor(45, 45, 45))
-    palette.setColor(
-        QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, QColor(30, 30, 30)
-    )
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor(200, 200, 200))
-    palette.setColor(
-        QPalette.ColorGroup.Disabled,
-        QPalette.ColorRole.ButtonText,
-        QColor(100, 100, 100),
-    )
-    palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-    palette.setColor(QPalette.ColorRole.Link, Qt.GlobalColor.red)
-    palette.setColor(QPalette.ColorRole.Highlight, LedgerColors.SafetyOrange.value)
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
-    app.setPalette(palette)
-    app.setStyleSheet("QToolBar { "
+    app.setStyle(LedgerStyle)
+    app.setPalette(LedgerPalette)
+    app.setStyleSheet(
+        "QToolBar { "
         "border: 1px solid #252525;"
         "border-radius: 4px;"
         "margin: 3px;"
         "padding: 6px;"
-        "background-color: #252525 }")
+        "background-color: #252525 }"
+    )
 
     QLocale.setDefault(QLocale.c())
+
+    # Loading configuration file
+    stream = None
+    if args.conf_file is not None:
+        stream = args.conf_file
+    else:
+        # Search existing configuration file, from current folder to root
+        current_dir = os.path.realpath((os.curdir))
+        while not os.path.exists(os.path.join(current_dir, "config.yaml")):
+            # Search for the config file in the parent directory
+            parent_dir = os.path.dirname(current_dir)
+            if current_dir == parent_dir:
+                break
+            current_dir = parent_dir
+
+        if os.path.exists(path := os.path.join(current_dir, "config.yaml")):
+            stream = open(path, "r")
+
+    yaml_config = None
+    if stream is not None:
+        # Load the found or given configuration file
+        yaml_config = yaml.load(stream, yaml.FullLoader)
+
+        # Check if the configuration file is valid
+        if type(yaml_config) is not dict:
+            print("Error: Invalid configuration file: it is not a dictionary")
+            yaml_config = None
+
+    if yaml_config is None:
+        # No configuration file found, generate one
+        config_generator = ConfigGenerator()
+        sys.argv.append("-L")  # Force to load the schema from the local files
+        config_generator.get_flags()
+        config_generator.load_schema()
+
+        wizard = ConfigGeneratorWizard(config_generator.schema)
+        wizard.exec()
+        yaml_config = wizard.config_result_page.config
 
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())
