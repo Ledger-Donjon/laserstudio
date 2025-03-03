@@ -522,8 +522,12 @@ class SchemaWidget(QGroupBox):
         self._layout.addLayout(properties_form)
         for key in properties.keys():
             subschema = properties[key]
+            child_type = subschema.get("type", "object")
             child = SchemaWidget(
-                subschema, key, required_keys=self.required_keys, make_flat=True
+                subschema,
+                key,
+                required_keys=self.required_keys,
+                make_flat=(child_type != "object"),
             )
             if child.value_widget is not None:
                 if child.hbox_plus_minus and child.keylabel_widget:
