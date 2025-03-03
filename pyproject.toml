@@ -1,14 +1,13 @@
-[tool.poetry]
+[project]
 name = "laserstudio"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Python3 software for hardware evaluation"
 authors = [
-    "Olivier Hériveaux <olivier.heriveaux@ledger.fr>",
-    "Michaël Mouchous <michael.mouchous@ledger.fr>",
+    { name = "Olivier Hériveaux", email = "olivier.heriveaux@ledger.fr" },
+    { name = "Michaël Mouchous", email = "michael.mouchous@ledger.fr" },
 ]
 license = "LGPL-3.0-or-later"
 readme = "README.md"
-documentation = "https://laserstudio.readthedocs.io/"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     # Indicate who your project is intended for
@@ -17,29 +16,36 @@ classifiers = [
     "Topic :: Security",
     "Topic :: System :: Hardware",
 ]
-[tool.poetry.scripts]
+dependencies=[
+    "pyqt6",
+    "pystages>=1.2",
+    "pillow>=10.4.0",
+    "opencv-python>=4.9.0.80",
+    "pyyaml",
+    "shapely",
+    "triangle",
+    "requests>=2.32.3,<3.0.0",
+    "numpy<2.0",
+    "pypdm",
+    "flask",
+    "flask-restx",
+    "hidapi>=0.14.0",
+    "colorama",
+    "donjon_hyshlr"
+]
+requires-python = ">=3.9,<3.13"
+
+[tool.poetry]
+version = "0.0.0"
+
+[project.urls]
+Documentation = "https://laserstudio.readthedocs.io/"
+
+[project.scripts]
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 laserstudio_generate_config_cli = 'laserstudio.config_generator:main_cli'
 laserstudio_generate_config = 'laserstudio.config_generator:main_gui'
-
-[tool.poetry.dependencies]
-python = ">=3.9 <3.13"
-pyqt6 = ">=6.0"
-pystages = "1.2"
-pillow = "10.4.0"
-opencv-python = "4.9.0.80"
-pyusb = "1.2.1"
-pyyaml = "6.0.1"
-shapely = "^2.0.5"
-triangle = "20250106"
-requests = ">=2.32.3,<3.0.0"
-numpy = "<2.0"
-pypdm = "1.1"
-flask = "3.0.3"
-flask-restx = "1.3.0"
-hidapi = "^0.14.0"
-colorama = "^0.4.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.0"

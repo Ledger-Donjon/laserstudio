@@ -48,6 +48,16 @@
       "exclusiveMinimum": 0.0,
       "description": "If there is a optical magnifier, specify the zooming factor of the objective.",
       "suffix": "x"
+    },
+    "shutter": {
+      "allOf": [
+        {
+          "$ref": "instrument.schema.json"
+        },
+        {
+          "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
+        }
+      ]
     }
   },
   "oneOf": [
@@ -73,11 +83,13 @@
         },
         "nuc_filepath": {
           "type": "string",
+          "subtype": "file",
           "default": "./nuc/25mhz/NUCFactory_2000us.yml",
           "description": "The file path pointing to the NUC settings of the camera."
         },
         "bpr_filepath": {
           "type": "string",
+          "subtype": "file",
           "default": "./nuc/25mhz/BPM.yml",
           "description": "The file path pointing to the BPR settings of the camera."
         }

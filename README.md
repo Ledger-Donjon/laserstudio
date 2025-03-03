@@ -7,6 +7,8 @@ Laser Studio permits to have a visual representation of a spatial environment,
 define zones of interests, and launch an automated scanning process to physically
 and randomly go through these zones, by controlling motion devices.
 
+![screenshot](docs/screenshot.png)
+
 ## Installation
 
 Laser Studio works on Python 3.9+.

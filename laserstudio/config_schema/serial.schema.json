@@ -8,6 +8,7 @@
       "properties": {
         "dev": {
           "type": "string",
+          "subtype": "device",
           "description": "Direct path to the serial device node (on unix system) or COM port name (on Windows system).",
           "examples": ["/dev/ttyUSB0", "COM3"]
         }

@@ -18,12 +18,33 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QComboBox,
+    QFileDialog,
 )
 from PyQt6.QtGui import QRegularExpressionValidator
 from jsonschema import validate, ValidationError
 from typing import Optional, Union
 from serial.tools.list_ports import comports
 from serial.tools.list_ports_common import ListPortInfo
+
+
+class FileSelector(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setLayout(hbox := QHBoxLayout())
+        hbox.setContentsMargins(0, 0, 0, 0)
+        self.le = QLineEdit()
+        hbox.addWidget(self.le)
+        self.pb = QPushButton("Browse")
+        hbox.addWidget(self.pb)
+        self.pb.clicked.connect(self.select_file)
+
+    def select_file(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*)")
+        if file:
+            self.le.setText(file)
+
+    def text(self):
+        return self.le.text()
 
 
 class DeviceSelector(QComboBox):
@@ -38,6 +59,8 @@ class DeviceSelector(QComboBox):
         line_edit.setClearButtonEnabled(True)
         line_edit.setPlaceholderText("Select device or enter direct dev path")
         self.setCurrentIndex(-1)
+        # Called when the user selects a device from the list
+        self.textActivated.connect(self.on_selection)
 
     def populate(self):
         self.clear()
@@ -50,6 +73,12 @@ class DeviceSelector(QComboBox):
         if type(selected) is ListPortInfo:
             return selected.device
         return self.currentText()
+
+    def on_selection(self):
+        # When the user selects an element from the list,
+        # we want to set the displayed text in the line edit
+        # to the device path only, not the full description
+        self.setEditText(self.dev_path())
 
 
 class AnyOf:
@@ -174,12 +203,11 @@ class SchemaWidget(QGroupBox):
         self.required_keys = required_keys + schema.get("required", [])
 
         if make_flat:
-            self.setChecked(True)
             self.setCheckable(False)
             self.setFlat(True)
-            # self.setTitle(None)
         else:
             self.setCheckable(key not in required_keys)
+            self.setChecked(False)
             self.setTitle(name or key)
 
         self.name = name
@@ -238,6 +266,7 @@ class SchemaWidget(QGroupBox):
     ) -> Union[QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QWidget, None]:
         schema = self.schema
         element_type = self.element_type
+        element_subtype = schema.get("subtype")
 
         if "const" in schema:
             value_widget = w = QLabel(str(schema["const"]))
@@ -258,19 +287,26 @@ class SchemaWidget(QGroupBox):
             value_widget = w = QCheckBox()
             if "default" in schema:
                 w.setChecked(schema["default"])
-        elif self.key == "dev" and element_type == "string":
-            value_widget = w = DeviceSelector()
         elif element_type == "string":
-            value_widget = w = QLineEdit()
+            if element_subtype == "file":
+                value_widget = w = FileSelector()
+                line_edit = w.le
+            elif element_subtype == "device":
+                value_widget = w = DeviceSelector()
+                line_edit = w.lineEdit()
+                assert line_edit is not None
+            else:
+                value_widget = w = QLineEdit()
+                line_edit = w
             if "pattern" in schema:
-                w.setValidator(
+                line_edit.setValidator(
                     QRegularExpressionValidator(QRegularExpression(schema["pattern"]))
                 )
             if "default" in schema:
-                w.setText(schema["default"])
+                line_edit.setText(schema["default"])
             if "examples" in schema:
-                w.setPlaceholderText(
-                    " or ".join(str(example) for example in schema["examples"])
+                line_edit.setPlaceholderText(
+                    " or ".join(str(example) for example in schema["examples"]) + "..."
                 )
         elif element_type == "array":
             items_type = schema.get("items", {}).get("type", "object")
@@ -307,6 +343,7 @@ class SchemaWidget(QGroupBox):
                     _value_widget is not None
                     and (layout := _value_widget.layout()) is not None
                 ):
+                    c.setChecked(True)
                     layout.addWidget(c.value_widget or c)
 
                 if maxItems is not None:
@@ -485,8 +522,12 @@ class SchemaWidget(QGroupBox):
         self._layout.addLayout(properties_form)
         for key in properties.keys():
             subschema = properties[key]
+            child_type = subschema.get("type", "object")
             child = SchemaWidget(
-                subschema, key, required_keys=self.required_keys, make_flat=True
+                subschema,
+                key,
+                required_keys=self.required_keys,
+                make_flat=(child_type != "object"),
             )
             if child.value_widget is not None:
                 if child.hbox_plus_minus and child.keylabel_widget:
@@ -507,6 +548,8 @@ class SchemaWidget(QGroupBox):
             return self.value_widget.isChecked()
         elif type(self.value_widget) is DeviceSelector:
             return self.value_widget.dev_path()
+        elif type(self.value_widget) is FileSelector:
+            return self.value_widget.text()
         elif type(self.value_widget) is QLineEdit:
             return self.value_widget.text()
         elif type(self.value_widget) is QSpinBox:
@@ -522,9 +565,11 @@ class SchemaWidget(QGroupBox):
 
     @property
     def selected(self):
-        if type(self.keylabel_widget) is KeyLabel:
+        if self.isCheckable():
+            return self.isChecked()
+        if self.keylabel_widget is not None:
             return self.keylabel_widget.cb.isChecked()
-        return self.isChecked() if self.isCheckable() else True
+        return True
 
     def json(self):
         if self.schema.get("type") == "array":
