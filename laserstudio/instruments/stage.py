@@ -1,5 +1,4 @@
-import threading
-from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt, QMutex
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
@@ -32,7 +31,7 @@ class StageInstrument(Instrument):
         """
         :param config: YAML configuration object
         """
-        super().__init__()
+        super().__init__(config)
         self.mutex = QMutex()
 
         device_type = config.get("type")
