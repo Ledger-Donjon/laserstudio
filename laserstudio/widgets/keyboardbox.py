@@ -133,7 +133,7 @@ class KeyboardBox(QGroupBox):
 
         position = self.stage_instrument.position
         position[axe] += displacement
-        self.stage_instrument.move_to(position, wait=True)
+        self.stage_instrument.move_to(position, wait=False)
 
     def _set_background_color(self, color: Optional[str] = None):
         """

@@ -25,6 +25,7 @@ from .widgets.toolbars import (
     LaserDriverToolbar,
     CameraNITToolBar,
     HayashiLightToolbar,
+    FocusToolbar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -91,6 +92,17 @@ class LaserStudio(QMainWindow):
         if self.instruments.stage is not None:
             toolbar = StageToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+
+        # Toolbar: Focusing
+        if (self.instruments.stage is not None) and (
+            type(self.instruments.camera) is CameraNITInstrument
+        ):
+            toolbar = FocusToolbar(
+                self.instruments.stage,
+                self.instruments.camera,
+                self.instruments.autofocus_helper,
+            )
+            self.addToolBar(toolbar)
 
         # Toolbar: Scanning zone definition and usage
         toolbar = ScanToolbar(self)
