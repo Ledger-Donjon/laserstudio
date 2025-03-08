@@ -96,6 +96,20 @@
       }
     },
     {
+      "title": "Raptor",
+      "properties": {
+        "type": {
+          "const": "Raptor",
+          "description": "A Camera from Raptor Photonics."
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "serial.schema.json"
+        }
+      ]
+    },
+    {
       "title": "REST",
       "properties": {
         "type": {
