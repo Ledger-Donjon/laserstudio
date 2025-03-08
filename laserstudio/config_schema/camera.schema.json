@@ -101,6 +101,11 @@
         "type": {
           "const": "Raptor",
           "description": "A Camera from Raptor Photonics."
+        },
+        "index": {
+          "type": "integer",
+          "default": 0,
+          "description": "Index of the camera (as used in OpenCV)."
         }
       },
       "allOf": [
