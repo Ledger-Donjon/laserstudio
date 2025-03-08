@@ -174,7 +174,7 @@ class FocusThread(QThread):
     def run_search(self, settings: FocusSearchSettings):
         """
         Start a research given some search settings.
-        
+
         :param settings: Focus research settings.
         """
         stage = self.__stage
