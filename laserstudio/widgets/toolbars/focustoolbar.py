@@ -3,11 +3,11 @@ from PyQt6.QtCore import Qt, QSize, QThread
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.signal
 from pystages import Autofocus, Vector
 from laserstudio.instruments.camera_nit import CameraNITInstrument
 from laserstudio.utils.util import colored_image
+from typing import Optional
 
 
 class FocusToolbar(QToolBar):
@@ -24,7 +24,7 @@ class FocusToolbar(QToolBar):
 
         # Set when a focus search is running, then cleared.
         # This is used to prevent launching two search threads at the same time.
-        self.focus_thread: FocusThread | None = None
+        self.focus_thread: Optional[FocusThread] = None
 
         self.autofocus_helper = autofocus_helper
         self.stage = stage
@@ -150,8 +150,8 @@ class FocusThread(QThread):
         camera: CameraNITInstrument,
         stage,
         coarse: FocusSearchSettings,
-        fine: FocusSearchSettings | None = None,
-        positions: list[Vector] | None = None,
+        fine: Optional[FocusSearchSettings] = None,
+        positions: Optional[list[Vector]] = None,
     ):
         """
         Tries to find optimal stage Z position to get best focus.
