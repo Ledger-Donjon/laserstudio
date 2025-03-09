@@ -4,6 +4,7 @@ from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
+from .camera_raptor import CameraRaptorInstrument
 from .hayashilight import HayashiLRInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
@@ -57,6 +58,10 @@ class Instruments:
                             "The NIT camera is not supported on other platforms than Linux or Windows."
                         )
                     self.camera: Optional[CameraInstrument] = CameraNITInstrument(
+                        camera_config
+                    )
+                elif device_type == "Raptor":
+                    self.camera: Optional[CameraInstrument] = CameraRaptorInstrument(
                         camera_config
                     )
             except Exception as e:
