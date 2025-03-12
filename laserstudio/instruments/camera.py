@@ -77,7 +77,9 @@ class CameraInstrument(Instrument):
         )
         return qImage
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
+    def get_last_image(
+        self,
+    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
         """
         To be overridden by the subclasses or CameraInstrument
 
