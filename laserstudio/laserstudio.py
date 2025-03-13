@@ -10,6 +10,7 @@ from .instruments.instruments import (
     PDMInstrument,
     LaserDriverInstrument,
     CameraNITInstrument,
+    CameraRaptorInstrument,
     HayashiLRInstrument,
 )
 from .instruments.stage import Vector
@@ -24,6 +25,7 @@ from .widgets.toolbars import (
     PDMToolbar,
     LaserDriverToolbar,
     CameraNITToolBar,
+    CameraRaptorToolBar,
     HayashiLightToolbar,
 )
 import yaml
@@ -96,8 +98,12 @@ class LaserStudio(QMainWindow):
         toolbar = ScanToolbar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
+        # Toolbar: Raptor Camera Image control
+        if isinstance(self.instruments.camera, CameraRaptorInstrument):
+            toolbar = CameraRaptorToolBar(self)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
         # Toolbar: Camera Image control
-        if self.instruments.camera is not None:
+        elif self.instruments.camera is not None:
             toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 

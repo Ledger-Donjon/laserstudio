@@ -1,5 +1,6 @@
 from .cameratoolbar import CameraToolbar
 from .cameranittoolbar import CameraNITToolBar
+from .cameraraptortoolbar import CameraRaptorToolBar
 from .pdmtoolbar import PDMToolbar
 from .hayashilighttoolbar import HayashiLightToolbar
 from .laserdrivertoolbar import LaserDriverToolbar
@@ -18,6 +19,7 @@ __all__ = [
     "StageToolbar",
     "CameraToolbar",
     "CameraNITToolBar",
+    "CameraRaptorToolBar",
     "PictureToolbar",
     "LaserDriverToolbar",
     "PDMToolbar",
