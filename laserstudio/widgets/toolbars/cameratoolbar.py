@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 class CameraToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
+        self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
         super().__init__("Camera parameters", laser_studio)
@@ -170,4 +171,31 @@ class CameraToolbar(QToolBar):
         w.setValue(100)
         grid.addWidget(w, i + 1, 1)
 
+        # Image levels adjustment
+        grid.addWidget(QLabel("Black Level:"), i + 2, 0)
+        self.black_level_slider = QSlider(Qt.Orientation.Horizontal)
+        self.black_level_slider.setMinimum(0)
+        self.black_level_slider.setMaximum(255)
+        self.black_level_slider.setValue(int(self.camera.black_level * 255))
+        self.black_level_slider.valueChanged.connect(self.update_levels)
+        grid.addWidget(self.black_level_slider, i + 2, 1)
+
+        grid.addWidget(QLabel("White Level:"), i + 3, 0)
+        self.white_level_slider = QSlider(Qt.Orientation.Horizontal)
+        self.white_level_slider.setMinimum(0)
+        self.white_level_slider.setMaximum(255)
+        self.white_level_slider.setValue(int(self.camera.white_level * 255))
+        self.white_level_slider.valueChanged.connect(self.update_levels)
+        grid.addWidget(self.white_level_slider, i + 3, 1)
+
         self.image_dialog.setLayout(grid)
+        self.image_dialog.setModal(False)
+        self.image_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+
+    def update_levels(self):
+        self.camera.black_level = (
+            self.black_level_slider.value() / self.black_level_slider.maximum()
+        )
+        self.camera.white_level = (
+            self.white_level_slider.value() / self.white_level_slider.maximum()
+        )

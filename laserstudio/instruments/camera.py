@@ -6,6 +6,7 @@ from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
 from .shutter import ShutterInstrument
 import logging
+import numpy
 
 
 class CameraInstrument(Instrument):
@@ -52,6 +53,9 @@ class CameraInstrument(Instrument):
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
+        self.black_level = 0.0
+        self.white_level = 1.0
+
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
 
@@ -87,6 +91,38 @@ class CameraInstrument(Instrument):
             color_mode is data from PIL.Image module.
         """
         return self.width, self.height, "L", None
+
+    def apply_levels(self, image: numpy.ndarray) -> numpy.ndarray:
+        """
+        Apply the black and white levels to the image before displaying it.
+
+        :param image: The image to apply the levels to.
+        :return: The image with the levels applied.
+        """
+        max = numpy.iinfo(image.dtype).max
+        type_ = image.dtype
+        image = image - self.black_level * max
+        image = image / (self.white_level - self.black_level)
+        return image.clip(0, max).astype(type_)
+
+    def compute_histogram(self, frame: numpy.ndarray):
+        # Compute histogram of last image
+        return numpy.histogram(
+            frame,
+            bins=150,
+            range=(0, numpy.iinfo(frame.dtype).max),
+        )
+
+    def histogram_to_string(self, hist: numpy.ndarray, nlines=2):
+        bar = " ▁▂▃▄▅▆▇█"
+        hist = nlines * (hist / max(hist)) * (len(bar) - 1)
+        hists = []
+        for i in range(nlines):
+            offset = i * len(bar)
+            val = [int(i) - offset for i in hist]
+            val = [max(0, min(len(bar) - 1, i)) for i in val]
+            hists.append("".join(bar[i] for i in val))
+        return hists[::-1]
 
     @property
     def yaml(self) -> dict:
