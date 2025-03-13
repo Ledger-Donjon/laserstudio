@@ -102,7 +102,25 @@ class StageInstrument(Instrument):
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
-        self.unit_factor = config.get("unit_factor", 1.0)
+        factors = config.get("unit_factor", config.get("unit_factors", [1.0]))
+        position = self.stage.position
+        if type(factors) != list:
+            factors = [factors] * len(position)
+        else:
+            # We ensure that there is at least one element in the array
+            if len(factors) == 0: 
+                factors = [1.0]
+
+            # Truncate array if there is too much values for the number of axes
+            factors = factors[:len(position)]
+            
+            # Completion with last value of the array until we get enough number of values
+            factors += [factors[-1]] * abs(len(position) - len(factors))
+
+        self.unit_factors = factors
+
+        assert type(self.unit_factors) is list and len(self.unit_factors) == len(position), f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
+
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
         if self.stage is not None:
@@ -117,7 +135,13 @@ class StageInstrument(Instrument):
 
         :return: Get the position of the stage
         """
-        return self.stage.position * self.unit_factor
+        position = self.stage.position
+        factors = self.unit_factors
+        assert type(factors) is list and len(factors) == len(position)
+        for i in range(len(position)):
+            position[i] = position[i] * factors[i]
+        return position
+        
 
     @position.setter
     def position(self, value: Vector):
@@ -179,4 +203,9 @@ class StageInstrument(Instrument):
                     )
                     return
         # Move to actual destination
-        self.stage.move_to(position / self.unit_factor, wait=wait)
+        factors = self.unit_factors
+        assert type(factors) is list and len(factors) == len(position)
+        for i in range(len(position)):
+            position[i] = position[i] / factors[i]
+        self.stage.move_to(position, wait=wait)
+        
