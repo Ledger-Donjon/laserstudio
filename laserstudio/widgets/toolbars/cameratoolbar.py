@@ -136,7 +136,7 @@ class CameraToolbar(QToolBar):
         grid = QGridLayout()
         # Image adjustment dialog (for USB camera)
         i = 0
-        if isinstance(self.camera, CameraUSBInstrument):
+        if type(self.camera) is CameraUSBInstrument:
             for i, (att, minimum, maximum) in enumerate(
                 [
                     ("brightness", 0, 255),
