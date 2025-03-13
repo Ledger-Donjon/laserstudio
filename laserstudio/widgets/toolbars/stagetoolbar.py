@@ -180,10 +180,15 @@ class StageToolbar(QToolBar):
         if not pressed:
             return
         axe = button // 2
-        if axe != 2:
-            return
-        coefficient = (button % 2) * 2.0 - 1.0
-        self.joystick_axis(axe, coefficient)
+        if axe == 2:
+            coefficient = (button % 2) * 2.0 - 1.0
+            self.joystick_axis(axe, coefficient)
+        elif axe == 0 and self.keyboardbox.displacement_z_spinbox is not None:
+            # First pair of number of buttons (0 and 1) is for changing the step of Z
+            self.keyboardbox.displacement_z_spinbox.setValue(self.keyboardbox.displacement_z * (2.0 if button % 2 else 0.5))
+        elif axe == 1 and self.keyboardbox.displacement_xy_spinbox is not None:
+            # Second pair of number of buttons (7 and 8) is for changing the step of XY
+            self.keyboardbox.displacement_xy_spinbox.setValue(self.keyboardbox.displacement_xy * (2.0 if button % 2 else 0.5))
 
     def joystick_axis(self, axe: int, coefficient: float):
         """
