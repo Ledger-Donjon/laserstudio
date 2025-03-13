@@ -125,11 +125,12 @@ class CameraToolbar(QToolBar):
 
         self.image_dialog = QDialog()
         self.image_dialog.setWindowTitle("Image Adjustment")
+        self.image_dialog.setObjectName("image_adjustment")
 
         w = QPushButton()
         w.setToolTip(self.image_dialog.windowTitle())
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/sliders-solid.svg")))
-        w.clicked.connect(lambda: self.image_dialog.exec())
+        w.clicked.connect(lambda: self.image_dialog.show())
         grid.addWidget(w, 1, 2)
 
         grid = QGridLayout()
