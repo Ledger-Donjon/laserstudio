@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
-from pystages import Corvus, CNCRouter, Stage, Vector
+from pystages import Corvus, CNCRouter, SMC100, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
@@ -41,7 +41,7 @@ class StageInstrument(Instrument):
         self.guardrail_enabled = True
 
         dev = config.get("dev")
-        if device_type in ["Corvus", "CNC"]:
+        if device_type in ["Corvus", "CNC", "SMC100"]:
             if dev is None:
                 logging.getLogger("laserstudio").error(
                     f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
@@ -71,6 +71,11 @@ class StageInstrument(Instrument):
             self.stage: Stage = CNCRouter(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 200
+        elif device_type == "SMC100":
+            logging.getLogger("laserstudio").info("Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... ")        
+            adresses = config.get('adresses', [1,2])
+            logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")                
+            self.stage: Stage = SMC100(dev=dev, addresses=adresses)
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
             self.stage: Stage = StageDummy(config=config, stage_instrument=self)
