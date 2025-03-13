@@ -173,6 +173,37 @@ class Viewer(QGraphicsView):
             min(w_ratio, h_ratio),
         )
 
+    def __set_picture_item(self, item: QGraphicsPixmapItem):
+        item = self.__picture_item = QGraphicsPixmapItem(item.pixmap())
+        item.setZValue(-10)
+        transform = QTransform()
+        # We place the image at current camera position
+        pos = self.cam_pos_zoom[0]
+        transform.translate(pos.x(), pos.y())
+        # Scene Y-axis is up, while for images it shall be down. We flip the
+        # image over the Y-axis to show it in the right orientation.
+        transform.scale(1, -1)
+        transform.translate(
+            -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
+        )
+        item.setTransform(transform)
+        self.__scene.addItem(item)
+
+    def snap_picture_from_camera(self):
+        """Takes the current picture from the current
+        and set it as background picture"""
+        if self.stage_sight is None:
+            return
+        self.clear_picture()
+        self.__set_picture_item(self.stage_sight.image)
+
+    def clear_picture(self):
+        """Clears the background picture"""
+        if self.__picture_item is not None:
+            self.__scene.removeItem(self.__picture_item)
+            self.__picture_item = None
+            self.background_picture_path = None
+
     def load_picture(self, picture_path: Optional[str] = None):
         """Requests loading a backgound picture from the user"""
         filename = (
@@ -182,23 +213,10 @@ class Viewer(QGraphicsView):
         )
         if len(filename):
             # Remove previous picture if defined
-            if self.__picture_item is not None:
-                self.__scene.removeItem(self.__picture_item)
-            item = self.__picture_item = QGraphicsPixmapItem(QPixmap(filename))
-            item.setZValue(-10)
-            transform = QTransform()
-            # We place the image at current camera position
-            pos = self.cam_pos_zoom[0]
-            transform.translate(pos.x(), pos.y())
-            # Scene Y-axis is up, while for images it shall be down. We flip the
-            # image over the Y-axis to show it in the right orientation.
-            transform.scale(1, -1)
-            transform.translate(
-                -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
-            )
-            item.setTransform(transform)
-            self.__scene.addItem(item)
-
+            self.clear_picture()
+            # Get the picture and set it as background
+            item = QGraphicsPixmapItem(QPixmap(filename))
+            self.__set_picture_item(item)
             # Save picture path for when transform is saved.
             self.background_picture_path = filename
 

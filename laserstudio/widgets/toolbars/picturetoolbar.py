@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 class PictureToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Background picture", laser_studio)
-        self.setObjectName("toolbar-background-picture")  # For settings save and restore
+        self.setObjectName(
+            "toolbar-background-picture"
+        )  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
@@ -35,4 +37,20 @@ class PictureToolbar(QToolBar):
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(lambda: laser_studio.viewer.load_picture())
+        self.addWidget(w)
+
+        # Button to clear background picture.
+        w = QPushButton(self)
+        w.setToolTip("Clear background picture")
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(lambda: laser_studio.viewer.clear_picture())
+        self.addWidget(w)
+
+        # Button to select set current image as background.
+        w = QPushButton(self)
+        w.setToolTip("Set current image as background")
+        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
+        w.setIconSize(QSize(24, 24))
+        w.clicked.connect(lambda: laser_studio.viewer.snap_picture_from_camera())
         self.addWidget(w)
