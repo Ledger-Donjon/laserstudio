@@ -1,11 +1,9 @@
-from numpy._typing._array_like import NDArray
 from .camera_usb import CameraUSBInstrument
 from .list_serials import (
     get_serial_device,
     DeviceSearchError,
     serial,
     ConnectionFailure,
-    ProtocolError,
 )
 from serial.serialutil import SerialException
 import logging
