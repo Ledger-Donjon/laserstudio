@@ -1,3 +1,4 @@
+from numpy._typing._array_like import NDArray
 from .camera_usb import CameraUSBInstrument
 from .list_serials import (
     get_serial_device,
@@ -161,39 +162,63 @@ class RaptorCommand(bytes, Enum):
 class CameraRaptorInstrument(CameraUSBInstrument):
     """Class to implement the Raptor cameras"""
 
-    def read_raptor_register(self, address: int) -> int:
+    def query_command(
+        self,
+        command: RaptorCommand,
+        data: bytes = b"",
+        expected_bytes: int = 0,
+        checksum=False,
+    ) -> bytes:
+        """
+        The check sum byte should be the result of the Exclusive OR of all bytes in the Host command packet including the ETX byte.
+        """
+        whole_command = command.value + data + RaptorErrorCode.ETX.value
+        if checksum:
+            checksum = 0
+            for byte in whole_command:
+                checksum ^= byte
+            whole_command += checksum.to_bytes(1, "big")
+
+        # print(f"RAPTOR > {whole_command.hex()}")
+        self.serial.write(whole_command)
+
+        expected_bytes += 1  # Add ETX
+        ret = bytes()
+        while len(ret) < expected_bytes:
+            # print(f"READing {expected_bytes - len(ret)} bytes")
+            ret += self.serial.read(expected_bytes - len(ret))
+            # print(f"RAPTOR < {ret.hex()}")
+        return ret[:-1]
+
+    def get_value_at_address(self, address: int, expected_bytes: int) -> bytes:
+        return self.query_command(
+            RaptorCommand.GET_VALUE, expected_bytes.to_bytes(1, "big"), expected_bytes
+        )
+
+    def write_raptor_register(self, address: int, value: int):
+        """
+        Writes a register to the camera.
+
+        :param address: The address of the register to write.
+        :param value: The value to write to the register (1 byte).
+        """
+        self.query_command(
+            RaptorCommand.SET_ADDRESS,
+            b"\x02" + address.to_bytes(1, "big") + value.to_bytes(1, "big"),
+        )
+
+    def read_raptor_register(self, address: int, expected_bytes: int = 1) -> int:
         """
         Reads a register from the camera.
 
         :param address: The address of the register to read.
         :return: The value of the register.
         """
-        self.serial.write(b"\x53\xe0\x01" + address.to_bytes(1, "big") + b"\x50")
-        self.serial.write(b"\x53\xe1\x01\x50")
-        response = self.serial.read(3)
-        if len(response) == 0:
-            raise ProtocolError(f"No response while reading register {address}")
-        if len(response) == 1 or response[-1] != 0x50:
-            raise ProtocolError(f"Error: {response}", -response[-1])
-
-        return response[-2]
-
-    def get_micro_version(self) -> tuple[int, int]:
-        """
-        Gets the micro version of the camera.
-
-        :return: The micro version of the camera.
-        """
-        self.serial.write(b"\x56\x50")
-        response = self.serial.read(4)
-        return response[2], response[3]
-
-    def get_serial_number(self) -> str:
-        """
-        Gets the serial number of the camera.
-
-        :return: The serial number of the camera.
-        """
+        self.query_command(
+            RaptorCommand.SET_ADDRESS, b"\x01" + address.to_bytes(1, "big")
+        )
+        value = self.get_value_at_address(address, expected_bytes)
+        return int.from_bytes(value, "big")
 
     def __init__(self, config: dict):
         super().__init__(config)
@@ -216,3 +241,293 @@ class CameraRaptorInstrument(CameraUSBInstrument):
             self.serial = serial.Serial(dev, 115200, timeout=1)
         except SerialException as e:
             raise ConnectionFailure() from e
+
+        self.width = self.width // 2
+        self.width_um = self.width_um // 2
+
+        self.last_frame_number = 0
+        self.last_frame: numpy.ndarray = numpy.zeros(
+            self.width * self.height, dtype=numpy.uint16
+        )
+        self.black_image: Optional[numpy.ndarray] = None
+        self.background_image = None
+
+        self.manufacturers_data = None
+
+    def get_last_image(
+        self,
+    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
+        ret, frame = self.vc.read()
+        if not ret or frame is None:
+            return self.width, self.height, "RGB", None
+        assert type(frame) is numpy.ndarray
+        # Each value is repeated three times...
+        frame = frame[:, :, :1].copy()
+        # Flatten the array
+        frame = numpy.reshape(frame, (-1,))
+        # Frame number is present in the data
+        number = frame[0:8]
+        self.last_frame_number = number.view(numpy.uint32)[0]
+        # Remove the 8 first bytes
+        frame = frame[8:]
+        # Convert to 16 bits and swap bytes
+        frame = frame.view(numpy.uint16)
+        # Give the whole range, as the camera is 14 bits
+        frame = frame * 4
+        # Add 0s to the end to compensate the values that were removed
+        frame.resize(self.width * self.height)
+        # Save the frame
+        self.last_frame = frame
+        # Remove black image
+        frame = self.remove_black_image(frame)
+        # Apply levels
+        frame = self.apply_levels(frame)
+        if frame.dtype == numpy.uint16:
+            frame_bytes = frame.byteswap().tobytes()
+            mode = "I;16"
+        else:
+            frame_bytes = frame.tobytes()
+            mode = "RGB"
+
+        return (
+            self.width,
+            self.height,
+            mode,
+            frame_bytes,
+        )
+
+    def get_micro_version(self) -> tuple[int, int]:
+        """
+        Gets the micro version of the camera.
+
+        :return: The micro version of the camera.
+        """
+        response = self.query_command(RaptorCommand.GET_MICRO_VERSION, b"", 2)
+        return response[0], response[1]
+
+    def get_manufacturers_data(self) -> RaptorManufacturersData:
+        """
+        Gets the serial number of the camera.
+
+        :return: The serial number of the camera.
+        """
+        self.query_command(RaptorCommand.GET_MANUFACTURERS_DATA)
+        self.manufacturers_data = RaptorManufacturersData.from_bytes(
+            self.query_command(RaptorCommand.GET_MANUFACTURERS_DATA_VALUE, b"\x12", 18)
+        )
+        return self.manufacturers_data
+
+    def get_system_status(self) -> RaptorSystemStatus:
+        status = self.query_command(RaptorCommand.GET_SYSTEM_STATUS, b"", 1)[0]
+        return RaptorSystemStatus(status)
+
+    def get_control_reg_0(self) -> RaptorCameraControlReg0:
+        return RaptorCameraControlReg0(self.read_raptor_register(0))
+
+    def get_control_reg_1(self) -> RaptorCameraControlReg1:
+        return RaptorCameraControlReg1(self.read_raptor_register(1))
+
+    def get_exposure_time(self) -> float:
+        """
+        Read address 0xEE (MSB), return 1 byte
+        Read address 0xEF (MIDU), return 1 byte
+        Read address 0xF0 (MIDL), return 1 byte
+        Read address F1 (LSB), return 1 byte
+        30 bit value, 4 bytes where:
+        1 count = 1*40MHz period = 25nsecs
+        2 Upper bits of 0xEE are don’t care’s.
+        Min Exposure = 500nsec = 20counts
+        """
+        return (
+            self.read_raptor_register(0xEE) << 24
+            | self.read_raptor_register(0xEF) << 16
+            | self.read_raptor_register(0xF0) << 8
+            | self.read_raptor_register(0xF1)
+        ) * 25e-9
+
+    def get_exposure_time_ms(self) -> float:
+        return self.get_exposure_time() * 1e3
+
+    def set_exposure_time(self, value: float):
+        """
+        30 bit value, 4 separate commands,
+        1 count = 1*40MHz period = 25nsecs
+        Y1 = xxMMMMMM bits of 4 byte word
+        Y4 = LLLLLLLL bits of 4 byte word
+        Exposure updated on LSB write
+        Min Exposure = 500nsec = 20counts
+        Max Exposure = (2^30)*25ns ≈ 26.8secs"""
+        counts = int(value / 25e-9)
+        self.write_raptor_register(0xEE, (counts >> 24) & 0x3F)
+        self.write_raptor_register(0xEF, (counts >> 16) & 0xFF)
+        self.write_raptor_register(0xF0, (counts >> 8) & 0xFF)
+        self.write_raptor_register(0xF1, counts & 0xFF)
+
+    def set_exposure_time_ms(self, value: float):
+        self.set_exposure_time(value * 1e-3)
+
+    def get_digital_gain(self) -> float:
+        """
+        2 bytes returned MM,LL
+        16bit value = gain*256
+        Reg. C6 bits 7..0 = gain bits 15..8
+        Reg. C7 bits 7..0 = level bits 7..0
+        """
+        v = self.read_raptor_register(0xC6) + self.read_raptor_register(0xC7) / 256.0
+        return v
+
+    def set_digital_gain(self, gain: float):
+        """
+        16bit value = gain*256
+        MM bits 7..0 = gain bits 15..8
+        LL bits 7..0 = level bits 7..0
+        Data updated on write to LSBs
+        Note: ALC must be disabled."
+        """
+        gain = int(gain * 256)
+        self.write_raptor_register(0xC6, gain >> 8)
+        self.write_raptor_register(0xC7, gain & 0xFF)
+
+    def get_digital_gain_db(self) -> float:
+        return 20 * math.log10(self.get_digital_gain())
+
+    def set_digital_gain_db(self, value: float):
+        self.set_digital_gain(10 ** (value / 20))
+
+    def get_alc_enabled(self) -> bool:
+        return bool(self.get_control_reg_0() & RaptorCameraControlReg0.ALC_ENABLED)
+
+    def set_alc_enabled(self, value: bool):
+        v = self.get_control_reg_0()
+        if value:
+            v |= RaptorCameraControlReg0.ALC_ENABLED
+        else:
+            v &= ~RaptorCameraControlReg0.ALC_ENABLED
+        self.write_raptor_register(0, v)
+
+    def get_tec_enabled(self) -> bool:
+        return bool(self.get_control_reg_0() & RaptorCameraControlReg0.TEC_ENABLED)
+
+    def set_tec_enabled(self, value: bool):
+        v = self.get_control_reg_0()
+        if value:
+            v |= RaptorCameraControlReg0.TEC_ENABLED
+        else:
+            v &= ~RaptorCameraControlReg0.TEC_ENABLED
+        self.write_raptor_register(0, v)
+
+    def get_fan_enabled(self) -> bool:
+        return bool(self.get_control_reg_0() & RaptorCameraControlReg0.FAN_ENABLED)
+
+    def set_fan_enabled(self, value: bool):
+        v = self.get_control_reg_0()
+        if value:
+            v |= RaptorCameraControlReg0.FAN_ENABLED
+        else:
+            v &= ~RaptorCameraControlReg0.FAN_ENABLED
+        self.write_raptor_register(0, v)
+
+    def get_agmc_enabled(self) -> bool:
+        return bool(self.get_control_reg_1() & RaptorCameraControlReg1.AGMC_ENABLED)
+
+    def set_agmc_enabled(self, value: bool):
+        v = self.get_control_reg_1()
+        if value:
+            v |= RaptorCameraControlReg1.AGMC_ENABLED
+        else:
+            v &= ~RaptorCameraControlReg1.AGMC_ENABLED
+        self.write_raptor_register(1, v)
+
+    def get_fan2_enabled(self) -> bool:
+        return bool(self.get_control_reg_1() & RaptorCameraControlReg1.FAN_ENABLED)
+
+    def set_fan2_enabled(self, value: bool):
+        v = self.get_control_reg_1()
+        if value:
+            v |= RaptorCameraControlReg1.FAN_ENABLED
+        else:
+            v &= ~RaptorCameraControlReg1.FAN_ENABLED
+        self.write_raptor_register(1, v)
+
+    def get_gain_trigger_mode(self) -> RaptorCameraGainTrigger:
+        return RaptorCameraGainTrigger(self.read_raptor_register(0xF2))
+
+    def set_gain_trigger_mode(self, value: RaptorCameraGainTrigger):
+        self.write_raptor_register(0xF2, value)
+
+    def get_high_gain_enabled(self) -> bool:
+        return bool(self.get_gain_trigger_mode() & RaptorCameraGainTrigger.HIGH_GAIN)
+
+    def set_high_gain_enabled(self, value: bool):
+        v = self.get_gain_trigger_mode()
+        if value:
+            v |= RaptorCameraGainTrigger.HIGH_GAIN
+        else:
+            v &= ~RaptorCameraGainTrigger.HIGH_GAIN
+
+        self.set_gain_trigger_mode(v)
+
+    temperature_changed = pyqtSignal(float)
+
+    def get_sensor_temperature(self) -> float:
+        """
+        Reg 6E, bits 3..0 = temp bits 11..8
+        Reg 6F, bits 7..0 = temp bits 7..0
+        12 bit value to be converted to temperature from
+        ADC calibration values (see "Get manufacturers Data")
+        """
+        adc_count = self.read_raptor_register(0x6E) * 256 + self.read_raptor_register(
+            0x6F
+        )
+        manufacturers_data = self.manufacturers_data
+        if manufacturers_data is None:
+            manufacturers_data = self.get_manufacturers_data()
+        temperature = (
+            (adc_count - manufacturers_data.adc_cal_0_deg)
+            * (40 - 0)
+            / (manufacturers_data.adc_cal_40_deg - manufacturers_data.adc_cal_0_deg)
+        )
+
+        self.temperature_changed.emit(temperature)
+        return temperature
+
+    def take_black_image(self, do_take: bool):
+        if do_take:
+            self.black_image = self.last_frame
+        else:
+            self.black_image = None
+
+    def take_background_image(self, do_take: bool):
+        if do_take:
+            self.background_image = self.last_frame
+        else:
+            self.background_image = None
+
+    def remove_black_image(self, frame: numpy.ndarray) -> numpy.ndarray:
+        if self.black_image is None:
+            return frame
+
+        pos = (
+            (frame - self.black_image)
+            .astype(numpy.int16)
+            .clip(0)
+            .astype(numpy.uint16)
+            .reshape(self.height, self.width, 1)
+        )
+        neg = (
+            (self.black_image - frame)
+            .astype(numpy.int16)
+            .clip(0)
+            .astype(numpy.uint16)
+            .reshape(self.height, self.width, 1)
+        )
+        back = (
+            numpy.zeros((self.height, self.width, 1), dtype=numpy.uint16)
+            if self.background_image is None
+            else self.background_image
+        )
+        stacked = numpy.stack([pos, neg, back], axis=2)
+        # 12 bits per pixel
+        stacked = stacked >> 4
+        # 8 bits per pixel
+        return stacked.astype(numpy.uint8).reshape(self.height * self.width * 3)
