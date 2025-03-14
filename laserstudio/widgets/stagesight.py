@@ -275,11 +275,15 @@ class StageSight(QGraphicsItemGroup):
         else:
             self.setPos(position)
 
-    def update_pos(self, position: Vector):
+    def update_pos(self, position: Optional[Vector] = None):
         """Update Widget position according to the stage's position, received in parameter
 
         :param position: The stage's current position.
         """
+        if position is None and self.stage is not None:
+            position = self.stage.position
+        if position is None:
+            return
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 

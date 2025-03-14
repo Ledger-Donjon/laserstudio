@@ -153,6 +153,7 @@ class Viewer(QGraphicsView):
                     (self.focused_element_position(), self.zoom),
                 )
             )
+            self.stage_sight.update_pos()
 
         # Emit the signal if necessary
         if self._follow_stage_sight != value:
