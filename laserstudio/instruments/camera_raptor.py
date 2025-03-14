@@ -244,10 +244,14 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.width_um = self.width_um // 2
 
         self.last_frame_number = 0
+
         self._last_frame_accumulator: numpy.ndarray = numpy.zeros(
-            self.width * self.height, dtype=numpy.uint16
+            self.width * self.height, dtype=numpy.uint32
         )
-        self._last_frames: list[numpy.ndarray] = [self._last_frame_accumulator] * 4
+        self._image_averaging = 1
+        self._last_frames: list[numpy.ndarray] = [
+            numpy.zeros(self.width * self.height, dtype=numpy.uint16)
+        ] * self._image_averaging
 
         self.black_image: Optional[numpy.ndarray] = None
         self.background_image = None
@@ -259,8 +263,29 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.select_objective(objective)
 
     @property
+    def image_averaging(self) -> int:
+        return self._image_averaging
+
+    @image_averaging.setter
+    def image_averaging(self, value: int):
+        self._image_averaging = value
+        self._last_frames = [
+            numpy.zeros(self.width * self.height, dtype=numpy.uint16)
+        ] * value
+        self._last_frame_accumulator = numpy.zeros(
+            self.width * self.height, dtype=numpy.uint32
+        )
+
+    @property
     def last_frame(self) -> numpy.ndarray:
-        return self._last_frame_accumulator
+        return (
+            ((self._last_frame_accumulator * 4) / self.image_averaging)
+            .clip(
+                min=numpy.iinfo(numpy.uint16).min,
+                max=numpy.iinfo(numpy.uint16).max,
+            )
+            .astype(numpy.uint16)
+        )
 
     @last_frame.setter
     def last_frame(self, value: numpy.ndarray):
@@ -290,7 +315,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # frame = frame * 4
         # Add 0s to the end to compensate the values that were removed
         frame.resize(self.width * self.height)
-        # Save the frame
+        # Save the frame. Here is the trick to accumulate the frames
         self.last_frame = frame
         # Remove black image
         frame = self.remove_black_image(self.last_frame)

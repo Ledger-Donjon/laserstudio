@@ -152,6 +152,18 @@ class CameraRaptorToolBar(CameraToolbar):
         w.setToolTip("The last image number")
         vbox.addWidget(w)
 
+        # Checkbox to activate Image averaging
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        w = QLabel("Image Averaging")
+        hbox.addWidget(w)
+        w = QSpinBox()
+        w.setToolTip("Number of images to average")
+        w.setRange(1, 4)
+        w.setValue(self.camera.image_averaging)
+        w.valueChanged.connect(lambda v: self.camera.__setattr__("image_averaging", v))
+        vbox.addWidget(w)
+
         # At each new image:
         # Refresh the image number, temperature, exposure time and gain
         self.camera.new_image.connect(
