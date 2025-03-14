@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter
+from ...instruments.stage import MoveFor, CNCRouter, SMC100
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 import os
@@ -88,6 +88,19 @@ class StageToolbar(QToolBar):
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
+        if type(self.stage.stage) is SMC100:
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Reset")
+            w.clicked.connect(self.stage.stage.reset)
+            hbox.addWidget(w)
+
+            w = QPushButton(self)
+            w.setText("Stop")
+            w.clicked.connect(self.stage.stage.stop)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
         vbox.addLayout(hbox)
@@ -138,6 +151,8 @@ class StageToolbar(QToolBar):
             buttons=QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Apply,
             defaultButton=QMessageBox.StandardButton.Abort,
         ):
+            if type(self.stage.stage) is SMC100:
+                self.stage.stage.reset()
             self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
