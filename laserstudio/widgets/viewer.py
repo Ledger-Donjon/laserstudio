@@ -173,21 +173,36 @@ class Viewer(QGraphicsView):
             min(w_ratio, h_ratio),
         )
 
-    def __set_picture_item(self, item: QGraphicsPixmapItem):
-        item = self.__picture_item = QGraphicsPixmapItem(item.pixmap())
+    def __place_picture_item(self, at_stage_sight: bool = False):
+        item = self.__picture_item
+        if item is None:
+            return
+        # Put if far far away in the back
         item.setZValue(-10)
-        transform = QTransform()
-        # We place the image at current camera position
-        pos = self.cam_pos_zoom[0]
-        transform.translate(pos.x(), pos.y())
-        # Scene Y-axis is up, while for images it shall be down. We flip the
-        # image over the Y-axis to show it in the right orientation.
-        transform.scale(1, -1)
-        transform.translate(
-            -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
-        )
+        if not at_stage_sight or self.stage_sight is None:
+            # We place the image at current viewing position
+            transform = QTransform()
+            pos = (
+                self.stage_sight.pos()
+                if self.stage_sight is not None and at_stage_sight
+                else self.cam_pos_zoom[0]
+            )
+            transform.translate(pos.x(), pos.y())
+            # Scene Y-axis is up, while for images it shall be down. We flip the
+            # image over the Y-axis to show it in the right orientation.
+            transform.scale(1, -1)
+            transform.translate(
+                -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
+            )
+        else:
+            # We place the image at current stagesight' position
+            transform = self.stage_sight.image.sceneTransform()
+
         item.setTransform(transform)
         self.__scene.addItem(item)
+
+    def __set_picture_item(self, item: QGraphicsPixmapItem):
+        item = self.__picture_item = QGraphicsPixmapItem(item.pixmap())
 
     def snap_picture_from_camera(self):
         """Takes the current picture from the current
@@ -196,6 +211,7 @@ class Viewer(QGraphicsView):
             return
         self.clear_picture()
         self.__set_picture_item(self.stage_sight.image)
+        self.__place_picture_item(at_stage_sight=True)
 
     def clear_picture(self):
         """Clears the background picture"""
@@ -217,6 +233,7 @@ class Viewer(QGraphicsView):
             # Get the picture and set it as background
             item = QGraphicsPixmapItem(QPixmap(filename))
             self.__set_picture_item(item)
+            self.__place_picture_item()
             # Save picture path for when transform is saved.
             self.background_picture_path = filename
 
