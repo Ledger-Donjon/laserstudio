@@ -146,8 +146,8 @@ class StageInstrument(Instrument):
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
             position[i] = position[i] * factors[i]
+        self.position_changed.emit(position)
         return position
-        
 
     @position.setter
     def position(self, value: Vector):
@@ -217,7 +217,8 @@ class StageInstrument(Instrument):
         for i in range(len(position)):
             position[i] = position[i] / factors[i]
         self.stage.move_to(position, wait=wait)
-        
+        _ = self.position
+
     @property
     def num_axis(self) -> int:
         """Get the number of axis of the stage instrument
