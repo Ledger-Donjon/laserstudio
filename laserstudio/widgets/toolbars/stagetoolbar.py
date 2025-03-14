@@ -16,7 +16,6 @@ from ...instruments.stage import MoveFor, CNCRouter, SMC100
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 import os
-import time
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -93,7 +92,7 @@ class StageToolbar(QToolBar):
             hbox = QHBoxLayout()
             w = QPushButton(self)
             w.setText("Reset")
-            w.clicked.connect(lambda: (stage.reset(), time.sleep(3)))
+            w.clicked.connect(lambda: stage.reset())
             hbox.addWidget(w)
 
             w = QPushButton(self)
@@ -152,9 +151,6 @@ class StageToolbar(QToolBar):
             buttons=QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Apply,
             defaultButton=QMessageBox.StandardButton.Abort,
         ):
-            if type(self.stage.stage) is SMC100:
-                self.stage.stage.reset()
-                time.sleep(3)
             self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
