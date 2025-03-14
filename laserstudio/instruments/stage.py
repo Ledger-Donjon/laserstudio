@@ -72,9 +72,11 @@ class StageInstrument(Instrument):
             if self.refresh_interval is None:
                 self.refresh_interval = 200
         elif device_type == "SMC100":
-            logging.getLogger("laserstudio").info("Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... ")        
-            adresses = config.get('adresses', [1,2])
-            logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")                
+            logging.getLogger("laserstudio").info(
+                "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
+            )
+            adresses = config.get("adresses", [1, 2])
+            logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
             self.stage: Stage = SMC100(dev=dev, addresses=adresses)
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
@@ -104,22 +106,26 @@ class StageInstrument(Instrument):
         # Unit factor to apply in order to get coordinates in micrometers
         factors = config.get("unit_factor", config.get("unit_factors", [1.0]))
         position = self.stage.position
-        if type(factors) != list:
+        if type(factors) is list:
             factors = [factors] * len(position)
         else:
             # We ensure that there is at least one element in the array
-            if len(factors) == 0: 
+            if len(factors) == 0:
                 factors = [1.0]
 
             # Truncate array if there is too much values for the number of axes
-            factors = factors[:len(position)]
-            
+            factors = factors[: len(position)]
+
             # Completion with last value of the array until we get enough number of values
             factors += [factors[-1]] * abs(len(position) - len(factors))
 
         self.unit_factors = factors
 
-        assert type(self.unit_factors) is list and len(self.unit_factors) == len(position), f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
+        assert type(self.unit_factors) is list and len(self.unit_factors) == len(
+            position
+        ), (
+            f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
+        )
 
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
