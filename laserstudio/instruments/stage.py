@@ -106,7 +106,7 @@ class StageInstrument(Instrument):
         # Unit factor to apply in order to get coordinates in micrometers
         factors = config.get("unit_factor", config.get("unit_factors", [1.0]))
         position = self.stage.position
-        if type(factors) is list:
+        if type(factors) is not list:
             factors = [factors] * len(position)
         else:
             # We ensure that there is at least one element in the array
