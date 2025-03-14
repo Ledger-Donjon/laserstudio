@@ -244,13 +244,25 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.width_um = self.width_um // 2
 
         self.last_frame_number = 0
-        self.last_frame: numpy.ndarray = numpy.zeros(
+        self._last_frame_accumulator: numpy.ndarray = numpy.zeros(
             self.width * self.height, dtype=numpy.uint16
         )
+        self._last_frames: list[numpy.ndarray] = [self._last_frame_accumulator] * 4
+
         self.black_image: Optional[numpy.ndarray] = None
         self.background_image = None
 
         self.manufacturers_data = None
+
+    @property
+    def last_frame(self) -> numpy.ndarray:
+        return self._last_frame_accumulator
+
+    @last_frame.setter
+    def last_frame(self, value: numpy.ndarray):
+        off_frame = self._last_frames.pop(0)
+        self._last_frames.append(value)
+        self._last_frame_accumulator = self._last_frame_accumulator - off_frame + value
 
     def get_last_image(
         self,
@@ -269,15 +281,15 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # Remove the 8 first bytes
         frame = frame[8:]
         # Convert to 16 bits and swap bytes
-        frame = frame.view(numpy.uint16)
+        frame = frame.view(numpy.uint16).copy()
         # Give the whole range, as the camera is 14 bits
-        frame = frame * 4
+        # frame = frame * 4
         # Add 0s to the end to compensate the values that were removed
         frame.resize(self.width * self.height)
         # Save the frame
         self.last_frame = frame
         # Remove black image
-        frame = self.remove_black_image(frame)
+        frame = self.remove_black_image(self.last_frame)
         # Apply levels
         frame = self.apply_levels(frame)
         if frame.dtype == numpy.uint16:
