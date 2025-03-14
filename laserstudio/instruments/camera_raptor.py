@@ -7,7 +7,7 @@ from .list_serials import (
 )
 from serial.serialutil import SerialException
 import logging
-from typing import Optional, Literal, NamedTuple
+from typing import Optional, Literal, NamedTuple, cast
 from enum import Enum, IntFlag
 import numpy
 import math
@@ -253,6 +253,10 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.background_image = None
 
         self.manufacturers_data = None
+
+        # Objective on this camera is 10 by default
+        objective = cast(float, config.get("objective", 10.0))
+        self.select_objective(objective)
 
     @property
     def last_frame(self) -> numpy.ndarray:

@@ -13,8 +13,12 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
+    QSpinBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
+from ...utils import util
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -88,6 +92,20 @@ class CameraRaptorToolBar(CameraToolbar):
         vbox.addWidget(w)
         w.setHidden(True)
 
+        # Magnification selector.
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        hbox.addWidget(QLabel("Objective:"))
+        w = self.mag_combobox = QComboBox()
+        for x in [10, 20]:
+            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
+            w.addItem(icon, f"{x} X")
+            if x == self.camera.objective:
+                w.setCurrentIndex(w.count() - 1)
+        w.setStyleSheet("QListView::item {height:24px;}")
+        w.currentIndexChanged.connect(self.mag_changed)
+        hbox.addWidget(w)
+
         # Checkbox to activate TEC
         w = QCheckBox("TEC")
         w.setToolTip("Enable the camera's TEC")
@@ -152,6 +170,14 @@ class CameraRaptorToolBar(CameraToolbar):
         w.setToolTip("Take a black image")
         vbox.addWidget(w)
         w.toggled.connect(self.camera.take_black_image)
+
+    def mag_changed(self):
+        """
+        Called when the magnification is changed in the UI.
+        """
+        self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
+        assert self.laser_studio.viewer.stage_sight is not None
+        self.laser_studio.viewer.stage_sight.update_size()
 
     def show_histogram_terminal(self):
         hists = self.camera.histogram_to_string(
