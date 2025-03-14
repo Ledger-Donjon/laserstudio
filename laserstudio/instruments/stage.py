@@ -180,6 +180,9 @@ class StageInstrument(Instrument):
         """
         pos = self.position
         for i, v in enumerate(displacement.data):
+            # Prevent crashes if the stage has less axis than the displacement
+            if i >= len(pos):
+                break
             pos[i] += v
         self.move_to(pos, wait=wait)
 
@@ -209,3 +212,10 @@ class StageInstrument(Instrument):
             position[i] = position[i] / factors[i]
         self.stage.move_to(position, wait=wait)
         
+    @property
+    def num_axis(self) -> int:
+        """Get the number of axis of the stage instrument
+
+        :return: Get the number of axis of the stage
+        """
+        return self.stage.num_axis
