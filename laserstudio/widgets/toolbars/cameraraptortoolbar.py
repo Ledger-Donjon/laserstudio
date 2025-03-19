@@ -6,15 +6,14 @@ from ...instruments.camera_raptor import (
 )
 from .cameratoolbar import CameraToolbar
 from PyQt6.QtWidgets import (
-    QPushButton,
     QWidget,
     QVBoxLayout,
     QCheckBox,
     QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
-    QSpinBox,
     QComboBox,
+    QSpinBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -71,57 +70,13 @@ class CameraRaptorToolBar(CameraToolbar):
         w.toggled.connect(self.camera.set_agmc_enabled)
         vbox.addWidget(w)
 
-        w = QWidget()
-        self.addWidget(w)
-        vbox = QVBoxLayout()
-        w.setLayout(vbox)
-
-        # Checkbox to activate the FAN
-        w = QCheckBox("Fan")
-        w.setToolTip("Get the camera to activate the fan")
-        w.setCheckable(True)
-        w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.FAN_ENABLED))
-        w.toggled.connect(self.camera.set_fan_enabled)
+        self.histogram_nlines = w = QSpinBox()
+        w.setToolTip("Number of lines in the histogram")
+        w.setRange(1, 1000)
+        w.setValue(5)
         vbox.addWidget(w)
 
-        w = QCheckBox("Fan 2")
-        w.setToolTip("Get the camera to activate the fan")
-        w.setCheckable(True)
-        w.setChecked(reg_1.__contains__(RaptorCameraControlReg1.FAN_ENABLED))
-        w.toggled.connect(self.camera.set_fan2_enabled)
-        vbox.addWidget(w)
-        w.setHidden(True)
-
-        # Magnification selector.
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        hbox.addWidget(QLabel("Objective:"))
-        w = self.mag_combobox = QComboBox()
-        for x in [10, 20]:
-            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
-            w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
-        w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.mag_changed)
-        hbox.addWidget(w)
-
-        # Checkbox to activate TEC
-        w = QCheckBox("TEC")
-        w.setToolTip("Enable the camera's TEC")
-        w.setCheckable(True)
-        w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.TEC_ENABLED))
-        w.toggled.connect(self.camera.set_tec_enabled)
-        vbox.addWidget(w)
-
-        # Label to show the temperature
-        self.temp_label = w = QLabel()
-        w.setToolTip("The camera's temperature")
-        w.setFixedWidth(150)
-        vbox.addWidget(w)
-        self.camera.temperature_changed.connect(
-            lambda t: self.temp_label.setText(f"Temperature: {t:.2f}°C")
-        )
+        vbox.addStretch()
 
         w = QWidget()
         self.addWidget(w)
@@ -147,22 +102,76 @@ class CameraRaptorToolBar(CameraToolbar):
         w.valueChanged.connect(self.camera.set_digital_gain_db)
         vbox.addWidget(w)
 
+        # Magnification selector.
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        hbox.addWidget(QLabel("Objective:"))
+        w = self.mag_combobox = QComboBox()
+        for x in [10, 20]:
+            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
+            w.addItem(icon, f"{x} X")
+            if x == self.camera.objective:
+                w.setCurrentIndex(w.count() - 1)
+        w.setStyleSheet("QListView::item {height:24px;}")
+        w.currentIndexChanged.connect(self.mag_changed)
+        hbox.addWidget(w)
+
         # Show last image number
         self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")
         w.setToolTip("The last image number")
         vbox.addWidget(w)
 
-        # Checkbox to activate Image averaging
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        w = QLabel("Image Averaging")
-        hbox.addWidget(w)
-        w = QSpinBox()
-        w.setToolTip("Number of images to average")
-        w.setRange(1, 4)
-        w.setValue(self.camera.image_averaging)
-        w.valueChanged.connect(lambda v: self.camera.__setattr__("image_averaging", v))
+        vbox.addStretch()
+
+        w = QWidget()
+        self.addWidget(w)
+        vbox = QVBoxLayout()
+        w.setLayout(vbox)
+
+        # Checkbox to activate the FAN
+        w = QCheckBox("Fan")
+        w.setToolTip("Get the camera to activate the fan")
+        w.setCheckable(True)
+        w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.FAN_ENABLED))
+        w.toggled.connect(self.camera.set_fan_enabled)
         vbox.addWidget(w)
+
+        w = QCheckBox("Fan 2")
+        w.setToolTip("Get the camera to activate the fan")
+        w.setCheckable(True)
+        w.setChecked(reg_1.__contains__(RaptorCameraControlReg1.FAN_ENABLED))
+        w.toggled.connect(self.camera.set_fan2_enabled)
+        vbox.addWidget(w)
+        w.setHidden(True)
+
+        # Checkbox to activate TEC
+        w = QCheckBox("TEC")
+        w.setToolTip("Enable the camera's TEC")
+        w.setCheckable(True)
+        w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.TEC_ENABLED))
+        w.toggled.connect(self.camera.set_tec_enabled)
+        vbox.addWidget(w)
+
+        # Label to show the temperature
+        self.temp_label = w = QLabel()
+        w.setToolTip("The camera's temperature")
+        w.setFixedWidth(150)
+        vbox.addWidget(w)
+        self.camera.temperature_changed.connect(
+            lambda t: self.temp_label.setText(f"Temperature: {t:.2f}°C")
+        )
+
+        self.temperature_setpoint = QDoubleSpinBox()
+        self.temperature_setpoint.setRange(-20, 20)
+        self.temperature_setpoint.setSuffix("°C")
+        self.temperature_setpoint.setSingleStep(1)
+        # self.temperature_setpoint.setValue(self.camera.get_tec_temperature_setpoint())
+        self.temperature_setpoint.valueChanged.connect(
+            self.camera.set_tec_temperature_setpoint
+        )
+        vbox.addWidget(self.temperature_setpoint)
+
+        vbox.addStretch()
 
         # At each new image:
         # Refresh the image number, temperature, exposure time and gain
@@ -175,13 +184,6 @@ class CameraRaptorToolBar(CameraToolbar):
                 self.show_histogram_terminal(),
             )
         )
-
-        # Button to take a black image
-        w = QPushButton("Take Black Image")
-        w.setCheckable(True)
-        w.setToolTip("Take a black image")
-        vbox.addWidget(w)
-        w.toggled.connect(self.camera.take_black_image)
 
     def mag_changed(self):
         """
