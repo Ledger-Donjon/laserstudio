@@ -1,6 +1,10 @@
 from .probe import ProbeInstrument
 from random import uniform
 from PyQt6.QtCore import QVariant
+from .shutter import ShutterInstrument
+from typing import Optional
+from .lmscontroller import LMSControllerInstrument
+import logging
 
 
 class LaserInstrument(ProbeInstrument):
@@ -13,6 +17,23 @@ class LaserInstrument(ProbeInstrument):
         self.sweep_min = 0.0
         self.sweep_freq = 100
         self._sweep_iteration = 0
+
+        # Shutter
+        self.shutter: Optional[ShutterInstrument] = None
+        shutter = config.get("shutter")
+        if type(shutter) is dict and shutter.get("enable", True):
+            try:
+                device_type = shutter.get("type")
+                if device_type == "LMSController":
+                    self.shutter = LMSControllerInstrument(shutter)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Shutter type {device_type}. Skipping device."
+                    )
+            except Exception as e:
+                logging.getLogger("laserstudio").warning(
+                    f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
+                )
 
     @property
     def yaml(self) -> dict:

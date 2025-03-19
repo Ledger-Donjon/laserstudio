@@ -1,7 +1,7 @@
 {
   "$id": "ticshutter.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "TIC",
+  "title": "TIC Shutter",
   "type": "object",
   "allOf": [
     {

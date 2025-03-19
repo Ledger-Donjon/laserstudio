@@ -50,21 +50,7 @@
       "suffix": "x"
     },
     "shutter": {
-      "oneOf": [
-        {
-          "$ref": "ticshutter.schema.json"
-        },
-        {
-          "allOf": [
-            {
-              "$ref": "lmscontroller.schema.json"
-            },
-            {
-              "description": "Shutter sytem by ALPhANOV."
-            }
-          ]
-        }
-      ]
+      "allOf": [{ "$ref": "ticshutter.schema.json" }]
     }
   },
   "oneOf": [
