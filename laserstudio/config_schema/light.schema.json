@@ -16,15 +16,18 @@
           "properties": {
             "motor": {
               "type": "integer",
-              "default": 2,
+              "default": 1,
               "minimum": 1,
               "maximum": 3,
-              "description": "The motor's number actuating the laser shutter"
+              "description": "The motor's number actuating the light shutter"
             }
           }
         },
         {
           "$ref": "lmscontroller.schema.json"
+        },
+        {
+          "required": ["motor"]
         }
       ]
     }

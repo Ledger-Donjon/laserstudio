@@ -29,3 +29,23 @@ class HayashiLRInstrument(LightInstrument):
                 := "No Hayashi Light dongle found. Please ensure the dongle is connected."
             )
             raise NoDongleError(msg)
+
+    @property
+    def light(self):
+        return bool(self.hyslr.lamp)
+
+    @light.setter
+    def light(self, value: bool):
+        self.hyslr.lamp = value
+
+    @property
+    def intensity(self):
+        return self.hyslr.intensity
+
+    @intensity.setter
+    def intensity(self, value: int):
+        self.hyslr.intensity = value
+
+    @property
+    def burnout(self):
+        return self.hyslr.burnout

@@ -101,7 +101,7 @@ class Instruments:
 
         # Lighting system
         self.light: Optional[LightInstrument] = None
-        light_config = config.get("ligthing", None)
+        light_config = config.get("lighting", None)
         if light_config is not None and light_config.get("enable", True):
             device_type = light_config.get("type")
             try:

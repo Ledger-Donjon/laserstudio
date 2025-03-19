@@ -4,35 +4,6 @@
   "title": "Laser",
   "type": "object",
   "description": "A Laser generator device.",
-  "properties": {
-    "shutter": {
-      "allOf": [
-        {
-          "title": "ALPhANOV LMS Controller as shutter",
-          "description": "Shutter sytem for Laser by ALPhANOV."
-        },
-        {
-          "$ref": "lmscontroller.schema.json"
-        },
-        {
-          "properties": {
-            "motor": {
-              "type": "integer",
-              "default": 2,
-              "minimum": 1,
-              "maximum": 3,
-              "description": "The motor's number actuating the laser shutter"
-            }
-          }
-        }
-      ]
-    }
-  },
-  "allOf": [
-    {
-      "$ref": "probe.schema.json"
-    }
-  ],
   "oneOf": [
     {
       "title": "PDM",
@@ -69,6 +40,38 @@
           "description": "Donjon's Laser Driver."
         }
       }
+    }
+  ],
+  "properties": {
+    "shutter": {
+      "allOf": [
+        {
+          "title": "ALPhANOV LMS Controller as shutter",
+          "description": "Shutter sytem for Laser by ALPhANOV."
+        },
+        {
+          "$ref": "lmscontroller.schema.json"
+        },
+        {
+          "properties": {
+            "motor": {
+              "type": "integer",
+              "default": 2,
+              "minimum": 1,
+              "maximum": 3,
+              "description": "The motor's number actuating the laser shutter"
+            }
+          }
+        },
+        {
+          "required": ["motor"]
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "probe.schema.json"
     }
   ],
   "required": ["type"]
