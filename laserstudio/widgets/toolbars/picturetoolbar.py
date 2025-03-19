@@ -42,7 +42,9 @@ class PictureToolbar(QToolBar):
         # Button to clear background picture.
         w = QPushButton(self)
         w.setToolTip("Clear background picture")
-        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
+        w.setIcon(
+            QIcon(colored_image(":/icons/fontawesome-free/image-regular-clear.svg"))
+        )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(lambda: laser_studio.viewer.clear_picture())
         self.addWidget(w)
@@ -50,7 +52,9 @@ class PictureToolbar(QToolBar):
         # Button to select set current image as background.
         w = QPushButton(self)
         w.setToolTip("Set current image as background")
-        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
+        w.setIcon(
+            QIcon(colored_image(":/icons/fontawesome-free/image-regular-camera.svg"))
+        )
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(lambda: laser_studio.viewer.snap_picture_from_camera())
         self.addWidget(w)
