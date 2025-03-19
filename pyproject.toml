@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Security",
     "Topic :: System :: Hardware",
 ]
-dependencies=[
+dependencies = [
     "pyqt6",
     "pystages>=1.2",
     "pillow>=10.4.0",
@@ -31,7 +31,8 @@ dependencies=[
     "flask-restx",
     "hidapi>=0.14.0",
     "colorama",
-    "donjon_hyshlr"
+    "donjon_hyshlr",
+    "pylmscontroller",
 ]
 requires-python = ">=3.9,<3.13"
 
