@@ -102,7 +102,11 @@ class CameraInstrument(Instrument):
         max = numpy.iinfo(image.dtype).max
         type_ = image.dtype
         image = image - self.black_level * max
-        image = image / (self.white_level - self.black_level)
+        image = (
+            image / (self.white_level - self.black_level)
+            if self.white_level - self.black_level != 0
+            else image
+        )
         return image.clip(0, max).astype(type_)
 
     def compute_histogram(self, frame: numpy.ndarray):
