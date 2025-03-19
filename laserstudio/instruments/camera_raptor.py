@@ -508,6 +508,43 @@ class CameraRaptorInstrument(CameraUSBInstrument):
 
     temperature_changed = pyqtSignal(float)
 
+    def get_tec_temperature_setpoint(self) -> float:
+        """
+        12 bit DAC value, LSB = LL byte, Lower nibble of
+        MM = MSBs
+        Reg 0xFB, bits 3..0 = set point bits 11..8
+        Reg 0xFA, bits 7..0 = set point bits 7..0
+        12 bit value to be converted to temperature from
+        DAC calibration values (see " Get manufacturers
+        Data")
+        """
+        dac_count = self.read_raptor_register(0xFB) * 256 + self.read_raptor_register(
+            0xFA
+        )
+        manufacturers_data = self.manufacturers_data
+        if manufacturers_data is None:
+            manufacturers_data = self.get_manufacturers_data()
+        temperature = (
+            (dac_count - manufacturers_data.dac_cal_0_deg)
+            * (40 - 0)
+            / (manufacturers_data.dac_cal_40_deg - manufacturers_data.dac_cal_0_deg)
+        )
+        return temperature
+
+    def set_tec_temperature_setpoint(self, value: float):
+        manufacturers_data = self.manufacturers_data
+        if manufacturers_data is None:
+            manufacturers_data = self.get_manufacturers_data()
+
+        dac_count = int(
+            (value - 0)
+            * (manufacturers_data.dac_cal_40_deg - manufacturers_data.dac_cal_0_deg)
+            / (40 - 0)
+            + manufacturers_data.dac_cal_0_deg
+        )
+        self.write_raptor_register(0xFB, (dac_count >> 8) & 0x0F)
+        self.write_raptor_register(0xFA, dac_count & 0xFF)
+
     def get_sensor_temperature(self) -> float:
         """
         Reg 6E, bits 3..0 = temp bits 11..8
