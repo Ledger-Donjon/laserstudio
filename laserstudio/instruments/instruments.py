@@ -5,6 +5,7 @@ from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
 from .light import LightInstrument
+from .hayashilight import HayashiLRInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
@@ -101,8 +102,16 @@ class Instruments:
         self.light: Optional[LightInstrument] = None
         light_config = config.get("ligth", None)
         if light_config is not None and light_config.get("enable", True):
+            device_type = light_config.get("type")
             try:
-                self.light = LightInstrument(light_config)
+                if device_type == "Hayashi":
+                    self.light = HayashiLRInstrument(light_config)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Lighting system type {device_type}. Skipping device."
+                    )
+                    raise
+
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
                     f"Lighting system is enabled but device could not be created: {str(e)}... Skipping."
