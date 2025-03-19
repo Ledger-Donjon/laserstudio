@@ -8,7 +8,14 @@
       "$ref": "hayashi.schema.json"
     },
     {
-      "$ref": "lmscontroller.schema.json"
+      "allOf": [
+        {
+          "$ref": "lmscontroller.schema.json"
+        },
+        {
+          "description": "Lighting sytem by ALPhANOV."
+        }
+      ]
     }
   ],
   "description": "Lighting instrument.",

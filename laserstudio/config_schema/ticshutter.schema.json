@@ -1,21 +1,19 @@
 {
-  "$id": "lmscontroller.schema.json",
+  "$id": "ticshutter.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ALPhANOV LMS Controller",
+  "title": "TIC",
   "type": "object",
   "allOf": [
     {
       "properties": {
         "type": {
-          "const": "LMSController"
+          "const": "TIC"
         }
       }
     },
     {
       "$ref": "instrument.schema.json"
-    },
-    {
-      "$ref": "serial.schema.json"
     }
-  ]
+  ],
+  "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
 }

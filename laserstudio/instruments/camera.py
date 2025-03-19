@@ -4,7 +4,8 @@ from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
-from .shutter import ShutterInstrument
+from .shutter import ShutterInstrument, TicShutterInstrument
+from .lmscontroller import LMSControllerInstrument
 import logging
 
 
@@ -46,7 +47,14 @@ class CameraInstrument(Instrument):
         self.shutter: Optional[ShutterInstrument] = None
         if type(shutter) is dict and shutter.get("enable", True):
             try:
-                self.shutter = ShutterInstrument(shutter)
+                if (device_type := shutter.get("type")) == "TIC":
+                    self.shutter = TicShutterInstrument(shutter)
+                elif device_type == "LMSController":
+                    self.shutter = LMSControllerInstrument(config)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Shutter type {device_type}. Skipping device."
+                    )
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."

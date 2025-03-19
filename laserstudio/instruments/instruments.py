@@ -6,6 +6,7 @@ from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
 from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
+from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
@@ -106,6 +107,8 @@ class Instruments:
             try:
                 if device_type == "Hayashi":
                     self.light = HayashiLRInstrument(light_config)
+                elif device_type == "LMSController":
+                    self.light = LMSControllerInstrument(light_config)
                 else:
                     logging.getLogger("laserstudio").error(
                         f"Unknown Lighting system type {device_type}. Skipping device."
