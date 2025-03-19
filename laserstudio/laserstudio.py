@@ -26,6 +26,7 @@ from .widgets.toolbars import (
     LaserDriverToolbar,
     CameraNITToolBar,
     CameraRaptorToolBar,
+    PhotoEmissionToolbar,
     HayashiLightToolbar,
 )
 import yaml
@@ -101,6 +102,8 @@ class LaserStudio(QMainWindow):
         # Toolbar: Raptor Camera Image control
         if isinstance(self.instruments.camera, CameraRaptorInstrument):
             toolbar = CameraRaptorToolBar(self)
+            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            toolbar = PhotoEmissionToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
         # Toolbar: Camera Image control
         elif self.instruments.camera is not None:
