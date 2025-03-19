@@ -128,6 +128,12 @@ class CameraInstrument(Instrument):
             hists.append("".join(bar[i] for i in val))
         return hists[::-1]
 
+    def levels_to_string(self):
+        white_pos = int(150 * self.white_level)
+        black_pos = int(150 * self.black_level)
+
+        return " " * black_pos + "^", " " * white_pos + "^"
+
     @property
     def yaml(self) -> dict:
         """Export settings to a dict for yaml serialization."""
