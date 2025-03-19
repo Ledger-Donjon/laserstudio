@@ -10,7 +10,7 @@ from .instruments.instruments import (
     PDMInstrument,
     LaserDriverInstrument,
     CameraNITInstrument,
-    HayashiLRInstrument,
+    LightInstrument,
 )
 from .instruments.stage import Vector
 from .widgets.toolbars import (
@@ -24,7 +24,7 @@ from .widgets.toolbars import (
     PDMToolbar,
     LaserDriverToolbar,
     CameraNITToolBar,
-    HayashiLightToolbar,
+    LightToolbar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -119,9 +119,9 @@ class LaserStudio(QMainWindow):
                 continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
-        # Hayashi Light toolbar
-        if isinstance(self.instruments.hayashi_light, HayashiLRInstrument):
-            toolbar = HayashiLightToolbar(self.instruments.hayashi_light)
+        # Light toolbar
+        if isinstance(self.instruments.light, LightInstrument):
+            toolbar = LightToolbar(self.instruments.light)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception

@@ -1,10 +1,10 @@
 from hyshlr import HyshLR, NoDongleError, MultipleDongleError
-from .instrument import Instrument
+from .light import LightInstrument
 from .list_serials import get_serial_device
 import logging
 
 
-class HayashiLRInstrument(Instrument):
+class HayashiLRInstrument(LightInstrument):
     def __init__(self, config: dict):
         super().__init__(config=config)
         self.label = config.get("label", "Hayashi Light")

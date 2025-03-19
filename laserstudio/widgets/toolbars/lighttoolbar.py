@@ -4,18 +4,19 @@ from PyQt6.QtGui import QIcon, QPixmap
 from ...utils.util import colored_image
 from ...utils.colors import LedgerColors
 
+from ...instruments.light import LightInstrument
 from ...instruments.hayashilight import HayashiLRInstrument
 
 
-class HayashiLightToolbar(QToolBar):
-    def __init__(self, hyshlr: HayashiLRInstrument):
+class LightToolbar(QToolBar):
+    def __init__(self, light: LightInstrument):
         """
-        :param hyshlr: Hayashi Light instrument to be controlled by the toolbar.
+        :param light: Light instrument to be controlled by the toolbar.
         """
-        self.hyshlr = hyshlr
+        self.light = light
 
-        super().__init__(hyshlr.label)
-        self.setObjectName("toolbar-hayashi-light")  # For settings save and restore
+        super().__init__(light.label)
+        self.setObjectName("toolbar-light")  # For settings save and restore
 
         self.setAllowedAreas(Qt.ToolBarArea.AllToolBarAreas)
         self.setFloatable(True)
@@ -49,7 +50,7 @@ class HayashiLightToolbar(QToolBar):
         )
         w.setIcon(icon)
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(lambda b: self.hyshlr.hyslr.__setattr__("lamp", b))
+        w.toggled.connect(lambda b: self.light.__setattr__("lamp_enabled", b))
         hbox.addWidget(w)
 
         w = QSlider(Qt.Orientation.Horizontal, self)
@@ -58,11 +59,12 @@ class HayashiLightToolbar(QToolBar):
         w.setToolTip("Intensity of the light")
         w.setSingleStep(10)
         w.valueChanged.connect(
-            lambda v: self.hyshlr.hyslr.__setattr__("intensity", float(v) / 100.0)
+            lambda v: self.light.__setattr__("intensity", float(v) / 100.0)
         )
         hbox.addWidget(w)
 
-        w = self.label_burnout = QLabel("Lamp burnout!")
-        w.setStyleSheet("color: red")
-        w.setVisible(self.hyshlr.hyslr.burnout)
-        self.addWidget(w)
+        if type(light) is HayashiLRInstrument:
+            w = self.label_burnout = QLabel("Lamp burnout!")
+            w.setStyleSheet("color: red")
+            w.setVisible(light.hyslr.burnout)
+            self.addWidget(w)

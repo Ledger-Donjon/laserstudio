@@ -4,7 +4,7 @@ from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
-from .hayashilight import HayashiLRInstrument
+from .light import LightInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
@@ -97,15 +97,15 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
-        # Hayashi Light Remote
-        self.hayashi_light: Optional[HayashiLRInstrument] = None
-        hayashi_config = config.get("hayashi", None)
-        if hayashi_config is not None and hayashi_config.get("enable", True):
+        # Lighting system
+        self.light: Optional[LightInstrument] = None
+        light_config = config.get("ligth", None)
+        if light_config is not None and light_config.get("enable", True):
             try:
-                self.hayashi_light = HayashiLRInstrument(hayashi_config)
+                self.light = LightInstrument(light_config)
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
-                    f"Hayashi Light Remote is enabled but device could not be created: {str(e)}... Skipping."
+                    f"Lighting system is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
     def go_next(self) -> dict[str, Any]:
