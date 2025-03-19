@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSlider,
     QLabel,
+    QDoubleSpinBox,
 )
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
@@ -123,9 +124,12 @@ class CameraToolbar(QToolBar):
             # self.addWidget(w)
             grid.addWidget(w, 4, 1, 1, 2)
 
+        # Add stretch of last row
+        grid.setRowStretch(5, 1)
+
         self.image_dialog = QDialog()
         self.image_dialog.setWindowTitle("Image Adjustment")
-        self.image_dialog.setObjectName("image_adjustment")
+        self.image_dialog.setObjectName("image-adjustment")
 
         w = QPushButton()
         w.setToolTip(self.image_dialog.windowTitle())
@@ -173,6 +177,7 @@ class CameraToolbar(QToolBar):
         grid.addWidget(w, i + 1, 1)
 
         # Image levels adjustment
+        # Add a slider to set the black level
         grid.addWidget(QLabel("Black Level:"), i + 2, 0)
         self.black_level_slider = QSlider(Qt.Orientation.Horizontal)
         self.black_level_slider.setMinimum(0)
@@ -181,6 +186,17 @@ class CameraToolbar(QToolBar):
         self.black_level_slider.valueChanged.connect(self.update_levels)
         grid.addWidget(self.black_level_slider, i + 2, 1)
 
+        # Add a double spinbox to set the black level
+        self.black_level_sb = QDoubleSpinBox()
+        self.black_level_sb.setRange(0, 100)
+        self.black_level_sb.setDecimals(2)
+        self.black_level_sb.setValue(self.camera.black_level * 100)
+        self.black_level_sb.valueChanged.connect(
+            lambda x: self.update_levels(black=x / 100)
+        )
+        grid.addWidget(self.black_level_sb, i + 2, 2)
+
+        # Add a slider to set the white level
         grid.addWidget(QLabel("White Level:"), i + 3, 0)
         self.white_level_slider = QSlider(Qt.Orientation.Horizontal)
         self.white_level_slider.setMinimum(0)
@@ -189,14 +205,40 @@ class CameraToolbar(QToolBar):
         self.white_level_slider.valueChanged.connect(self.update_levels)
         grid.addWidget(self.white_level_slider, i + 3, 1)
 
+        # Add a double spinbox to set the white level
+        self.white_level_sb = QDoubleSpinBox()
+        self.white_level_sb.setRange(0, 100)
+        self.white_level_sb.setDecimals(2)
+        self.white_level_sb.setValue(self.camera.white_level * 100)
+        self.white_level_sb.valueChanged.connect(
+            lambda x: self.update_levels(white=x / 100)
+        )
+        grid.addWidget(self.white_level_sb, i + 3, 2)
+
         self.image_dialog.setLayout(grid)
         self.image_dialog.setModal(False)
         self.image_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
-    def update_levels(self):
-        self.camera.black_level = (
-            self.black_level_slider.value() / self.black_level_slider.maximum()
-        )
-        self.camera.white_level = (
-            self.white_level_slider.value() / self.white_level_slider.maximum()
-        )
+    def update_levels(self, black=None, white=None):
+        if black is None:
+            black = self.black_level_slider.value() / self.black_level_slider.maximum()
+        if white is None:
+            white = self.white_level_slider.value() / self.white_level_slider.maximum()
+
+        self.black_level_slider.blockSignals(True)
+        self.white_level_slider.blockSignals(True)
+        self.white_level_sb.blockSignals(True)
+        self.black_level_sb.blockSignals(True)
+
+        self.black_level_sb.setValue(black * 100)
+        self.white_level_sb.setValue(white * 100)
+        self.white_level_slider.setValue(int(white * 255))
+        self.black_level_slider.setValue(int(black * 255))
+
+        self.black_level_slider.blockSignals(False)
+        self.white_level_slider.blockSignals(False)
+        self.white_level_sb.blockSignals(False)
+        self.black_level_sb.blockSignals(False)
+
+        self.camera.black_level = black
+        self.camera.white_level = white
