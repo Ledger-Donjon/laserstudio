@@ -198,9 +198,8 @@ class LaserStudio(QMainWindow):
         Triggers the viewer to perform changes to go to next step of scan.
         """
         v = {}
-        if self.scanning_enabled:
-            v.update(self.instruments.go_next())
-            v.update(self.viewer.go_next())
+        v.update(self.instruments.go_next())
+        v.update(self.viewer.go_next())
         return v
 
     def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:

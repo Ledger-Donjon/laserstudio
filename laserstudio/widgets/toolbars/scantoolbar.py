@@ -40,9 +40,9 @@ class ScanToolbar(QToolBar):
         w.clicked.connect(laser_studio.handle_go_next)
         self.addWidget(w)
 
-        # Scanning enable/disable button
+        # Scanning from LSAPI enable/disable button
         w = ColoredPushButton(":/icons/no-scan.svg", ":/icons/scan.svg", parent=self)
-        w.setToolTip("Enable/Disable scanning")
+        w.setToolTip("Enable or block the go_next commands from LSAPI.")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         w.setChecked(laser_studio.scanning_enabled)
