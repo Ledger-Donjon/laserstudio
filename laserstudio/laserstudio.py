@@ -46,6 +46,9 @@ class LaserStudio(QMainWindow):
         # Configuration file
         self.config = config
 
+        # Permits for the user to deactivate temporarly the go_next effect
+        self.scanning_enabled = True
+
         # User settings
         self.settings = QSettings("ledger", "laserstudio")
 
@@ -195,8 +198,9 @@ class LaserStudio(QMainWindow):
         Triggers the viewer to perform changes to go to next step of scan.
         """
         v = {}
-        v.update(self.instruments.go_next())
-        v.update(self.viewer.go_next())
+        if self.scanning_enabled:
+            v.update(self.instruments.go_next())
+            v.update(self.viewer.go_next())
         return v
 
     def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:
