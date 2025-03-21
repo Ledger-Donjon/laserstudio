@@ -10,9 +10,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
 )
 from PyQt6.QtCore import Qt
-from ...instruments.camera_raptor import (
-    CameraRaptorInstrument,
-)
+from ...instruments.camera import CameraInstrument
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -30,7 +28,7 @@ class PhotoEmissionToolbar(QToolBar):
             | Qt.ToolBarArea.BottomToolBarArea
         )
         self.setFloatable(True)
-        assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
+        assert isinstance(laser_studio.instruments.camera, CameraInstrument)
         self.camera = laser_studio.instruments.camera
 
         w = QWidget()

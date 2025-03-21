@@ -58,8 +58,28 @@ class CameraInstrument(Instrument):
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
+        # Whtie and black levels adjustment
         self.black_level = 0.0
         self.white_level = 1.0
+
+        # Image averaging
+        self._last_frame_accumulator: numpy.ndarray = numpy.zeros(
+            self.width * self.height, dtype=numpy.uint64
+        )
+        # The number of images to average
+        self._image_averaging = 1
+        # The number of images that have been averaged
+        self.number_of_averaged_images = 0
+
+        # Window averaging makes to store all averaged image to make a 'rotating' average
+        # When the number of images to average is hit, and a new frame is retrieved,
+        # the oldest one is removed from the accumulator and the new one is added.
+        self.windowed_averaging = True
+        self._last_frames: list[numpy.ndarray] = [
+            numpy.zeros(self.width * self.height, dtype=numpy.uint16)
+        ] * self._image_averaging
+
+        self.show_negative_values = True
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
@@ -96,6 +116,65 @@ class CameraInstrument(Instrument):
             color_mode is data from PIL.Image module.
         """
         return self.width, self.height, "L", None
+
+    @property
+    def image_averaging(self) -> int:
+        """
+        Returns the number of images that must be averaged.
+        """
+        return self._image_averaging
+
+    @image_averaging.setter
+    def image_averaging(self, value: int):
+        """
+        Sets the number of images that must be averaged.
+        """
+        if self.windowed_averaging:
+            if len(self._last_frames) > value:
+                # Drop the oldest frames (at the begining of the array)
+                to_substract = self._last_frames[: len(self._last_frames) - value]
+                self._last_frames = self._last_frames[len(self._last_frames) - value :]
+                self._last_frame_accumulator -= sum(to_substract)
+                self.number_of_averaged_images -= len(to_substract)
+        else:
+            self.clear_averaged_images()
+
+        self._image_averaging = value
+
+    def clear_averaged_images(self):
+        """
+        Clears the list of averaged images.
+        """
+        self._last_frames = []
+        self._last_frame_accumulator = numpy.zeros(
+            self.width * self.height, dtype=numpy.uint64
+        )
+        self.number_of_averaged_images = 0
+
+    def accumulate_frame(self, new_frame: numpy.ndarray):
+        """
+        Accumulates the given frame and removes the oldest one
+          if windowed averaging is active.
+        """
+        if not self.windowed_averaging:
+            if self.number_of_averaged_images == self._image_averaging:
+                # Discarding the new frame from accumulation
+                return
+        if self._image_averaging == self.number_of_averaged_images:
+            # The list is full, we can remove the oldest frame
+            self._last_frame_accumulator -= self._last_frames.pop(0)
+            self.number_of_averaged_images -= 1
+        # Add the new frame in the accumulator and the list
+        self._last_frames.append(new_frame)
+        self._last_frame_accumulator += new_frame
+        self.number_of_averaged_images += 1
+
+    @property
+    def average_count(self) -> int:
+        """
+        Returns the number of images that have been averaged.
+        """
+        return self.number_of_averaged_images
 
     def apply_levels(self, image: numpy.ndarray) -> numpy.ndarray:
         """
@@ -138,6 +217,79 @@ class CameraInstrument(Instrument):
         black_pos = int(150 * self.black_level)
 
         return " " * black_pos + "^", " " * white_pos + "^"
+
+    def take_reference_image(self, do_take: bool):
+        """
+        Take a reference image to substract from the next frames.
+        """
+        if do_take:
+            self.reference_image_accumulator = self._last_frame_accumulator.copy()
+        else:
+            self.reference_image_accumulator = None
+
+    def substract_reference_image(
+        self,
+    ) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
+        """Substract the reference_image_accumulator from the current accumulator"""
+        if self.reference_image_accumulator is None:
+            """The reference image is not yet defined"""
+            self._last_pos = self._last_frame_accumulator
+            self._last_neg = None
+        else:
+            self._last_pos = (
+                (self._last_frame_accumulator - self.reference_image_accumulator)
+                .astype(numpy.int64)
+                .clip(0)
+                .astype(numpy.uint64)
+            )
+            self._last_neg = (
+                (self.reference_image_accumulator - self._last_frame_accumulator)
+                .astype(numpy.int64)
+                .clip(0)
+                .astype(numpy.uint64)
+            )
+        return self._last_pos, self._last_neg
+
+    @property
+    def last_frame(self) -> numpy.ndarray:
+        """
+        Return the frame that should be analysed by histogram computation
+        """
+        pos = self._last_pos
+        neg = self._last_neg
+        return self.construct_display_image(pos, neg)
+
+    def construct_display_image(
+        self, pos: numpy.ndarray, neg: Optional[numpy.ndarray]
+    ) -> numpy.ndarray:
+        """
+        Construct the display image from the positive and negative images.
+        """
+        pos_16 = (
+            (pos * (4.0 / self.average_count))
+            .clip(
+                min=numpy.iinfo(numpy.uint16).min,
+                max=numpy.iinfo(numpy.uint16).max,
+            )
+            .astype(numpy.uint16)
+        )
+        if neg is None:
+            return pos_16
+
+        neg_16 = (
+            (neg * (4.0 / self.average_count))
+            .clip(
+                min=numpy.iinfo(numpy.uint16).min,
+                max=numpy.iinfo(numpy.uint16).max,
+            )
+            .astype(numpy.uint16)
+        )
+        zer_16 = numpy.zeros((self.height, self.width, 1), dtype=numpy.uint16)
+        pos_16 = pos_16.reshape(zer_16.shape)
+        neg_16 = neg_16.reshape(zer_16.shape)
+        stacked = numpy.stack([neg_16, pos_16, zer_16], axis=2)
+
+        return stacked.astype(numpy.uint8).reshape(self.height * self.width * 3)
 
     @property
     def yaml(self) -> dict:
