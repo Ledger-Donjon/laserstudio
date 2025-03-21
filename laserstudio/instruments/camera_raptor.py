@@ -303,35 +303,33 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         )
         self.number_of_averaged_images = 0
 
-    @property
-    def last_frame(self) -> numpy.ndarray:
-        """
-        Return the frame that should be analysed by histogram computation
-        And presented to the user
-        """
-        
-        # return (
-
-        #     ((self._last_frame_accumulator * 4) / self.average_count)
-        #     .clip(
-        #         min=numpy.iinfo(numpy.uint16).min,
-        #         max=numpy.iinfo(numpy.uint16).max,
-        #     )
-        #     .astype(numpy.uint16)
-        # )
+    # @property
+    # def last_frame(self) -> numpy.ndarray:
+    #     """
+    #     Return the frame that should be analysed by histogram computation
+    #     """
+    #     return (
+    #         ((self._last_frame_accumulator * 4) / self.average_count)
+    #         .clip(
+    #             min=numpy.iinfo(numpy.uint16).min,
+    #             max=numpy.iinfo(numpy.uint16).max,
+    #         )
+    #         .astype(numpy.uint16)
+    #     )
 
     def accumulate_frame(self, new_frame: numpy.ndarray):
         """
         Accumulates the given frame and removes the oldest one
           if windowed averaging is active.
         """
-        if self.windowed_averaging:
+        if not self.windowed_averaging:
             if self.number_of_averaged_images == self._image_averaging:
                 # Discarding the new frame from accumulation
                 return
         if self._image_averaging == self.number_of_averaged_images:
             # The list is full, we can remove the oldest frame
             self._last_frame_accumulator -= self._last_frames.pop(0)
+            self.number_of_averaged_images -= 1
         # Add the new frame in the accumulator and the list
         self._last_frames.append(new_frame)
         self._last_frame_accumulator += new_frame
@@ -357,19 +355,24 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         frame = numpy.reshape(frame, (-1,))
         # Frame number is present in the data
         number = frame[0:8]
-        self.last_frame_number = number.view(numpy.uint64)[0]
+        self.last_frame_number = number.view(numpy.uint32)[0]
         # Remove the 8 first bytes (containing the frame number)
         frame = frame[8:]
         # Interpret as 16 bits array
         frame = frame.view(numpy.uint16).copy()
         # Add 0s to the end to compensate the values that were removed for frame number
-        frame.resize(self.width * self.height)
+        frame = numpy.resize(frame, self.width * self.height)
         # Put the frame in the accumulator
         self.accumulate_frame(frame)
         # Apply the subtraction of reference image
-        self.substract_reference_image()
+        pos, neg = self.substract_reference_image()
+
         # Apply levels
-        frame = self.apply_levels(self.last_frame)
+        pos = self.apply_levels(pos)
+        if neg is not None:
+            neg = self.apply_levels(neg)
+
+        frame = self.construct_display_image(pos, neg)
         if frame.dtype == numpy.uint16:
             frame_bytes = frame.byteswap().tobytes()
             mode = "I;16"
@@ -383,6 +386,47 @@ class CameraRaptorInstrument(CameraUSBInstrument):
             mode,
             frame_bytes,
         )
+
+    @property
+    def last_frame(self) -> numpy.ndarray:
+        """
+        Return the frame that should be analysed by histogram computation
+        """
+        pos = self._last_pos
+        neg = self._last_neg
+        return self.construct_display_image(pos, neg)
+
+    def construct_display_image(self, pos: numpy.ndarray, neg) -> numpy.ndarray:
+        """
+        Construct the display image from the positive and negative images.
+        """
+        pos_16 = (
+            (pos * (4.0 / self.average_count))
+            .clip(
+                min=numpy.iinfo(numpy.uint16).min,
+                max=numpy.iinfo(numpy.uint16).max,
+            )
+            .astype(numpy.uint16)
+        )
+        if neg is None:
+            return pos_16
+
+        neg_16 = (
+            (neg * (4.0 / self.average_count))
+            .clip(
+                min=numpy.iinfo(numpy.uint16).min,
+                max=numpy.iinfo(numpy.uint16).max,
+            )
+            .astype(numpy.uint16)
+        )
+        zer_16 = numpy.zeros((self.height, self.width, 1), dtype=numpy.uint16)
+        pos_16 = pos_16.reshape(zer_16.shape)
+        neg_16 = neg_16.reshape(zer_16.shape)
+        stacked = numpy.stack([neg_16, pos_16, zer_16], axis=2)
+
+        stacked = stacked >> 4
+        # 8 bits per pixel
+        return stacked.astype(numpy.uint8).reshape(self.height * self.width * 3)
 
     def get_micro_version(self) -> tuple[int, int]:
         """
@@ -625,12 +669,14 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         else:
             self.reference_image_accumulator = None
 
-    def substract_reference_image(self) -> tuple[numpy.ndarray, numpy.ndarray]:
+    def substract_reference_image(
+        self,
+    ) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
         """Substract the reference_image_accumulator from the current accumulator"""
         if self.reference_image_accumulator is None:
             """The reference image is not yet defined"""
-            self._last_pos = self._last_frame_accumulator.copy()
-            self._last_neg = numpy.zeros(self.width * self.height, dtype=numpy.uint64)
+            self._last_pos = self._last_frame_accumulator
+            self._last_neg = None
         else:
             self._last_pos = (
                 (self._last_frame_accumulator - self.reference_image_accumulator)
