@@ -1,4 +1,4 @@
-from pylmscontroller import LMSController, MotorState
+from pylmscontroller import LMSController, MotorState, ControlMode
 from .shutter import ShutterInstrument
 from .light import LightInstrument
 from .list_serials import get_serial_device
@@ -26,6 +26,10 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
         self.motor = cast(int, config.get("motor", 1))
         assert self.motor in (1, 2, 3), "Motor index must be 1, 2, or 3"
 
+        self.lms.motors_control_mode = ControlMode.SOFTWARE
+        self.lms.led_control = ControlMode.SOFTWARE
+        self.lms.apply()
+
     # Shutter operations
     @property
     def open(self):
@@ -33,7 +37,9 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
 
     @open.setter
     def open(self, value: bool):
-        super().open = value
+        super(LMSControllerInstrument, type(self)).open.fset(self, value)
+        # k = super(LMSControllerInstrument)
+        # super(ShutterInstrument, self).open = value
         state = MotorState.SLIDE_IN if value else MotorState.SLIDE_OUT
         if self.motor == 1:
             self.lms.motor_1_position = state
@@ -41,6 +47,7 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
             self.lms.motor_2_position = state
         elif self.motor == 3:
             self.lms.motor_3_position = state
+        self.lms.apply()
 
     # Light operations
     @property
@@ -50,6 +57,7 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     @light.setter
     def light(self, value: bool):
         self.lms.led_activation = value
+        self.lms.apply()
 
     @property
     def intensity(self):
@@ -58,3 +66,9 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     @intensity.setter
     def intensity(self, value: float):
         self.lms.led_current = value * self.lms.MAX_IR_LED_CURRENT
+        self.lms.apply()
+
+    def __del__(self):
+        self.lms.led_control = ControlMode.MANUAL
+        self.lms.motors_control_mode = ControlMode.MANUAL
+        self.lms.apply()
