@@ -11,7 +11,6 @@ from .instruments.instruments import (
     LaserDriverInstrument,
     CameraNITInstrument,
     CameraRaptorInstrument,
-    HayashiLRInstrument,
     LightInstrument,
 )
 from .instruments.stage import Vector
@@ -28,7 +27,6 @@ from .widgets.toolbars import (
     CameraNITToolBar,
     CameraRaptorToolBar,
     PhotoEmissionToolbar,
-    HayashiLightToolbar,
     LightToolbar,
 )
 import yaml

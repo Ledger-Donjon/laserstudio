@@ -226,19 +226,19 @@ class CameraToolbar(QToolBar):
             white = self.white_level_slider.value() / self.white_level_slider.maximum()
 
         self.black_level_slider.blockSignals(True)
+        self.black_level_sb.blockSignals(True)
         self.white_level_slider.blockSignals(True)
         self.white_level_sb.blockSignals(True)
-        self.black_level_sb.blockSignals(True)
 
         self.black_level_sb.setValue(black * 100)
         self.white_level_sb.setValue(white * 100)
-        self.white_level_slider.setValue(int(white * 255))
         self.black_level_slider.setValue(int(black * 255))
+        self.white_level_slider.setValue(int(white * 255))
 
         self.black_level_slider.blockSignals(False)
+        self.black_level_sb.blockSignals(False)
         self.white_level_slider.blockSignals(False)
         self.white_level_sb.blockSignals(False)
-        self.black_level_sb.blockSignals(False)
 
         self.camera.black_level = black
         self.camera.white_level = white

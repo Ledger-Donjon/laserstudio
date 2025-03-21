@@ -39,9 +39,9 @@ class PhotoEmissionToolbar(QToolBar):
         w.setLayout(vbox)
 
         # Button to take a black image
-        w = QPushButton("Take Black Image")
+        w = QPushButton("Take Reference image")
         w.setCheckable(True)
-        w.setToolTip("Take a black image")
+        w.setToolTip("Take a Reference image")
         vbox.addWidget(w)
         w.toggled.connect(self.camera.take_reference_image)
 
@@ -54,7 +54,7 @@ class PhotoEmissionToolbar(QToolBar):
         hbox.addWidget(w)
         w = QSpinBox()
         w.setToolTip("Number of images to average")
-        w.setRange(1, 500)
+        w.setRange(1, 36000)
         w.setValue(self.camera.image_averaging)
         w.valueChanged.connect(lambda v: self.camera.__setattr__("image_averaging", v))
         hbox.addWidget(w)

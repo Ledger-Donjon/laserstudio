@@ -204,5 +204,5 @@ class CameraRaptorToolBar(CameraToolbar):
         for hist in hists[1:-1]:
             print("|" + hist + "|")
         print("⸤" + hists[-1] + "⸥")
-        print("⚫️" + levels[0])
-        print("⚪️" + levels[1])
+        print("B" + levels[0])
+        print("W" + levels[1])
