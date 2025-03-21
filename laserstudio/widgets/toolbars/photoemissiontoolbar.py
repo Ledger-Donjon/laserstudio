@@ -86,4 +86,16 @@ class PhotoEmissionToolbar(QToolBar):
         w.toggled.connect(lambda x: self.camera.__setattr__("show_negative_values", x))
         vbox.addWidget(w)
 
+        # Checkbox to activate single-mode averaging
+        w = QCheckBox("Window mode averaging")
+        w.setToolTip(
+            "Makes the averaging to be on a rotating window (risk to store too much data)."
+            "On non-rotating window mode, the image aquisition stops after the limit being achieved."
+            "Trigger a new averaging session with the Clear button."
+        )
+        w.setCheckable(True)
+        w.setChecked(self.camera.windowed_averaging)
+        w.toggled.connect(lambda x: self.camera.__setattr__("windowed_averaging", x))
+        vbox.addWidget(w)
+
         vbox.addStretch()
