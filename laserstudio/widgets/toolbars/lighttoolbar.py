@@ -1,11 +1,10 @@
-from PyQt6.QtWidgets import QPushButton, QToolBar, QSlider, QHBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QToolBar, QSlider, QHBoxLayout, QWidget, QLabel
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QPixmap
-from ...utils.util import colored_image
 from ...utils.colors import LedgerColors
-
+from ..coloredbutton import ColoredPushButton
 from ...instruments.light import LightInstrument
 from ...instruments.hayashilight import HayashiLRInstrument
+from ...instruments.lmscontroller import LMSControllerInstrument
 
 
 class LightToolbar(QToolBar):
@@ -27,35 +26,20 @@ class LightToolbar(QToolBar):
         w.setLayout(hbox)
         self.addWidget(w)
 
-        w = QPushButton(self)
-
+        w = ColoredPushButton(
+            icon_path=":/icons/fontawesome-free/lightbulb-regular.svg",
+            color=LedgerColors.SafetyOrange,
+        )
         w.setToolTip("On/Off Light")
         w.setCheckable(True)
-        w.setChecked(False)
-        icon = QIcon()
-        icon.addPixmap(
-            QPixmap(
-                colored_image(
-                    ":/icons/fontawesome-free/lightbulb-regular.svg",
-                    LedgerColors.SafetyOrange,
-                )
-            ),
-            QIcon.Mode.Normal,
-            QIcon.State.On,
-        )
-        icon.addPixmap(
-            QPixmap(colored_image(":/icons/fontawesome-free/lightbulb-regular.svg")),
-            QIcon.Mode.Normal,
-            QIcon.State.Off,
-        )
-        w.setIcon(icon)
+        w.setChecked(self.light.light)
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(lambda b: self.light.__setattr__("lamp_enabled", b))
+        w.toggled.connect(lambda b: self.light.__setattr__("light", b))
         hbox.addWidget(w)
 
         w = QSlider(Qt.Orientation.Horizontal, self)
         w.setRange(0, 100)
-        w.setValue(0)
+        w.setValue(int(self.light.intensity * 100))
         w.setToolTip("Intensity of the light")
         w.setSingleStep(10)
         w.valueChanged.connect(
@@ -68,3 +52,18 @@ class LightToolbar(QToolBar):
             w.setStyleSheet("color: red")
             w.setVisible(light.hyslr.burnout)
             self.addWidget(w)
+
+        if type(light) is LMSControllerInstrument:
+            w = ColoredPushButton(
+                ":/icons/shutter-closed.svg", ":/icons/shutter-closed.svg"
+            )
+            w.setToolTip("Open/Close shutter")
+            w.setCheckable(True)
+            w.setChecked(False)
+            w.setIconSize(QSize(24, 24))
+            w.toggled.connect(self.open_shutter)
+            hbox.addWidget(w)
+
+    def open_shutter(self, b):
+        if type(self.light) is LMSControllerInstrument:
+            self.light.open = b
