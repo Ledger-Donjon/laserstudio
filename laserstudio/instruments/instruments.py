@@ -5,7 +5,9 @@ from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
 from .camera_raptor import CameraRaptorInstrument
+from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
+from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
@@ -102,15 +104,25 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
-        # Hayashi Light Remote
-        self.hayashi_light: Optional[HayashiLRInstrument] = None
-        hayashi_config = config.get("hayashi", None)
-        if hayashi_config is not None and hayashi_config.get("enable", True):
+        # Lighting system
+        self.light: Optional[LightInstrument] = None
+        light_config = config.get("lighting", None)
+        if light_config is not None and light_config.get("enable", True):
+            device_type = light_config.get("type")
             try:
-                self.hayashi_light = HayashiLRInstrument(hayashi_config)
+                if device_type == "Hayashi":
+                    self.light = HayashiLRInstrument(light_config)
+                elif device_type == "LMSController":
+                    self.light = LMSControllerInstrument(light_config)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Lighting system type {device_type}. Skipping device."
+                    )
+                    raise
+
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
-                    f"Hayashi Light Remote is enabled but device could not be created: {str(e)}... Skipping."
+                    f"Lighting system is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
     def go_next(self) -> dict[str, Any]:

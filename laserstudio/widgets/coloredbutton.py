@@ -10,6 +10,7 @@ class ColoredPushButton(QPushButton):
     def __init__(
         self,
         icon_path: str,
+        pushed_icon_path: Optional[str] = None,
         color: Union[
             QColor, Qt.GlobalColor, int, LedgerColors
         ] = LedgerColors.SafetyOrange,
@@ -17,7 +18,7 @@ class ColoredPushButton(QPushButton):
     ):
         super().__init__(parent)
         self.normal_pixmap = colored_image(icon_path)
-        self.colored_pixmap = colored_image(icon_path, color=color)
+        self.colored_pixmap = colored_image(pushed_icon_path or icon_path, color=color)
         icon = QIcon()
         icon.addPixmap(self.normal_pixmap, QIcon.Mode.Normal, QIcon.State.Off)
         icon.addPixmap(self.colored_pixmap, QIcon.Mode.Normal, QIcon.State.On)

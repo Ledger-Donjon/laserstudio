@@ -50,14 +50,7 @@
       "suffix": "x"
     },
     "shutter": {
-      "allOf": [
-        {
-          "$ref": "instrument.schema.json"
-        },
-        {
-          "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
-        }
-      ]
+      "allOf": [{ "$ref": "ticshutter.schema.json" }]
     }
   },
   "oneOf": [

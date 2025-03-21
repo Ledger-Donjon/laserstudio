@@ -12,6 +12,7 @@ from .instruments.instruments import (
     CameraNITInstrument,
     CameraRaptorInstrument,
     HayashiLRInstrument,
+    LightInstrument,
 )
 from .instruments.stage import Vector
 from .widgets.toolbars import (
@@ -28,6 +29,7 @@ from .widgets.toolbars import (
     CameraRaptorToolBar,
     PhotoEmissionToolbar,
     HayashiLightToolbar,
+    LightToolbar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -48,6 +50,9 @@ class LaserStudio(QMainWindow):
 
         # Configuration file
         self.config = config
+
+        # Permits for the user to deactivate temporarly the go_next effect
+        self.scanning_enabled = True
 
         # User settings
         self.settings = QSettings("ledger", "laserstudio")
@@ -125,9 +130,9 @@ class LaserStudio(QMainWindow):
                 continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
-        # Hayashi Light toolbar
-        if isinstance(self.instruments.hayashi_light, HayashiLRInstrument):
-            toolbar = HayashiLightToolbar(self.instruments.hayashi_light)
+        # Light toolbar
+        if isinstance(self.instruments.light, LightInstrument):
+            toolbar = LightToolbar(self.instruments.light)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
