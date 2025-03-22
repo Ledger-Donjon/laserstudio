@@ -17,7 +17,6 @@ class CameraUSBInstrument(CameraInstrument):
 
         self.vc = self.__video_capture = cv2.VideoCapture(config.get("index", 0))
 
-
         self.width = int(
             config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         )
@@ -38,17 +37,16 @@ class CameraUSBInstrument(CameraInstrument):
     def __del__(self):
         self.__video_capture.release()
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
-        """Retrieve last captured image"""
-        # returns tuple [width, height, fmt, data]. Data is None if acquisition failed.
+    def capture_image(self):
         ret, frame = self.__video_capture.read()
         if not ret or frame is None:
-            return self.width, self.height, "RGB", None
-        data = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-        if data.shape != (self.height, self.width, 3):
+            return None
+        frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+        if frame.shape[2:] != (self.height, self.width):
             size = self.width, self.height
-            data = self.cv2.resize(data, size, interpolation=self.cv2.INTER_AREA)
-        return self.width, self.height, "RGB", bytes(data)
+            frame = self.cv2.resize(frame, size, interpolation=self.cv2.INTER_AREA)
+
+        return frame.reshape((self.width, self.height, -1))
 
     @property
     def brightness(self) -> float:

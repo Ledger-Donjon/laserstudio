@@ -189,12 +189,9 @@ class CameraRaptorInstrument(CameraUSBInstrument):
 
         self.manufacturers_data = None
 
-        # Objective on this camera is 10 by default
+        # Objective on this camera is 10x by default
         objective = cast(float, config.get("objective", 10.0))
         self.select_objective(objective)
-
-        # Reference image feature
-        self.reference_image_accumulator: Optional[numpy.ndarray] = None
 
     def query_command(
         self,

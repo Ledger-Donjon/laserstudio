@@ -63,9 +63,7 @@ class CameraInstrument(Instrument):
         self.white_level = 1.0
 
         # Image averaging
-        self._last_frame_accumulator: numpy.ndarray = numpy.zeros(
-            self.width * self.height, dtype=numpy.uint64
-        )
+        self._last_frame_accumulator: Optional[numpy.ndarray] = None
         # The number of images to average
         self._image_averaging = 1
         # The number of images that have been averaged
@@ -75,10 +73,10 @@ class CameraInstrument(Instrument):
         # When the number of images to average is hit, and a new frame is retrieved,
         # the oldest one is removed from the accumulator and the new one is added.
         self.windowed_averaging = True
-        self._last_frames: list[numpy.ndarray] = [
-            numpy.zeros(self.width * self.height, dtype=numpy.uint16)
-        ] * self._image_averaging
+        self._last_frames: list[numpy.ndarray] = []
 
+        # Reference image feature
+        self.reference_image_accumulator: Optional[numpy.ndarray] = None
         self.show_negative_values = True
 
     def select_objective(self, factor: float):
@@ -106,16 +104,39 @@ class CameraInstrument(Instrument):
         )
         return qImage
 
+    def capture_image(self) -> Optional[numpy.ndarray]:
+        """
+        To be overridden by the subclasses or CameraInstrument
+
+        :return: a ndarray corresponding to the image. None if the acquisition failed.
+        """
+        return None
+
     def get_last_image(
         self,
     ) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
         """
-        To be overridden by the subclasses or CameraInstrument
+        Capture an image and construct a Gray, 16bit Gray or RGB byte array.
 
         :return: a tuple containing: the width, height, color_mode, and data of the picture.
             color_mode is data from PIL.Image module.
         """
-        return self.width, self.height, "L", None
+        frame = self.capture_image()
+        if frame is None:
+            return self.width, self.height, "L", None
+
+        # Put the frame in the accumulator
+        self.accumulate_frame(frame)
+        assert self._last_frame_accumulator is not None
+
+        # Apply the subtraction of reference image
+        pos, neg = self.substract_reference_image()
+        # Construct a frame from substracted values
+        frame = self.construct_display_image(pos, neg)
+        # Apply levels
+        frame = self.apply_levels(frame)
+        mode = "RGB" if frame.shape[-1] == 3 else "L"
+        return self.width, self.height, mode, frame.tobytes()
 
     @property
     def image_averaging(self) -> int:
@@ -129,13 +150,19 @@ class CameraInstrument(Instrument):
         """
         Sets the number of images that must be averaged.
         """
-        if self.windowed_averaging:
+        if self._last_frame_accumulator is not None and self.windowed_averaging:
+            # In the case we are in windowed_average mode and we have already accumulated images
             if len(self._last_frames) > value:
+                # We reduce the number of images to average
                 # Drop the oldest frames (at the begining of the array)
                 to_substract = self._last_frames[: len(self._last_frames) - value]
                 self._last_frames = self._last_frames[len(self._last_frames) - value :]
                 self._last_frame_accumulator -= sum(to_substract)
                 self.number_of_averaged_images -= len(to_substract)
+                assert len(self._last_frames) == self.number_of_averaged_images
+                assert (
+                    len(self._last_frames) == value
+                ), f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
         else:
             self.clear_averaged_images()
 
@@ -146,9 +173,7 @@ class CameraInstrument(Instrument):
         Clears the list of averaged images.
         """
         self._last_frames = []
-        self._last_frame_accumulator = numpy.zeros(
-            self.width * self.height, dtype=numpy.uint64
-        )
+        self._last_frame_accumulator = None
         self.number_of_averaged_images = 0
 
     def accumulate_frame(self, new_frame: numpy.ndarray):
@@ -156,16 +181,29 @@ class CameraInstrument(Instrument):
         Accumulates the given frame and removes the oldest one
           if windowed averaging is active.
         """
+        # We make sure that we have an image in the accumulator
+        if self._last_frame_accumulator is None:
+            self._last_frame_accumulator = new_frame.astype(numpy.uint64, copy=True)
+            self.number_of_averaged_images = 1
+            if self.windowed_averaging:
+                self._last_frames = [new_frame]
+            return
+
         if not self.windowed_averaging:
             if self.number_of_averaged_images == self._image_averaging:
                 # Discarding the new frame from accumulation
                 return
+
         if self._image_averaging == self.number_of_averaged_images:
             # The list is full, we can remove the oldest frame
-            self._last_frame_accumulator -= self._last_frames.pop(0)
-            self.number_of_averaged_images -= 1
-        # Add the new frame in the accumulator and the list
-        self._last_frames.append(new_frame)
+            if self.windowed_averaging:
+                self._last_frame_accumulator -= self._last_frames.pop(0)
+                self.number_of_averaged_images -= 1
+        # Add in the list
+        if self.windowed_averaging:
+            self._last_frames.append(new_frame)
+
+        # We accumulate the value of the frame
         self._last_frame_accumulator += new_frame
         self.number_of_averaged_images += 1
 
@@ -227,27 +265,26 @@ class CameraInstrument(Instrument):
         else:
             self.reference_image_accumulator = None
 
-    def substract_reference_image(
-        self,
-    ) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
+    def substract_reference_image(self):
         """Substract the reference_image_accumulator from the current accumulator"""
+        assert self._last_frame_accumulator is not None
         if self.reference_image_accumulator is None:
-            """The reference image is not yet defined"""
             self._last_pos = self._last_frame_accumulator
             self._last_neg = None
-        else:
-            self._last_pos = (
-                (self._last_frame_accumulator - self.reference_image_accumulator)
-                .astype(numpy.int64)
-                .clip(0)
-                .astype(numpy.uint64)
-            )
-            self._last_neg = (
-                (self.reference_image_accumulator - self._last_frame_accumulator)
-                .astype(numpy.int64)
-                .clip(0)
-                .astype(numpy.uint64)
-            )
+            return self._last_pos, self._last_neg
+
+        self._last_pos = (
+            (self._last_frame_accumulator - self.reference_image_accumulator)
+            .astype(numpy.int64)
+            .clip(0)
+            .astype(numpy.uint64)
+        )
+        self._last_neg = (
+            (self.reference_image_accumulator - self._last_frame_accumulator)
+            .astype(numpy.int64)
+            .clip(0)
+            .astype(numpy.uint64)
+        )
         return self._last_pos, self._last_neg
 
     @property
@@ -260,36 +297,42 @@ class CameraInstrument(Instrument):
         return self.construct_display_image(pos, neg)
 
     def construct_display_image(
-        self, pos: numpy.ndarray, neg: Optional[numpy.ndarray]
+        self, pos: numpy.ndarray, neg: Optional[numpy.ndarray] = None
     ) -> numpy.ndarray:
         """
         Construct the display image from the positive and negative images.
         """
-        pos_16 = (
-            (pos * (4.0 / self.average_count))
+        pos_8 = (
+            (pos / self.average_count)
             .clip(
-                min=numpy.iinfo(numpy.uint16).min,
-                max=numpy.iinfo(numpy.uint16).max,
+                min=numpy.iinfo(numpy.uint8).min,
+                max=numpy.iinfo(numpy.uint8).max,
             )
-            .astype(numpy.uint16)
+            .astype(numpy.uint8)
         )
         if neg is None:
-            return pos_16
+            return pos_8
 
-        neg_16 = (
-            (neg * (4.0 / self.average_count))
-            .clip(
-                min=numpy.iinfo(numpy.uint16).min,
-                max=numpy.iinfo(numpy.uint16).max,
+        # There is a negative value, which means that we are in differential analysis mode
+        neg_8 = (
+            (
+                (neg / self.average_count)
+                .clip(
+                    min=numpy.iinfo(numpy.uint8).min,
+                    max=numpy.iinfo(numpy.uint8).max,
+                )
+                .astype(numpy.uint8)
             )
-            .astype(numpy.uint16)
+            if self.show_negative_values
+            else numpy.zeros(pos_8.shape, dtype=numpy.uint8)
         )
-        zer_16 = numpy.zeros((self.height, self.width, 1), dtype=numpy.uint16)
-        pos_16 = pos_16.reshape(zer_16.shape)
-        neg_16 = neg_16.reshape(zer_16.shape)
-        stacked = numpy.stack([neg_16, pos_16, zer_16], axis=2)
 
-        return stacked.astype(numpy.uint8).reshape(self.height * self.width * 3)
+        if pos_8.shape[-1] == 3:
+            return pos_8 + neg_8
+
+        zer_8 = numpy.zeros((self.width, self.height, 1), dtype=numpy.uint8)
+        stacked = numpy.stack([neg_8, pos_8, zer_8], axis=2)
+        return stacked.reshape(self.width, self.height, 3)
 
     @property
     def yaml(self) -> dict:
