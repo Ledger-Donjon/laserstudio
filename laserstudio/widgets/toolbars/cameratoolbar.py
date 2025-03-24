@@ -181,15 +181,17 @@ class CameraToolbar(QToolBar):
         grid.addWidget(QLabel("Black Level:"), i + 2, 0)
         self.black_level_slider = QSlider(Qt.Orientation.Horizontal)
         self.black_level_slider.setMinimum(0)
-        self.black_level_slider.setMaximum(255)
-        self.black_level_slider.setValue(int(self.camera.black_level * 255))
-        self.black_level_slider.valueChanged.connect(self.update_levels)
+        self.black_level_slider.setMaximum(2550)
+        self.black_level_slider.setValue(int(self.camera.black_level * 2550))
+        self.black_level_slider.valueChanged.connect(
+            lambda x: self.update_levels(black=x / 2550)
+        )
         grid.addWidget(self.black_level_slider, i + 2, 1)
 
         # Add a double spinbox to set the black level
         self.black_level_sb = QDoubleSpinBox()
         self.black_level_sb.setRange(0, 100)
-        self.black_level_sb.setDecimals(2)
+        self.black_level_sb.setDecimals(5)
         self.black_level_sb.setValue(self.camera.black_level * 100)
         self.black_level_sb.valueChanged.connect(
             lambda x: self.update_levels(black=x / 100)
@@ -200,15 +202,17 @@ class CameraToolbar(QToolBar):
         grid.addWidget(QLabel("White Level:"), i + 3, 0)
         self.white_level_slider = QSlider(Qt.Orientation.Horizontal)
         self.white_level_slider.setMinimum(0)
-        self.white_level_slider.setMaximum(255)
-        self.white_level_slider.setValue(int(self.camera.white_level * 255))
-        self.white_level_slider.valueChanged.connect(self.update_levels)
+        self.white_level_slider.setMaximum(2550)
+        self.white_level_slider.setValue(int(self.camera.white_level * 2550))
+        self.white_level_slider.valueChanged.connect(
+            lambda x: self.update_levels(white=x / 2550)
+        )
         grid.addWidget(self.white_level_slider, i + 3, 1)
 
         # Add a double spinbox to set the white level
         self.white_level_sb = QDoubleSpinBox()
         self.white_level_sb.setRange(0, 100)
-        self.white_level_sb.setDecimals(2)
+        self.white_level_sb.setDecimals(5)
         self.white_level_sb.setValue(self.camera.white_level * 100)
         self.white_level_sb.valueChanged.connect(
             lambda x: self.update_levels(white=x / 100)
@@ -232,8 +236,8 @@ class CameraToolbar(QToolBar):
 
         self.black_level_sb.setValue(black * 100)
         self.white_level_sb.setValue(white * 100)
-        self.black_level_slider.setValue(int(black * 255))
-        self.white_level_slider.setValue(int(white * 255))
+        self.black_level_slider.setValue(int(black * 2550))
+        self.white_level_slider.setValue(int(white * 2550))
 
         self.black_level_slider.blockSignals(False)
         self.black_level_sb.blockSignals(False)
