@@ -198,11 +198,21 @@ class CameraRaptorToolBar(CameraToolbar):
             self.camera.compute_histogram(self.camera.last_frame)[0],
             nlines=self.histogram_nlines.value(),
         )
+        hists2 = self.camera.histogram_to_string(
+            self.camera.compute_histogram(self.camera.last_frame, False)[0],
+            nlines=self.histogram_nlines.value(),
+        )
         levels = self.camera.levels_to_string()
 
+        print("=" * (len(hists2[0]) + 2))
+        print("⸢" + hists2[0] + "⸣")
+        for hist in hists2[1:-1]:
+            print("|" + hist + "|")
+        print("⸤" + hists2[-1] + "⸥")
         print("⸢" + hists[0] + "⸣")
         for hist in hists[1:-1]:
             print("|" + hist + "|")
         print("⸤" + hists[-1] + "⸥")
         print("B" + levels[0])
         print("W" + levels[1])
+        print("=" * (len(hists2[0]) + 2))

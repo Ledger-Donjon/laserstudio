@@ -114,12 +114,12 @@ class CameraInstrument(Instrument):
         )
         return image.clip(0, max).astype(type_)
 
-    def compute_histogram(self, frame: numpy.ndarray):
+    def compute_histogram(self, frame: numpy.ndarray, full_range: bool = True):
         # Compute histogram of last image
         return numpy.histogram(
             frame,
             bins=150,
-            range=(0, numpy.iinfo(frame.dtype).max),
+            range=(0, numpy.iinfo(frame.dtype).max) if full_range else None,
         )
 
     def histogram_to_string(self, hist: numpy.ndarray, nlines=2):
