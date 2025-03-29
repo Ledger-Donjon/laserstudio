@@ -24,7 +24,8 @@ class Instrument(QObject):
         if data.get("label") != self.label:
             print(
                 "Warning, we are applying settings for a device "
-                + f"with a different label ({self.label}),"
-                + f"from a file who has been created with a device with label ({data.get('label')})."
+                + f"with a different label ({self.label}), "
+                + "from a file created with device having different "
+                + f"label ({data.get('label')})."
             )
         return
