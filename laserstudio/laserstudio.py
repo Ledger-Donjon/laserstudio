@@ -102,13 +102,12 @@ class LaserStudio(QMainWindow):
         toolbar = ScanToolbar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Raptor Camera Image control
-        if isinstance(self.instruments.camera, CameraRaptorInstrument):
-            toolbar = CameraRaptorToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
         # Toolbar: Camera Image control
-        elif self.instruments.camera is not None:
-            toolbar = CameraToolbar(self)
+        if self.instruments.camera is not None:
+            if isinstance(self.instruments.camera, CameraRaptorInstrument):
+                toolbar = CameraRaptorToolBar(self)
+            else:
+                toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
             toolbar = PhotoEmissionToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)

@@ -483,12 +483,10 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.temperature_changed.emit(temperature)
         return temperature
 
-    def get_last_image(
-        self,
-    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
+    def capture_image(self):
         ret, frame = self.vc.read()
         if not ret or frame is None:
-            return self.width, self.height, "RGB", None
+            return None
         assert type(frame) is numpy.ndarray
         # Each value is repeated three times...
         frame = frame[:, :, :1].copy()
@@ -503,27 +501,4 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         frame = frame.view(numpy.uint16).copy()
         # Add 0s to the end to compensate the values that were removed for frame number
         frame = numpy.resize(frame, self.width * self.height)
-        # Put the frame in the accumulator
-        self.accumulate_frame(frame)
-        # Apply the subtraction of reference image
-        pos, neg = self.substract_reference_image()
-
-        # Apply levels
-        pos = self.apply_levels(pos)
-        if neg is not None:
-            neg = self.apply_levels(neg)
-
-        frame = self.construct_display_image(pos, neg)
-        if frame.dtype == numpy.uint16:
-            frame_bytes = frame.byteswap().tobytes()
-            mode = "I;16"
-        else:
-            frame_bytes = frame.tobytes()
-            mode = "RGB"
-
-        return (
-            self.width,
-            self.height,
-            mode,
-            frame_bytes,
-        )
+        return frame
