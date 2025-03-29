@@ -66,4 +66,10 @@ def test_go_next():
 
 def test_get_settings():
     api = LSAPI()
-    print(api.instrument_settings("test"))
+    assert api.instrument_settings("test") is not None
+    assert api.instrument_settings("test2") is None
+
+
+def test_set_settings():
+    api = LSAPI()
+    api.instrument_settings("test", {"settings": {"label": "TOTO"}})

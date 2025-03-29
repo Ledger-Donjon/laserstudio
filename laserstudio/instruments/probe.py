@@ -25,7 +25,8 @@ class ProbeInstrument(Instrument):
     @settings.setter
     def settings(self, data: dict):
         """Import settings from a dict."""
-        super().settings = data
+        assert Instrument.settings.fset is not None
+        Instrument.settings.fset(self, data)
         offset_pos = data.get("offset_pos", None)
         self.offset_pos = tuple(offset_pos) if offset_pos is not None else None
 

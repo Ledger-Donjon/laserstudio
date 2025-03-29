@@ -345,6 +345,7 @@ class CameraInstrument(Instrument):
     @settings.setter
     def settings(self, data: dict):
         """Import settings from a dict."""
-        super().settings = data
+        assert Instrument.settings.fset is not None
+        Instrument.settings.fset(self, data)
         if "transform" in data:
             self.correction_matrix = yaml_to_qtransform(data["transform"])
