@@ -32,6 +32,7 @@ from .widgets.toolbars import (
 import yaml
 from .restserver.server import RestProxy
 from PIL import Image, ImageQt
+import numpy
 
 
 class LaserStudio(QMainWindow):
@@ -109,8 +110,10 @@ class LaserStudio(QMainWindow):
             else:
                 toolbar = CameraToolbar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
-            toolbar = PhotoEmissionToolbar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            self.photoemission_toolbar = PhotoEmissionToolbar(self)
+            self.addToolBar(
+                Qt.ToolBarArea.BottomToolBarArea, self.photoemission_toolbar
+            )
 
         # Toolbar: NIT Camera Image control
         if isinstance(self.instruments.camera, CameraNITInstrument):
@@ -248,6 +251,60 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
 
+    def handle_camera_accumulator(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+        """
+        Handle a Camera API request to get the accumulated image of the camera.
+        Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
+
+        :param path: The path where to store the accumulator's data.
+            If None, the data is returned.
+        :return: The camera's accumulator's data if it has not been stored in a file.
+            Otherwise, an empty array.
+        """
+        # Takes the Image of the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return None
+
+        frame = camera.last_frame_accumulator
+        if frame is None:
+            return None
+
+        if path is not None:
+            numpy.save(path, frame)
+            # Image has been saved at a given path, we return an empty array.
+            return numpy.array([])
+        return frame
+
+    def handle_camera_reference(self, dotake: Optional[bool], refname: Optional[str]):
+        """
+        Handles camera reference image operations.
+
+        This method manages the camera's reference image by allowing the user to set
+        the current reference image or take a new one.
+
+        :param dotake: If True, a new reference image will be taken. If False, no new
+                       image will be taken. If None, no action is performed.
+        :param refname: The name of reference image to set as the current reference
+                       image for the camera. If None, no action is performed.
+        :returns: None if the stage sight or its associated camera is unavailable,
+                  otherwise returns the current reference image number.
+        """
+        # Takes the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return
+        if refname is not None:
+            camera.current_reference_image = refname
+        if dotake is not None:
+            camera.take_reference_image(dotake)
+        self.photoemission_toolbar.update_ref_image_controls()
+        return camera.current_reference_image
+
     def handle_instrument_settings(
         self, label: str, settings: Optional[dict]
     ) -> Optional[dict]:
@@ -341,12 +398,11 @@ class LaserStudio(QMainWindow):
             Memory points are defined in the configuration file, on the
             stage -> mem_points.
 
-        :param name: The name of the memory point to go to.
+        :param index: The index of the memory point to go to.
         """
-        if self.instruments.stage is None:
-            return {"pos": []}
-
-        if index < 0 or index >= len(self.instruments.stage.mem_points):
+        if self.instruments.stage is None or index not in range(
+            len(self.instruments.stage.mem_points)
+        ):
             return {"pos": []}
 
         point = self.instruments.stage.mem_points[index]

@@ -76,8 +76,35 @@ class CameraInstrument(Instrument):
         self._last_frames: list[numpy.ndarray] = []
 
         # Reference image feature
-        self.reference_image_accumulator: Optional[numpy.ndarray] = None
+        self.reference_image_accumulators: dict[str, numpy.ndarray] = {}
+        self.current_reference_image = "RefImage"
         self.show_negative_values = True
+
+    @property
+    def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
+        return self.reference_image_accumulators.get(self.current_reference_image)
+
+    @reference_image_accumulator.setter
+    def reference_image_accumulator(self, value: Optional[numpy.ndarray]):
+        if (
+            value is None
+            and self.current_reference_image in self.reference_image_accumulators
+        ):
+            del self.reference_image_accumulators[self.current_reference_image]
+        elif value is not None:
+            self.reference_image_accumulators[self.current_reference_image] = value
+        # Do nothing...
+
+    @property
+    def last_frame_accumulator(self) -> Optional[numpy.ndarray]:
+        """
+        Returns the last frame accumulator.
+        """
+        return (
+            self._last_frame_accumulator.copy()
+            if self._last_frame_accumulator is not None
+            else None
+        )
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
@@ -260,7 +287,7 @@ class CameraInstrument(Instrument):
         """
         Take a reference image to substract from the next frames.
         """
-        if do_take:
+        if do_take and self._last_frame_accumulator is not None:
             self.reference_image_accumulator = self._last_frame_accumulator.copy()
         else:
             self.reference_image_accumulator = None

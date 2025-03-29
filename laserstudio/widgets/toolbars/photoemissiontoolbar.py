@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QLabel,
     QCheckBox,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt
 from ...instruments.camera import CameraInstrument
@@ -37,11 +38,32 @@ class PhotoEmissionToolbar(QToolBar):
         w.setLayout(vbox)
 
         # Button to take a black image
-        w = QPushButton("Take Reference image")
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        hbox.addWidget(QLabel("Reference image"))
+        # Select reference image
+        self.ref_selection = w = QComboBox()
+        w.setEditable(True)
+        w.setToolTip("Reference image number")
+        w.currentTextChanged.connect(
+            lambda v: (
+                self.camera.__setattr__("current_reference_image", v),
+                self.update_ref_image_controls(),
+            )
+        )
+        hbox.addWidget(w)
+        self.takerefbutton = w = QPushButton("Set")
+        # Set fixed width to avoid resizing
+        w.setFixedWidth(50)
         w.setCheckable(True)
-        w.setToolTip("Take a Reference image")
-        vbox.addWidget(w)
-        w.toggled.connect(self.camera.take_reference_image)
+        w.setToolTip("Set/Unset a reference image")
+        hbox.addWidget(w)
+        w.toggled.connect(
+            lambda v: (
+                self.camera.take_reference_image(v),
+                self.update_ref_image_controls(),
+            )
+        )
 
         # Checkbox to activate Image averaging
         w = QWidget()
@@ -97,3 +119,17 @@ class PhotoEmissionToolbar(QToolBar):
         vbox.addWidget(w)
 
         vbox.addStretch()
+
+    def update_ref_image_controls(self):
+        self.takerefbutton.blockSignals(True)
+        self.ref_selection.blockSignals(True)
+        self.takerefbutton.setChecked(
+            self.camera.reference_image_accumulator is not None
+        )
+        if self.takerefbutton.isChecked():
+            self.takerefbutton.setText("Unset")
+        else:
+            self.takerefbutton.setText("Set")
+        self.ref_selection.setCurrentText(self.camera.current_reference_image)
+        self.takerefbutton.blockSignals(False)
+        self.ref_selection.blockSignals(False)

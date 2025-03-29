@@ -15,6 +15,7 @@ from PyQt6.QtCore import (
 from ..lsapi.lsapi import LSAPI
 import io
 from PIL.Image import Image
+import numpy
 
 if TYPE_CHECKING:
     from ..laserstudio import LaserStudio
@@ -49,7 +50,7 @@ class RestProxy(QObject):
         except RuntimeError as e:
             return {"error": str(e)}
 
-    @pyqtSlot(result="QVariant")
+    @pyqtSlot(int, result="QVariant")
     def handle_go_to_memory_point(self, index: int):
         return QVariant(self.laser_studio.handle_go_to_memory_point(index))
 
@@ -70,6 +71,16 @@ class RestProxy(QObject):
     @pyqtSlot(QVariant, result="QVariant")
     def handle_camera(self, path: Optional[str]):
         return QVariant(self.laser_studio.handle_camera(path))
+
+    @pyqtSlot(QVariant, result="QVariant")
+    def handle_camera_accumulator(self, path: Optional[str]):
+        return QVariant(self.laser_studio.handle_camera_accumulator(path))
+
+    @pyqtSlot(QVariant, QVariant, result="QVariant")
+    def handle_camera_reference(
+        self, dotake: Optional[bool] = None, refname: Optional[str] = None
+    ):
+        return QVariant(self.laser_studio.handle_camera_reference(dotake, refname))
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_screenshot(self, path: Optional[str]):
@@ -168,6 +179,7 @@ flask_api = Api(flask_app, version="1.2", title="LaserStudio REST API")
 
 image = flask_api.namespace("images", description="Get some images")
 path_png = image.model("Image Path", {"path": fields.String(example="/tmp/image.png")})
+path_file = image.model("File Path", {"path": fields.String(example="/tmp/file.bin")})
 
 
 @image.route("/screenshot")
@@ -223,6 +235,84 @@ class Camera(Resource):
         return ""
 
 
+@image.route("/camera/accumulator")
+class CameraAccumulator(Resource):
+    @image.response(
+        HTTPStatus.NOT_FOUND, "No data can be produced (there may be no camera)"
+    )
+    def get(self):
+        frame = cast(
+            Optional[numpy.ndarray],
+            RestServer.invoke("handle_camera_accumulator", QVariant(None)),
+        )
+        if frame is None:
+            flask_api.abort(
+                HTTPStatus.NOT_FOUND,
+                "No data can be produced (there may be no camera)",
+            )
+            return
+        buffer = io.BytesIO()
+        numpy.save(buffer, frame)
+        buffer.seek(0)
+        return flask.send_file(
+            buffer, mimetype="application/octet-stream", download_name="accumulator.npy"
+        )
+
+    @image.expect(path_file)
+    def post(self):
+        if not flask.request.is_json:
+            return "Given value is not a JSON", 415
+        json = flask.request.json
+        if not isinstance(json, dict):
+            return "Given value is not a dictionary", 415
+        path = json.get("path")
+        RestServer.invoke("handle_camera_accumulator", QVariant(path))
+        return path
+
+
+@image.route("/camera/averaging")
+class CameraAveraging(Resource):
+    @image.response(200, "Get the current number of averaged images")
+    def get(self):
+        return RestServer.invoke(
+            "handle_camera_average", QVariant(None), QVariant(None)
+        )
+
+    @image.response(200, "Clear the current average")
+    def delete(self):
+        return RestServer.invoke(
+            "handle_camera_average", QVariant(True), QVariant(None)
+        )
+
+    @image.response(200, "Set the current number images to be averaged")
+    def post(self):
+        return RestServer.invoke(
+            "handle_camera_average", QVariant(True), QVariant(number)
+        )
+
+
+@image.route("/camera/reference/")
+@image.route("/camera/reference/<refname>")
+class CameraReference(Resource):
+    @image.response(200, "Select the reference image")
+    def get(self, refname: Optional[str] = None):
+        return RestServer.invoke(
+            "handle_camera_reference", QVariant(None), QVariant(refname)
+        )
+
+    @image.response(200, "Set the reference image")
+    def post(self, refname: Optional[str] = None):
+        return RestServer.invoke(
+            "handle_camera_reference", QVariant(True), QVariant(refname)
+        )
+
+    @image.response(200, "Unset the reference image")
+    def delete(self, refname: Optional[str] = None):
+        return RestServer.invoke(
+            "handle_camera_reference", QVariant(False), QVariant(refname)
+        )
+
+
 motion = flask_api.namespace("motion", description="Control stage position")
 
 viewer_pos = fields.List(fields.Float, example=[42.5, 44.1])
@@ -260,20 +350,10 @@ class GoNext(Resource):
 #         return RestServer.invoke("handle_autofocus")
 
 
-memory_point = motion.model("MemoryPoint", {"index": fields.Integer(example="1")})
-
-
-@motion.route("/go_to_memory_point")
+@motion.route("/go_to_memory_point/<int:index>")
 class GoToMemoryPoint(Resource):
-    @motion.expect(memory_point)
     @motion.response(200, "Go to memory point is done", stage_pos)
-    def put(self):
-        if not flask.request.is_json:
-            return "Given value is not a JSON", 415
-        json = flask.request.json
-        if not isinstance(json, dict):
-            return "Given value is not a dictionary", 415
-        index = json.get("index")
+    def put(self, index):
         return RestServer.invoke("handle_go_to_memory_point", index)
 
 

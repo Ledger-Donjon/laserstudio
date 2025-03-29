@@ -5,6 +5,7 @@ from typing import Optional, Union, Tuple, List, Dict
 import requests
 from PIL import Image
 import io
+import numpy
 
 
 class LSAPI:
@@ -114,7 +115,7 @@ class LSAPI:
         :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send("motion/go_to_memory_point", {"index": index}).json()
+        return self.send(f"motion/go_to_memory_point/{index}", is_put=True).json()
 
     def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """
@@ -131,6 +132,26 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
+
+    def accumulated_image(self) -> Optional[numpy.ndarray]:
+        """
+        Get the camera accumulator's data.
+        """
+        response = self.send("images/camera/accumulator")
+        c = response.content
+        print(len(c))
+        if type(c) is bytes:
+            frame = numpy.frombuffer(c)
+            print(frame)
+            return frame
+
+    def reference_image(
+        self, num: Optional[int] = None, data: Optional[numpy.ndarray] = None
+    ) -> Optional[numpy.ndarray]:
+        """
+        Get and/or set the reference image for the camera.
+        """
+        self.send("images/camera/reference" + (f"/{num}" if num is not None else ""))
 
     def screenshot(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """

@@ -1,5 +1,6 @@
 from laserstudio.lsapi import LSAPI
 from random import random
+import numpy
 
 
 def test_add_marker():
@@ -73,3 +74,10 @@ def test_get_settings():
 def test_set_settings():
     api = LSAPI()
     api.instrument_settings("test", {"settings": {"label": "TOTO"}})
+
+
+def test_get_accumulated_image():
+    api = LSAPI()
+    image = api.accumulated_image()
+    assert image is not None
+    assert isinstance(image, numpy.ndarray)
