@@ -248,6 +248,28 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
 
+    def handle_instrument_settings(
+        self, label: str, settings: Optional[dict]
+    ) -> Optional[dict]:
+        """
+        Handles the settings for a specific instrument identified by its label.
+        This method retrieves an instrument by its label, updates its settings if
+        provided, and returns the updated settings.
+
+        :param label: The label identifying the instrument.
+        :param settings: A dictionary containing the settings to be
+            applied to the instrument. If None, the instrument's settings
+            remain unchanged.
+        :return: A dictionary containing the updated settings of the
+            instrument if the instrument is found, otherwise None.
+        """
+        inst = self.instruments.get_instrument_with_label(label)
+        if inst is not None:
+            if settings is not None:
+                inst.settings = settings
+            return {"settings": inst.settings}
+        return None
+
     def handle_position(self, pos: Optional[list[float]]) -> dict:
         if self.instruments.stage is None:
             return {"pos": []}
@@ -348,19 +370,19 @@ class LaserStudio(QMainWindow):
 
         # Camera settings
         if self.instruments.camera is not None:
-            data["camera"] = self.instruments.camera.yaml
+            data["camera"] = self.instruments.camera.settings
 
         # Scanning geometry
-        data["scangeometry"] = self.viewer.scan_geometry.yaml
+        data["scangeometry"] = self.viewer.scan_geometry.settings
 
         # Probes
-        data["probes"] = [probe.yaml for probe in self.instruments.probes]
+        data["probes"] = [probe.settings for probe in self.instruments.probes]
 
         # Lasers
-        data["lasers"] = [laser.yaml for laser in self.instruments.lasers]
+        data["lasers"] = [laser.settings for laser in self.instruments.lasers]
 
         # Viewver
-        data["viewer"] = self.viewer.yaml
+        data["viewer"] = self.viewer.settings
 
         yaml.dump(data, open("settings.yaml", "w"))
 
@@ -372,7 +394,7 @@ class LaserStudio(QMainWindow):
         # Camera settings (maybe missing from settings)
         camera = data.get("camera")
         if (self.instruments.camera is not None) and (camera is not None):
-            self.instruments.camera.yaml = camera
+            self.instruments.camera.settings = camera
             if self.viewer.stage_sight is not None:
                 self.viewer.stage_sight.distortion = (
                     self.instruments.camera.correction_matrix
@@ -381,19 +403,19 @@ class LaserStudio(QMainWindow):
         # Scanning geometry
         geometry = data.get("scangeometry")
         if geometry is not None:
-            self.viewer.scan_geometry.yaml = geometry
+            self.viewer.scan_geometry.settings = geometry
 
         # Probes
         probes = data.get("probes", [])
         for pdata, probe in zip(probes, self.instruments.probes):
-            probe.yaml = pdata
+            probe.settings = pdata
 
         # Lasers
         lasers = data.get("lasers", [])
         for pdata, laser in zip(lasers, self.instruments.lasers):
-            laser.yaml = pdata
+            laser.settings = pdata
 
         # Viewver's configuration
         viewer = data.get("viewer")
         if viewer is not None:
-            self.viewer.yaml = viewer
+            self.viewer.settings = viewer

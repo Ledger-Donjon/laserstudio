@@ -165,6 +165,23 @@ class LSAPI:
         res = self.send("motion/position", params, is_put=True)
         return res.json()
 
+    def instrument_settings(
+        self, label: str, settings: Optional[dict] = None
+    ) -> Optional[dict]:
+        """
+        Retrieve or update the settings of a specific instrument.
+        This method interacts with the API to either fetch the current settings
+        of an instrument identified by its label or update its settings if a
+        dictionary of settings is provided.
+
+        :param label: The unique identifier for the instrument.
+        :param settings: A dictionary containing the settings to update for the
+                         instrument. If None, the current settings will be retrieved.
+        :return: The response from the API containing the instrument's settings,
+                 or None if the operation fails.
+        """
+        return self.send(f"instruments/{label}/settings", settings, is_put=True).json()
+
     def laser(
         self,
         num: int = 1,

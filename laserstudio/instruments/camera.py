@@ -160,9 +160,9 @@ class CameraInstrument(Instrument):
                 self._last_frame_accumulator -= sum(to_substract)
                 self.number_of_averaged_images -= len(to_substract)
                 assert len(self._last_frames) == self.number_of_averaged_images
-                assert (
-                    len(self._last_frames) == value
-                ), f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
+                assert len(self._last_frames) == value, (
+                    f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
+                )
         else:
             self.clear_averaged_images()
 
@@ -335,15 +335,16 @@ class CameraInstrument(Instrument):
         return stacked.reshape(self.width, self.height, 3)
 
     @property
-    def yaml(self) -> dict:
+    def settings(self) -> dict:
         """Export settings to a dict for yaml serialization."""
+        settings = super().settings
         if self.correction_matrix is not None:
-            return {"transform": qtransform_to_yaml(self.correction_matrix)}
-        else:
-            return {}
+            settings["transform"] = qtransform_to_yaml(self.correction_matrix)
+        return settings
 
-    @yaml.setter
-    def yaml(self, data: dict):
+    @settings.setter
+    def settings(self, data: dict):
         """Import settings from a dict."""
+        super().settings = data
         if "transform" in data:
             self.correction_matrix = yaml_to_qtransform(data["transform"])

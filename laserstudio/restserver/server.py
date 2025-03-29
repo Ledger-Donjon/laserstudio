@@ -88,6 +88,10 @@ class RestProxy(QObject):
             self.laser_studio.handle_laser(num, active, power, offset_current)
         )
 
+    @pyqtSlot(QVariant, QVariant, result="QVariant")
+    def handle_instrument_settings(self, label: str, conf: Optional[dict]):
+        return QVariant(self.laser_studio.handle_instrument_settings(label, conf))
+
 
 class RestThread(QThread):
     """
@@ -160,7 +164,7 @@ class RestServer(QObject):
 
 
 flask_app = flask.Flask(__name__)
-flask_api = Api(flask_app, version="1.1", title="LaserStudio REST API")
+flask_api = Api(flask_app, version="1.2", title="LaserStudio REST API")
 
 image = flask_api.namespace("images", description="Get some images")
 path_png = image.model("Image Path", {"path": fields.String(example="/tmp/image.png")})
@@ -330,16 +334,43 @@ class Markers(Resource):
         return cast(List[dict], qvar)
 
 
-# instruments = flask_api.namespace("instruments", description="Control instruments")
+instruments = flask_api.namespace("instruments", description="Control instruments")
 
-# laser = instruments.model(
-#     "Laser",
-#     {
-#         "active": fields.Boolean(description="The activation state of the laser"),
-#         "power": fields.Float(description="The power level of the current, in percent"),
-#         "offset_current": fields.Float(description="The offset current, in mA"),
-#     },
-# )
+instrument = instruments.model(
+    "Instrument",
+    {
+        "settings": fields.Raw(description="The settings of the instrument"),
+    },
+)
+
+
+@instruments.route("/<label>/settings")
+@instruments.param("label", "Label of the instrument.")
+class Instrument(Resource):
+    @instruments.doc("get_instrument_settings")
+    def get(self, label: str):
+        qvar = RestServer.invoke(
+            "handle_instrument_settings",
+            QVariant(label),
+            QVariant(None),
+        )
+        return cast(dict, qvar)
+
+    @instruments.doc("put_instrument_settings")
+    @instruments.expect(instrument)
+    @instruments.marshal_with(instrument)
+    def put(self, label: str):
+        if not flask.request.is_json:
+            return "Given value is not a JSON", 415
+        json = flask.request.json
+        if not isinstance(json, dict):
+            return "Given value is not a dictionary", 415
+        qvar = RestServer.invoke(
+            "handle_instrument_settings",
+            QVariant(label),
+            QVariant(json["settings"]),
+        )
+        return cast(dict, qvar)
 
 
 # @instruments.route("/laser/<int:num>")

@@ -7,12 +7,13 @@ from .camera_nit import CameraNITInstrument
 from .camera_raptor import CameraRaptorInstrument
 from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
+from .instrument import Instrument
 from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
-from typing import Optional, cast, Any
+from typing import Optional, cast, Any, Sequence
 import sys
 import logging
 
@@ -130,3 +131,12 @@ class Instruments:
         for laser in self.lasers:
             results.append(laser.go_next())
         return {"lasers": results}
+
+    @property
+    def all_instruments(self) -> Sequence[Optional[Instrument]]:
+        return [self.stage] + self.lasers + [self.camera] + [self.light] + self.probes
+
+    def get_instrument_with_label(self, label: str) -> Optional[Instrument]:
+        for instrument in self.all_instruments:
+            if instrument is not None and instrument.label == label:
+                return instrument

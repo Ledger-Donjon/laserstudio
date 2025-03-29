@@ -686,25 +686,25 @@ class Viewer(QGraphicsView):
         self.__markers.clear()
 
     @property
-    def yaml(self) -> dict:
+    def settings(self) -> dict:
         """Export settings to a dict for yaml serialization."""
-        yaml = {}
-        yaml["marker_size"] = self.default_marker_size
+        data = {}
+        data["marker_size"] = self.default_marker_size
 
         if self.background_picture_path is not None:
-            yaml["background_picture_path"] = self.background_picture_path
+            data["background_picture_path"] = self.background_picture_path
         if (pic := self.__picture_item) is not None:
-            yaml["background_picture_transform"] = qtransform_to_yaml(pic.transform())
-        return yaml
+            data["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+        return data
 
-    @yaml.setter
-    def yaml(self, yaml: dict):
+    @settings.setter
+    def settings(self, data: dict):
         """Import settings from a dict."""
-        if (marker_size := yaml.get("marker_size")) is not None:
+        if (marker_size := data.get("marker_size")) is not None:
             self.marker_size(marker_size)
-        if (path := yaml.get("background_picture_path")) is not None:
+        if (path := data.get("background_picture_path")) is not None:
             self.load_picture(path)
-            if (transform := yaml.get("background_picture_transform")) is not None and (
+            if (transform := data.get("background_picture_transform")) is not None and (
                 pic := self.__picture_item
             ) is not None:
                 pic.setTransform(yaml_to_qtransform(transform))
