@@ -77,7 +77,7 @@ class CameraInstrument(Instrument):
 
         # Reference image feature
         self.reference_image_accumulators: dict[str, numpy.ndarray] = {}
-        self.current_reference_image = "RefImage"
+        self.current_reference_image = "Reference 0"
         self.show_negative_values = True
 
     @property

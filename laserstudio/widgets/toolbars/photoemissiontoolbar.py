@@ -39,12 +39,13 @@ class PhotoEmissionToolbar(QToolBar):
 
         # Button to take a black image
         hbox = QHBoxLayout()
+        vbox.addWidget(QLabel("Reference image"))
         vbox.addLayout(hbox)
-        hbox.addWidget(QLabel("Reference image"))
         # Select reference image
         self.ref_selection = w = QComboBox()
         w.setEditable(True)
-        w.setToolTip("Reference image number")
+        w.lineEdit().setPlaceholderText("Image name")
+        w.setToolTip("Reference image name")
         w.currentTextChanged.connect(
             lambda v: (
                 self.camera.__setattr__("current_reference_image", v),
@@ -126,10 +127,12 @@ class PhotoEmissionToolbar(QToolBar):
         self.takerefbutton.setChecked(
             self.camera.reference_image_accumulator is not None
         )
+        self.ref_selection.setCurrentText(self.camera.current_reference_image)
         if self.takerefbutton.isChecked():
             self.takerefbutton.setText("Unset")
+            if self.ref_selection.findText(self.camera.current_reference_image) == -1:
+                self.ref_selection.addItem(self.camera.current_reference_image)
         else:
             self.takerefbutton.setText("Set")
-        self.ref_selection.setCurrentText(self.camera.current_reference_image)
         self.takerefbutton.blockSignals(False)
         self.ref_selection.blockSignals(False)
