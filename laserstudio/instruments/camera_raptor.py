@@ -502,3 +502,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # Add 0s to the end to compensate the values that were removed for frame number
         frame = numpy.resize(frame, self.width * self.height)
         return frame
+    
+    def construct_display_image(self, pos, neg = None):
+        # As we accumulated 16-bits images, we have to reduce it to 8-bits for display
+        return super().construct_display_image(pos / 64.0, None if neg is None else neg / 64.0)
