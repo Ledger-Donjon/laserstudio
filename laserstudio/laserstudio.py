@@ -251,6 +251,27 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
 
+    def handle_camera_average(self, reset: bool):
+        """
+        Handle a Camera API request to get the average count of the camera associated to the main Stage.
+
+        :param reset: If True, reset the camera's accumulator.
+        :return: The current number of accumulated images.
+            None if no camera exists
+        """
+        # Takes the Image of the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return None
+
+        if reset:
+            camera.clear_averaged_images()
+
+        # Return the number of averaged images
+        return camera.number_of_averaged_images
+
     def handle_camera_accumulator(self, path: Optional[str]) -> Optional[numpy.ndarray]:
         """
         Handle a Camera API request to get the accumulated image of the camera.

@@ -37,7 +37,7 @@ class LSAPI:
         self.session.close()
 
     def send(
-        self, command: str, params: Optional[dict] = None, is_put=False
+        self, command: str, params: Optional[dict] = None, is_put=False, is_delete=False
     ) -> requests.Response:
         """
         Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
@@ -45,9 +45,12 @@ class LSAPI:
         :param command: The REST command to be executed (eg, the path part of the URL)
         :param params: The payload to be sent in the body of the request, as a JSON
         :param is_put: To force to send a PUT command instead of a POST, when params is not None
+        :param is_put: To force to send a DELETE command
         :return: The response from the server.
         """
         url = f"http://{self.host}:{self.port}/{command}"
+        if is_delete:
+            return self.session.delete(url, json=params)
         if params is None:
             return self.session.get(url)
         else:
@@ -144,6 +147,15 @@ class LSAPI:
             frame = numpy.frombuffer(c)
             print(frame)
             return frame
+
+    def averaging(self, reset=False) -> Optional[int]:
+        """
+        Get the number of images accumulated in the camera's accumulator.
+
+        :param reset: If True, reset the accumulator.
+        :return: The number of images accumulated in the camera's accumulator.
+        """
+        return self.send("images/camera/averaging", is_delete=reset).json()
 
     def reference_image(
         self, num: Optional[int] = None, data: Optional[numpy.ndarray] = None

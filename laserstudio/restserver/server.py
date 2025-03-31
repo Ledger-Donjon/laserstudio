@@ -76,6 +76,10 @@ class RestProxy(QObject):
     def handle_camera_accumulator(self, path: Optional[str]):
         return QVariant(self.laser_studio.handle_camera_accumulator(path))
 
+    @pyqtSlot(QVariant, result="QVariant")
+    def handle_camera_average(self, reset: bool) -> QVariant:
+        return QVariant(self.laser_studio.handle_camera_average(reset))
+
     @pyqtSlot(QVariant, QVariant, result="QVariant")
     def handle_camera_reference(
         self, dotake: Optional[bool] = None, refname: Optional[str] = None
@@ -270,25 +274,18 @@ class CameraAccumulator(Resource):
         return path
 
 
+count = image.model("Average Count", {"count": fields.Integer(example="50")})
+
+
 @image.route("/camera/averaging")
 class CameraAveraging(Resource):
     @image.response(200, "Get the current number of averaged images")
     def get(self):
-        return RestServer.invoke(
-            "handle_camera_average", QVariant(None), QVariant(None)
-        )
+        return RestServer.invoke("handle_camera_average", QVariant(False))
 
     @image.response(200, "Clear the current average")
     def delete(self):
-        return RestServer.invoke(
-            "handle_camera_average", QVariant(True), QVariant(None)
-        )
-
-    @image.response(200, "Set the current number images to be averaged")
-    def post(self):
-        return RestServer.invoke(
-            "handle_camera_average", QVariant(True), QVariant(number)
-        )
+        return RestServer.invoke("handle_camera_average", QVariant(True))
 
 
 @image.route("/camera/reference/")
