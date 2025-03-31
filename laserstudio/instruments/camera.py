@@ -358,7 +358,14 @@ class CameraInstrument(Instrument):
             return pos_8 + neg_8
 
         zer_8 = numpy.zeros((self.width, self.height, 1), dtype=numpy.uint8)
-        stacked = numpy.stack([neg_8, pos_8, zer_8], axis=2)
+        stacked = numpy.stack(
+            [
+                neg_8.reshape(self.width, self.height, 1),
+                pos_8.reshape(self.width, self.height, 1),
+                zer_8,
+            ],
+            axis=2,
+        )
         return stacked.reshape(self.width, self.height, 3)
 
     @property
