@@ -283,6 +283,21 @@ class CameraInstrument(Instrument):
 
         return " " * black_pos + "^", " " * white_pos + "^"
 
+    def show_histogram_terminal(
+        self, frame: Optional[numpy.ndarray] = None, nlines: int = 5
+    ):
+        hists = self.histogram_to_string(
+            self.compute_histogram(frame or self.last_frame)[0], nlines=nlines
+        )
+        levels = self.levels_to_string()
+
+        print("⸢" + hists[0] + "⸣")
+        for hist in hists[1:-1]:
+            print("|" + hist + "|")
+        print("⸤" + hists[-1] + "⸥")
+        print("B" + levels[0])
+        print("W" + levels[1])
+
     def take_reference_image(self, do_take: bool):
         """
         Take a reference image to substract from the next frames.

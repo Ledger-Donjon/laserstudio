@@ -181,7 +181,7 @@ class CameraRaptorToolBar(CameraToolbar):
                 self.frame_no_label.setText(f"{self.camera.last_frame_number}"),
                 self.exposure_time_sb.setValue(self.camera.get_exposure_time_ms()),
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
-                self.show_histogram_terminal(),
+                self.camera.show_histogram_terminal(self.histogram_nlines.value()),
             )
         )
 
@@ -192,17 +192,3 @@ class CameraRaptorToolBar(CameraToolbar):
         self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()
-
-    def show_histogram_terminal(self):
-        hists = self.camera.histogram_to_string(
-            self.camera.compute_histogram(self.camera.last_frame)[0],
-            nlines=self.histogram_nlines.value(),
-        )
-        levels = self.camera.levels_to_string()
-
-        print("⸢" + hists[0] + "⸣")
-        for hist in hists[1:-1]:
-            print("|" + hist + "|")
-        print("⸤" + hists[-1] + "⸥")
-        print("B" + levels[0])
-        print("W" + levels[1])
