@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from ...utils import util
+import os
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -70,11 +71,22 @@ class CameraRaptorToolBar(CameraToolbar):
         w.toggled.connect(self.camera.set_agmc_enabled)
         vbox.addWidget(w)
 
-        self.histogram_nlines = w = QSpinBox()
+        # Histogram size configuration
+        hbox = QHBoxLayout()
+        vbox.addWidget(QLabel("Histogram:"))
+        vbox.addLayout(hbox)
+        self.hist_width = w = QSpinBox()
+        w.setToolTip("Number of bins in the histogram")
+        w.setRange(20, 1000)
+        w.setValue(os.get_terminal_size().columns - 2)
+        w.setSuffix(" bins")
+        hbox.addWidget(w)
+        self.hist_height = w = QSpinBox()
         w.setToolTip("Number of lines in the histogram")
         w.setRange(1, 1000)
         w.setValue(5)
-        vbox.addWidget(w)
+        w.setSuffix(" lines")
+        hbox.addWidget(w)
 
         vbox.addStretch()
 
@@ -181,7 +193,10 @@ class CameraRaptorToolBar(CameraToolbar):
                 self.frame_no_label.setText(f"{self.camera.last_frame_number}"),
                 self.exposure_time_sb.setValue(self.camera.get_exposure_time_ms()),
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
-                self.camera.show_histogram_terminal(self.histogram_nlines.value()),
+                self.camera.show_histogram_terminal(
+                    nlines=self.hist_height.value(), nbins=self.hist_width.value()
+                ),
+                self.camera.show_levels_terminal(width=self.hist_width.value()),
             )
         )
 

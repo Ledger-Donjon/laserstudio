@@ -7,7 +7,7 @@ from .list_serials import (
 )
 from serial.serialutil import SerialException
 import logging
-from typing import Optional, Literal, NamedTuple, cast
+from typing import NamedTuple, cast
 from enum import Enum, IntFlag
 import numpy
 import math
@@ -502,7 +502,53 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # Add 0s to the end to compensate the values that were removed for frame number
         frame = numpy.resize(frame, self.width * self.height)
         return frame
-    
-    def construct_display_image(self, pos, neg = None):
+
+    def construct_display_image(self, pos, neg=None):
         # As we accumulated 16-bits images, we have to reduce it to 8-bits for display
-        return super().construct_display_image(pos / 64.0, None if neg is None else neg / 64.0)
+        return super().construct_display_image(
+            pos / 64.0, None if neg is None else neg / 64.0
+        )
+
+    @property
+    def settings(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        settings = super().settings
+        settings["gain_db"] = self.get_digital_gain_db()
+        settings["exposure_time_ms"] = self.get_exposure_time_ms()
+        settings["high_gain"] = self.get_high_gain_enabled()
+        settings["temperature_setpoint"] = self.get_tec_temperature_setpoint()
+        settings["fan_enabled"] = self.get_fan_enabled()
+        settings["alc_enabled"] = self.get_alc_enabled()
+        settings["tec_enabled"] = self.get_tec_enabled()
+        return settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        """Import and apply settings."""
+        # Call the parent class settings setter
+        assert CameraUSBInstrument.settings.fset is not None
+        CameraUSBInstrument.settings.fset(self, data)
+
+        if "gain_db" in data:
+            self.set_digital_gain_db(data["gain_db"])
+            self.parameter_changed.emit("gain_db", data["gain_db"])
+        if "exposure_time_ms" in data:
+            self.set_exposure_time_ms(data["exposure_time_ms"])
+            self.parameter_changed.emit("exposure_time_ms", data["exposure_time_ms"])
+        if "high_gain" in data:
+            self.set_high_gain_enabled(data["high_gain"])
+            self.parameter_changed.emit("high_gain", data["high_gain"])
+        if "temperature_setpoint" in data:
+            self.set_tec_temperature_setpoint(data["temperature_setpoint"])
+            self.parameter_changed.emit(
+                "temperature_setpoint", data["temperature_setpoint"]
+            )
+        if "fan_enabled" in data:
+            self.set_fan_enabled(data["fan_enabled"])
+            self.parameter_changed.emit("fan_enabled", data["fan_enabled"])
+        if "alc_enabled" in data:
+            self.set_alc_enabled(data["alc_enabled"])
+            self.parameter_changed.emit("alc_enabled", data["alc_enabled"])
+        if "tec_enabled" in data:
+            self.set_tec_enabled(data["tec_enabled"])
+            self.parameter_changed.emit("tec_enabled", data["tec_enabled"])

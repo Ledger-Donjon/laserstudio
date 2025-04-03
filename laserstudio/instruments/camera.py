@@ -7,6 +7,7 @@ from .instrument import Instrument
 from .shutter import ShutterInstrument, TicShutterInstrument
 import logging
 import numpy
+import os
 
 
 class CameraInstrument(Instrument):
@@ -258,11 +259,13 @@ class CameraInstrument(Instrument):
         )
         return image.clip(0, max).astype(type_)
 
-    def compute_histogram(self, frame: numpy.ndarray):
+    def compute_histogram(
+        self, frame: numpy.ndarray, width: int = os.get_terminal_size().columns - 2
+    ):
         # Compute histogram of last image
         return numpy.histogram(
             frame,
-            bins=150,
+            bins=width,
             range=(0, numpy.iinfo(frame.dtype).max),
         )
 
@@ -277,24 +280,29 @@ class CameraInstrument(Instrument):
             hists.append("".join(bar[i] for i in val))
         return hists[::-1]
 
-    def levels_to_string(self):
-        white_pos = int(150 * self.white_level)
-        black_pos = int(150 * self.black_level)
+    def levels_to_string(self, width: int = os.get_terminal_size().columns - 2):
+        white_pos = int(width * self.white_level)
+        black_pos = int(width * self.black_level)
 
         return " " * black_pos + "^", " " * white_pos + "^"
 
     def show_histogram_terminal(
-        self, frame: Optional[numpy.ndarray] = None, nlines: int = 5
+        self,
+        frame: Optional[numpy.ndarray] = None,
+        nlines: int = 5,
+        nbins: int = os.get_terminal_size().columns - 2,
     ):
         hists = self.histogram_to_string(
-            self.compute_histogram(frame or self.last_frame)[0], nlines=nlines
+            self.compute_histogram(frame=frame or self.last_frame, width=nbins)[0],
+            nlines=nlines,
         )
-        levels = self.levels_to_string()
-
         print("⸢" + hists[0] + "⸣")
         for hist in hists[1:-1]:
             print("|" + hist + "|")
         print("⸤" + hists[-1] + "⸥")
+
+    def show_levels_terminal(self, width: int = os.get_terminal_size().columns - 2):
+        levels = self.levels_to_string(width=width)
         print("B" + levels[0])
         print("W" + levels[1])
 

@@ -452,6 +452,10 @@ class LaserStudio(QMainWindow):
         # Scanning geometry
         data["scangeometry"] = self.viewer.scan_geometry.settings
 
+        # Lighting
+        if self.instruments.light is not None:
+            data["light"] = self.instruments.light.settings
+
         # Probes
         data["probes"] = [probe.settings for probe in self.instruments.probes]
 
@@ -476,6 +480,11 @@ class LaserStudio(QMainWindow):
                 self.viewer.stage_sight.distortion = (
                     self.instruments.camera.correction_matrix
                 )
+
+        # Lighting system settings
+        light = data.get("light")
+        if (self.instruments.light is not None) and (light is not None):
+            self.instruments.light.settings = light
 
         # Scanning geometry
         geometry = data.get("scangeometry")

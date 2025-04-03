@@ -142,10 +142,8 @@ class LSAPI:
         """
         response = self.send("images/camera/accumulator")
         c = response.content
-        print(len(c))
         if type(c) is bytes:
             frame = numpy.frombuffer(c)
-            print(frame)
             return frame
 
     def averaging(self, reset=False) -> Optional[int]:

@@ -43,7 +43,7 @@ class HayashiLRInstrument(LightInstrument):
         return self.hyslr.intensity
 
     @intensity.setter
-    def intensity(self, value: int):
+    def intensity(self, value: float):
         self.hyslr.intensity = value
 
     @property

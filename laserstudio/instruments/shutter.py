@@ -17,6 +17,19 @@ class ShutterInstrument(Instrument):
             raise ValueError("Expected bool")
         self.__open = value
 
+    @property
+    def settings(self) -> dict:
+        super_settings = super().settings
+        super_settings["open"] = self.open
+        return super_settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        super().settings = data
+        if "open" in data:
+            self.open = data["open"]
+            self.parameter_changed.emit("open", data["open"])
+
 
 class TicShutterInstrument(ShutterInstrument):
     def __init__(self, config: dict):

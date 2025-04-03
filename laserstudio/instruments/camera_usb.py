@@ -1,6 +1,5 @@
 import logging
 from .camera import CameraInstrument
-from typing import Optional, Literal
 
 
 class CameraUSBInstrument(CameraInstrument):
@@ -50,8 +49,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def brightness(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_BRIGHTNESS)
-        return float(exp)
+        bri = self.__video_capture.get(self.cv2.CAP_PROP_BRIGHTNESS)
+        return float(bri)
 
     @brightness.setter
     def brightness(self, value: float):
@@ -59,8 +58,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def contrast(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_CONTRAST)
-        return float(exp)
+        con = self.__video_capture.get(self.cv2.CAP_PROP_CONTRAST)
+        return float(con)
 
     @contrast.setter
     def contrast(self, value: float):
@@ -77,8 +76,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def gain(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_GAIN)
-        return float(exp)
+        gain = self.__video_capture.get(self.cv2.CAP_PROP_GAIN)
+        return float(gain)
 
     @gain.setter
     def gain(self, value: float):
@@ -95,8 +94,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def saturation(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_SATURATION)
-        return float(exp)
+        sat = self.__video_capture.get(self.cv2.CAP_PROP_SATURATION)
+        return float(sat)
 
     @saturation.setter
     def saturation(self, value: float):
@@ -104,8 +103,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def fps(self) -> int:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_FPS)
-        return int(exp)
+        fps = self.__video_capture.get(self.cv2.CAP_PROP_FPS)
+        return int(fps)
 
     @fps.setter
     def fps(self, value: int):
@@ -122,8 +121,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def gamma(self) -> int:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_GAMMA)
-        return int(exp)
+        gamma = self.__video_capture.get(self.cv2.CAP_PROP_GAMMA)
+        return int(gamma)
 
     @gamma.setter
     def gamma(self, value: int):

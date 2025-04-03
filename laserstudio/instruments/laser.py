@@ -47,8 +47,7 @@ class LaserInstrument(ProbeInstrument):
     @settings.setter
     def settings(self, data: dict):
         """Import settings from a dict."""
-        assert ProbeInstrument.settings.fset is not None
-        ProbeInstrument.settings.fset(self, data)
+        ProbeInstrument.settings.__set__(self, data)
         self.sweep_max = data.get("sweep_max", self.sweep_max)
         self.sweep_min = data.get("sweep_min", self.sweep_min)
         self.sweep_freq = data.get("sweep_freq", self.sweep_freq)

@@ -10,8 +10,8 @@ _shared_device: dict[str, LMSController] = {}
 
 class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     def __init__(self, config: dict):
-        super(ShutterInstrument, self).__init__(config)
-        super(LightInstrument, self).__init__(config)
+        ShutterInstrument.__init__(self, config)
+        LightInstrument.__init__(self, config)
 
         dev = config.get("dev")
         if dev == "":
@@ -33,13 +33,11 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     # Shutter operations
     @property
     def open(self):
-        return super().open
+        return ShutterInstrument.open.__get__(self)
 
     @open.setter
     def open(self, value: bool):
-        super(LMSControllerInstrument, type(self)).open.fset(self, value)
-        # k = super(LMSControllerInstrument)
-        # super(ShutterInstrument, self).open = value
+        ShutterInstrument.open.__set__(self, value)
         state = MotorState.SLIDE_IN if value else MotorState.SLIDE_OUT
         if self.motor == 1:
             self.lms.motor_1_position = state
@@ -72,3 +70,23 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
         self.lms.led_control = ControlMode.MANUAL
         self.lms.motors_control_mode = ControlMode.MANUAL
         self.lms.apply()
+
+    @property
+    def settings(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        settings = super().settings
+        return settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        """Import and apply settings."""
+        # Call the parent class settings setter
+        if "intensity" in data:
+            self.intensity = data["intensity"]
+            self.parameter_changed.emit("intensity", data["intensity"])
+        if "light" in data:
+            self.light = data["light"]
+            self.parameter_changed.emit("light", data["light"])
+        if "open" in data:
+            self.open = data["open"]
+            self.parameter_changed.emit("open", data["open"])
