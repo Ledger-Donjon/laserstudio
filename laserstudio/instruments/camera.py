@@ -397,12 +397,38 @@ class CameraInstrument(Instrument):
         settings = super().settings
         if self.correction_matrix is not None:
             settings["transform"] = qtransform_to_yaml(self.correction_matrix)
+        settings["white_level"] = self.white_level
+        settings["black_level"] = self.black_level
+        settings["shutter"] = self.shutter.settings if self.shutter else None
+        settings["image_averaging"] = self.image_averaging
+        settings["windowed_averaging"] = self.windowed_averaging
+        settings["objective"] = self.objective
+
         return settings
 
     @settings.setter
     def settings(self, data: dict):
         """Import settings from a dict."""
-        assert Instrument.settings.fset is not None
-        Instrument.settings.fset(self, data)
+        Instrument.settings.__set__(self, data)
         if "transform" in data:
             self.correction_matrix = yaml_to_qtransform(data["transform"])
+        if "white_level" in data:
+            self.white_level = data["white_level"]
+            self.parameter_changed.emit("white_level", data["white_level"])
+        if "black_level" in data:
+            self.black_level = data["black_level"]
+            self.parameter_changed.emit("black_level", data["black_level"])
+        if "shutter" in data and self.shutter is not None:
+            self.shutter.settings = data["shutter"]
+            self.parameter_changed.emit("shutter", data["shutter"])
+        if "image_averaging" in data:
+            self.image_averaging = data["image_averaging"]
+            self.parameter_changed.emit("image_averaging", data["image_averaging"])
+        if "windowed_averaging" in data:
+            self.windowed_averaging = data["windowed_averaging"]
+            self.parameter_changed.emit(
+                "windowed_averaging", data["windowed_averaging"]
+            )
+        if "objective" in data:
+            self.select_objective(data["objective"])
+            self.parameter_changed.emit("objective", data["objective"])

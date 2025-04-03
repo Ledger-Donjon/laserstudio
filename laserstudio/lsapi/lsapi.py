@@ -238,3 +238,29 @@ class LSAPI:
             },
             is_put=True,
         ).json()
+
+    def set_instrument_settings(self, label: str, settings: dict):
+        """
+        Set the settings of a specific instrument.
+        This method interacts with the API to update the settings of an instrument
+        identified by its label.
+
+        :param label: The unique identifier for the instrument.
+        :param settings: A dictionary containing the settings to update for the
+                         instrument.
+        :return: The response from the API containing the instrument's updated settings.
+        """
+        return self.send(
+            f"instruments/{label}/settings", {"settings": settings}, is_put=True
+        ).json()
+
+    def get_instrument_settings(self, label: str):
+        """
+        Get the settings of a specific instrument.
+        This method interacts with the API to retrieve the settings of an instrument
+        identified by its label.
+
+        :param label: The unique identifier for the instrument.
+        :return: The response from the API containing the instrument's settings.
+        """
+        return self.send(f"instruments/{label}/settings").json()["settings"]

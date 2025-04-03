@@ -526,8 +526,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
     def settings(self, data: dict):
         """Import and apply settings."""
         # Call the parent class settings setter
-        assert CameraUSBInstrument.settings.fset is not None
-        CameraUSBInstrument.settings.fset(self, data)
+        CameraUSBInstrument.settings.__set__(self, data)
 
         if "gain_db" in data:
             self.set_digital_gain_db(data["gain_db"])
