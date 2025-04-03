@@ -135,7 +135,7 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.PIN))
-        if (stage := self.instruments.stage) is not None:
+        if (stage := self.instruments.stage) is not None and stage.num_axis > 2:
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(
                 lambda: stage.move_relative(Vector(0, 0, 1), wait=True)

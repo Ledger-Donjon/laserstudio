@@ -54,6 +54,24 @@
       ]
     },
     {
+      "title": "SMC100",
+      "properties": {
+        "type": {
+          "const": "SMC100",
+          "description": "A Newport SMC100."
+        },
+        "adresses": {
+          "description": "Adresses.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          },
+          "default": [1, 2]
+        }
+      }
+    },
+    {
       "title": "Dummy",
       "properties": {
         "type": {
