@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtCore import Qt, QSize, QMargins
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QDoubleSpinBox,
 )
+from PyQt6.QtCharts import QBarSet, QBarSeries, QChart, QChartView
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
@@ -224,6 +225,40 @@ class CameraToolbar(QToolBar):
         self.image_dialog.setLayout(grid)
         self.image_dialog.setModal(False)
         self.image_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+
+        self.charts = QBarSeries()
+        self.charts.setName("Histogram")
+        self.chart = QChart()
+        self.chart.legend().hide()
+        self.chart.addSeries(self.charts)
+        self.chart.setMargins(QMargins())
+        self.chart.setBackgroundRoundness(0)
+        self.chart.setBackgroundBrush(QColor(0, 0, 0, 0))
+        self._chart_view = QChartView(self.chart)
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        grid.addWidget(self._chart_view, i + 4, 0, 1, 3)
+        self.camera.new_image.connect(lambda _: self.update_histogram())
+
+    def update_histogram(self):
+        """Update the histogram chart with the new data.
+
+        :param histogram: The histogram data to update the chart with.
+        """
+        histogram = self.camera.compute_histogram(
+            self.camera.last_frame, width=256 // 4
+        )
+        self.charts.clear()
+        bs = QBarSet("Histogram")
+        bs.append(histogram[0])
+        self.charts.append(bs)
+        self.chart.createDefaultAxes()
+        axes = self.chart.axes()
+        axes[1].setRange(0, max(histogram[0]) * 1.1)
+        for axe in axes:
+            axe.setLabelsVisible(False)
+            axe.setGridLineVisible(False)
+            axe.setLineVisible(False)
+        self.chart.update()
 
     def update_levels(self, black=None, white=None):
         if black is None:

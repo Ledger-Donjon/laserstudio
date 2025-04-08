@@ -193,10 +193,6 @@ class CameraRaptorToolBar(CameraToolbar):
                 self.frame_no_label.setText(f"{self.camera.last_frame_number}"),
                 self.exposure_time_sb.setValue(self.camera.get_exposure_time_ms()),
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
-                self.camera.show_histogram_terminal(
-                    nlines=self.hist_height.value(), nbins=self.hist_width.value()
-                ),
-                self.camera.show_levels_terminal(width=self.hist_width.value()),
             )
         )
 
