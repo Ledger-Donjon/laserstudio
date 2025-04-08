@@ -136,15 +136,23 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
 
-    def accumulated_image(self) -> Optional[numpy.ndarray]:
+    def accumulated_image(self, path: Optional[str]) -> Optional[numpy.ndarray]:
         """
         Get the camera accumulator's data.
         """
-        response = self.send("images/camera/accumulator")
-        c = response.content
-        if type(c) is bytes:
-            frame = numpy.frombuffer(c)
-            return frame
+
+        if path is None:
+            response = self.send("images/camera/accumulator")
+            c = response.content
+            if type(c) is bytes:
+                frame = numpy.frombuffer(c)
+                return frame
+            return response
+        else:
+            # We request for the data to be saved on the host machine at given path
+            response = self.send("images/camera/accumulator", {"path": path})
+            return numpy.load(response.text.strip().strip("\""))
+
 
     def averaging(self, reset=False) -> Optional[int]:
         """
@@ -156,12 +164,16 @@ class LSAPI:
         return self.send("images/camera/averaging", is_delete=reset).json()
 
     def reference_image(
-        self, num: Optional[int] = None, data: Optional[numpy.ndarray] = None
+        self, num: Optional[int] = None, unset: bool = False, set: bool = False
     ) -> Optional[numpy.ndarray]:
         """
         Get and/or set the reference image for the camera.
         """
-        self.send("images/camera/reference" + (f"/{num}" if num is not None else ""))
+        self.send(
+            "images/camera/reference" + (f"/{num}" if num is not None else ""),
+            {} if set else None,
+            is_delete=unset,
+        )
 
     def screenshot(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """

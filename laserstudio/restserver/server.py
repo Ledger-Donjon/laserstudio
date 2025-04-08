@@ -245,10 +245,11 @@ class CameraAccumulator(Resource):
         HTTPStatus.NOT_FOUND, "No data can be produced (there may be no camera)"
     )
     def get(self):
-        frame = cast(
-            Optional[numpy.ndarray],
+        content = cast(
+            QVariant,
             RestServer.invoke("handle_camera_accumulator", QVariant(None)),
         )
+        frame = cast(numpy.ndarray, content.value())
         if frame is None:
             flask_api.abort(
                 HTTPStatus.NOT_FOUND,
