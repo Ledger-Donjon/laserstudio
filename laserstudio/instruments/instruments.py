@@ -1,3 +1,4 @@
+from pystages import Autofocus, Vector
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
@@ -105,6 +106,10 @@ class Instruments:
                     continue
                 self.probes.append(ProbeInstrument(config=probe_config))
 
+        # Autofocus helper: stores registered position in order to do automatic camera
+        # focusing. This can be considered as an abstract instrument.
+        self.autofocus_helper = Autofocus()
+
         # Lighting system
         self.light: Optional[LightInstrument] = None
         light_config = config.get("lighting", None)
@@ -140,3 +145,13 @@ class Instruments:
         for instrument in self.all_instruments:
             if instrument is not None and instrument.label == label:
                 return instrument
+                
+    def autofocus(self):
+        if self.stage is None:
+            return
+        if len(self.autofocus_helper.registered_points) < 3:
+            return
+        pos = self.stage.position
+        z = self.autofocus_helper.focus(pos.x, pos.y)
+        assert abs(z - pos.z) < 500
+        self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
