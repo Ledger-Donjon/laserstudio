@@ -44,7 +44,8 @@ class PhotoEmissionToolbar(QToolBar):
         # Select reference image
         self.ref_selection = w = QComboBox()
         w.setEditable(True)
-        w.lineEdit().setPlaceholderText("Image name")
+        if (line_edit := w.lineEdit()) is not None:
+            line_edit.setPlaceholderText("Image name")
         w.setToolTip("Reference image name")
         w.currentTextChanged.connect(
             lambda v: (
@@ -65,6 +66,26 @@ class PhotoEmissionToolbar(QToolBar):
                 self.update_ref_image_controls(),
             )
         )
+        hbox = QHBoxLayout()
+        vbox.addLayout(hbox)
+        hbox.setSpacing(0)
+        hbox.setContentsMargins(0, 0, 0, 0)
+        self.memory_buttons: list[QPushButton] = []
+        # Button to take a reference image
+        for m in ["M1", "M2", "M3", "M4"]:
+            w = QPushButton(m)
+            self.memory_buttons.append(w)
+            w.setToolTip(f"Set reference image {m}")
+            w.setCheckable(True)
+            w.setChecked(False)
+            w.clicked.connect(
+                lambda v, m=m: (
+                    self.camera.__setattr__("current_reference_image", m),
+                    self.camera.take_reference_image(v),
+                    self.update_ref_image_controls(),
+                )
+            )
+            hbox.addWidget(w)
 
         # Checkbox to activate Image averaging
         w = QWidget()
@@ -134,5 +155,12 @@ class PhotoEmissionToolbar(QToolBar):
                 self.ref_selection.addItem(self.camera.current_reference_image)
         else:
             self.takerefbutton.setText("Set")
+
+        for m in self.memory_buttons:
+            m.blockSignals(True)
+            m.setChecked(
+                self.camera.reference_image_accumulators.get(m.text()) is not None
+            )
+            m.blockSignals(False)
         self.takerefbutton.blockSignals(False)
         self.ref_selection.blockSignals(False)

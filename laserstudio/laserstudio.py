@@ -311,7 +311,7 @@ class LaserStudio(QMainWindow):
         :param refname: The name of reference image to set as the current reference
                        image for the camera. If None, no action is performed.
         :returns: None if the stage sight or its associated camera is unavailable,
-                  otherwise returns the current reference image number.
+                  otherwise returns the current reference image name.
         """
         # Takes the camera associated to the stage.
         if (

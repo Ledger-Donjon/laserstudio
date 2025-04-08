@@ -177,7 +177,7 @@ class CameraRaptorToolBar(CameraToolbar):
         self.temperature_setpoint.setRange(-20, 20)
         self.temperature_setpoint.setSuffix("°C")
         self.temperature_setpoint.setSingleStep(1)
-        # self.temperature_setpoint.setValue(self.camera.get_tec_temperature_setpoint())
+        self.temperature_setpoint.setValue(self.camera.get_tec_temperature_setpoint())
         self.temperature_setpoint.valueChanged.connect(
             self.camera.set_tec_temperature_setpoint
         )
