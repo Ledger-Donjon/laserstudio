@@ -36,7 +36,9 @@ class RestProxy(QObject):
 
     @pyqtSlot(result="QVariant")
     def handle_go_next(self):
-        response = self.laser_studio.handle_go_next()
+        response = {}
+        if self.laser_studio.scanning_enabled:
+            response = self.laser_studio.handle_go_next()
         return QVariant(response)
 
     @pyqtSlot(result="QVariant")

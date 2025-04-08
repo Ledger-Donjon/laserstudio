@@ -47,6 +47,9 @@ class LaserStudio(QMainWindow):
         # Configuration file
         self.config = config
 
+        # Permits for the user to deactivate temporarly the go_next effect
+        self.scanning_enabled = True
+
         # User settings
         self.settings = QSettings("ledger", "laserstudio")
 
