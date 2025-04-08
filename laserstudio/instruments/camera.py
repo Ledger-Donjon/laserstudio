@@ -159,10 +159,14 @@ class CameraInstrument(Instrument):
 
         # Apply the subtraction of reference image
         pos, neg = self.substract_reference_image()
+
+        # Apply levels
+        pos = self.apply_levels(pos)
+        if neg is not None:
+            neg = self.apply_levels(neg)
+
         # Construct a frame from substracted values
         frame = self.construct_display_image(pos, neg)
-        # Apply levels
-        frame = self.apply_levels(frame)
         mode = "RGB" if frame.shape[-1] == 3 else "L"
         return self.width, self.height, mode, frame.tobytes()
 
