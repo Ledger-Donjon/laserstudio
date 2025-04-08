@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, QCoreApplication, Qt
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from pystages import Corvus, CNCRouter, Stage, Vector
@@ -31,7 +31,8 @@ class StageInstrument(Instrument):
         """
         :param config: YAML configuration object
         """
-        super().__init__(config=config)
+        super().__init__(config)
+        self.mutex = QMutex()
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time
@@ -100,9 +101,6 @@ class StageInstrument(Instrument):
         self.unit_factor = config.get("unit_factor", 1.0)
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
-        if self.stage is not None:
-            self.stage.wait_routine = lambda: QCoreApplication.processEvents()
-
         # Indicate
         self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
@@ -112,7 +110,10 @@ class StageInstrument(Instrument):
 
         :return: Get the position of the stage
         """
-        return self.stage.position * self.unit_factor
+        self.mutex.lock()
+        result = self.stage.position * self.unit_factor
+        self.mutex.unlock()
+        return result
 
     @position.setter
     def position(self, value: Vector):
@@ -174,4 +175,6 @@ class StageInstrument(Instrument):
                     )
                     return
         # Move to actual destination
+        self.mutex.lock()
         self.stage.move_to(position / self.unit_factor, wait=wait)
+        self.mutex.unlock()
