@@ -41,6 +41,8 @@ class StageInstrument(Instrument):
         self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
         self.guardrail_enabled = True
 
+        self.backlashes = cast(list[float], config.get("backlashes_um"))
+
         dev = config.get("dev")
         if device_type in ["Corvus", "CNC", "SMC100"]:
             if dev is None:
@@ -138,7 +140,7 @@ class StageInstrument(Instrument):
         """Get the position of the stage instrument
 
         :return: Get the position of the stage
-        """        
+        """
         self.mutex.lock()
         position = self.stage.position
         self.mutex.unlock()

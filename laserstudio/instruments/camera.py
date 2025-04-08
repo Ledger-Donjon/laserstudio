@@ -4,10 +4,13 @@ from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
+from .instruments import StageInstrument
 from .shutter import ShutterInstrument, TicShutterInstrument
+from .focus import FocusThread, FocusSearchSettings
 import logging
 import numpy
 import os
+import cv2
 
 
 class CameraInstrument(Instrument):
@@ -80,6 +83,11 @@ class CameraInstrument(Instrument):
         self.reference_image_accumulators: dict[str, numpy.ndarray] = {}
         self.current_reference_image = "Reference 0"
         self.show_negative_values = True
+
+        # Magic Focus
+        # Set when a focus search is running, then cleared.
+        # This is used to prevent launching two search threads at the same time.
+        self.focus_thread: Optional[FocusThread] = None
 
     @property
     def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
@@ -182,23 +190,22 @@ class CameraInstrument(Instrument):
         """
         Sets the number of images that must be averaged.
         """
-        if self._last_frame_accumulator is not None and self.windowed_averaging:
-            # In the case we are in windowed_average mode and we have already accumulated images
-            if len(self._last_frames) > value:
-                # We reduce the number of images to average
-                # Drop the oldest frames (at the begining of the array)
-                to_substract = self._last_frames[: len(self._last_frames) - value]
-                self._last_frames = self._last_frames[len(self._last_frames) - value :]
-                self._last_frame_accumulator -= sum(to_substract)
-                self.number_of_averaged_images -= len(to_substract)
-                assert len(self._last_frames) == self.number_of_averaged_images
-                assert len(self._last_frames) == value, (
-                    f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
-                )
-        else:
-            self.clear_averaged_images()
-
+        # if self._last_frame_accumulator is not None and self.windowed_averaging:
+        #     # In the case we are in windowed_average mode and we have already accumulated images
+        #     if len(self._last_frames) > value:
+        #         # We reduce the number of images to average
+        #         # Drop the oldest frames (at the begining of the array)
+        #         to_substract = self._last_frames[: len(self._last_frames) - value]
+        #         self._last_frames = self._last_frames[len(self._last_frames) - value :]
+        #         self._last_frame_accumulator -= sum(to_substract)
+        #         self.number_of_averaged_images -= len(to_substract)
+        #         assert len(self._last_frames) == self.number_of_averaged_images
+        #         assert len(self._last_frames) == value, (
+        #             f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
+        #         )
+        # else:
         self._image_averaging = value
+        self.clear_averaged_images()
 
     def clear_averaged_images(self):
         """
@@ -356,8 +363,11 @@ class CameraInstrument(Instrument):
         """
         Construct the display image from the positive and negative images.
         """
+        average_count = self.average_count
+        if average_count == 0:
+            average_count = 1
         pos_8 = (
-            (pos / self.average_count)
+            (pos / average_count)
             .clip(
                 min=numpy.iinfo(numpy.uint8).min,
                 max=numpy.iinfo(numpy.uint8).max,
@@ -370,7 +380,7 @@ class CameraInstrument(Instrument):
         # There is a negative value, which means that we are in differential analysis mode
         neg_8 = (
             (
-                (neg / self.average_count)
+                (neg / average_count)
                 .clip(
                     min=numpy.iinfo(numpy.uint8).min,
                     max=numpy.iinfo(numpy.uint8).max,
@@ -436,3 +446,64 @@ class CameraInstrument(Instrument):
         if "objective" in data:
             self.select_objective(data["objective"])
             self.parameter_changed.emit("objective", data["objective"])
+
+    @property
+    def laplacian_std_dev(self) -> float:
+        """
+        Return the standard deviation of the Laplacian operator on the last image.
+
+        :return: The standard deviation of the Laplacian operator on the last image.
+        """
+        if self.last_frame is None:
+            return 0.0
+
+        last_frame = self.last_frame
+
+        # cv::Laplacian(src, dst, CV_16S, 3);
+        # KSIZE (3): Aperture size used to compute the
+        #   second-derivative filters. See getDerivKernels for details.
+        #   The size must be positive and odd.
+        dst = cv2.Laplacian(last_frame, cv2.CV_8U, ksize=3)
+
+        # cv::meanStdDev(dst, mean, std_dev);
+        _, std_dev = cv2.meanStdDev(dst)
+
+        # this->result = std_dev[0];
+        self._result = float(std_dev[0][0])
+        return self._result
+
+    def magic_focus(
+        self,
+        stage: StageInstrument,
+        coarse: Optional[FocusSearchSettings] = None,
+        fine: Optional[FocusSearchSettings] = None,
+    ):
+        """
+        Estimates automatically the correct focus by moving the stage and analysing the
+        resulting camera image. This is executed in a thread.
+        """
+        assert self.focus_thread is None
+
+        # Adapt range depending on currently selected microscope objective.
+        objective = self.objective
+        t = FocusThread(
+            self,
+            stage,
+            coarse
+            or FocusSearchSettings(
+                4000 / objective, 50, 4, multi_peaks=True, best_is_hightest=False
+            ),
+            fine
+            or FocusSearchSettings(
+                200 / objective, 20, 16, multi_peaks=True, best_is_hightest=False
+            ),
+            None,
+        )
+        self.focus_thread = t
+        t.finished.connect(self.magic_focus_finished)
+        return t
+
+    def magic_focus_finished(self):
+        """Called when focus search thread has finished."""
+        assert self.focus_thread is not None
+        self.focus_thread = None

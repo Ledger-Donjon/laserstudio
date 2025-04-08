@@ -102,7 +102,7 @@ class LaserStudio(QMainWindow):
 
         # Toolbar: Focusing
         if (self.instruments.stage is not None) and (
-            type(self.instruments.camera) is CameraNITInstrument
+            self.instruments.camera is not None
         ):
             toolbar = FocusToolbar(
                 self.instruments.stage,
