@@ -1,6 +1,10 @@
 from .probe import ProbeInstrument
 from random import uniform
 from PyQt6.QtCore import QVariant
+from .shutter import ShutterInstrument
+from typing import Optional
+from .lmscontroller import LMSControllerInstrument
+import logging
 
 
 class LaserInstrument(ProbeInstrument):
@@ -14,23 +18,39 @@ class LaserInstrument(ProbeInstrument):
         self.sweep_freq = 100
         self._sweep_iteration = 0
 
-    @property
-    def yaml(self) -> dict:
-        """Export settings to a dict for yaml serialization."""
-        yaml = super().yaml
-        yaml["sweep_max"] = self.sweep_max
-        yaml["sweep_min"] = self.sweep_min
-        yaml["sweep_freq"] = self.sweep_freq
-        return yaml
+        # Shutter
+        self.shutter: Optional[ShutterInstrument] = None
+        shutter = config.get("shutter")
+        if type(shutter) is dict and shutter.get("enable", True):
+            try:
+                device_type = shutter.get("type")
+                if device_type == "LMSController":
+                    self.shutter = LMSControllerInstrument(shutter)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Shutter type {device_type}. Skipping device."
+                    )
+            except Exception as e:
+                logging.getLogger("laserstudio").warning(
+                    f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
+                )
 
-    @yaml.setter
-    def yaml(self, yaml: dict):
+    @property
+    def settings(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        settings = super().settings
+        settings["sweep_max"] = self.sweep_max
+        settings["sweep_min"] = self.sweep_min
+        settings["sweep_freq"] = self.sweep_freq
+        return settings
+
+    @settings.setter
+    def settings(self, data: dict):
         """Import settings from a dict."""
-        assert ProbeInstrument.yaml.fset is not None
-        ProbeInstrument.yaml.fset(self, yaml)
-        self.sweep_max = yaml.get("sweep_max", self.sweep_max)
-        self.sweep_min = yaml.get("sweep_min", self.sweep_min)
-        self.sweep_freq = yaml.get("sweep_freq", self.sweep_freq)
+        ProbeInstrument.settings.__set__(self, data)
+        self.sweep_max = data.get("sweep_max", self.sweep_max)
+        self.sweep_min = data.get("sweep_min", self.sweep_min)
+        self.sweep_freq = data.get("sweep_freq", self.sweep_freq)
 
     @property
     def on_off(self) -> bool: ...

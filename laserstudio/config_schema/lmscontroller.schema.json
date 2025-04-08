@@ -1,13 +1,13 @@
 {
-  "$id": "hayashi.schema.json",
+  "$id": "lmscontroller.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Hayashi",
+  "title": "ALPhANOV LMS Controller",
   "type": "object",
   "allOf": [
     {
       "properties": {
         "type": {
-          "const": "Hayashi"
+          "const": "LMSController"
         }
       }
     },
@@ -17,6 +17,5 @@
     {
       "$ref": "serial.schema.json"
     }
-  ],
-  "description": "Hayashi light controlled through a dongle from https://github.com/Ledger-Donjon/hayashi-light-remote."
+  ]
 }

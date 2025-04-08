@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtCore import Qt, QSize, QMargins
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
@@ -9,7 +9,9 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QSlider,
     QLabel,
+    QDoubleSpinBox,
 )
+from PyQt6.QtCharts import QBarSet, QBarSeries, QChart, QChartView
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
 
 class CameraToolbar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
+        self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
         super().__init__("Camera parameters", laser_studio)
@@ -122,19 +125,23 @@ class CameraToolbar(QToolBar):
             # self.addWidget(w)
             grid.addWidget(w, 4, 1, 1, 2)
 
+        # Add stretch of last row
+        grid.setRowStretch(5, 1)
+
         self.image_dialog = QDialog()
         self.image_dialog.setWindowTitle("Image Adjustment")
+        self.image_dialog.setObjectName("image-adjustment")
 
         w = QPushButton()
         w.setToolTip(self.image_dialog.windowTitle())
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/sliders-solid.svg")))
-        w.clicked.connect(lambda: self.image_dialog.exec())
+        w.clicked.connect(lambda: self.image_dialog.show())
         grid.addWidget(w, 1, 2)
 
         grid = QGridLayout()
         # Image adjustment dialog (for USB camera)
         i = 0
-        if isinstance(self.camera, CameraUSBInstrument):
+        if type(self.camera) is CameraUSBInstrument:
             for i, (att, minimum, maximum) in enumerate(
                 [
                     ("brightness", 0, 255),
@@ -159,15 +166,120 @@ class CameraToolbar(QToolBar):
         grid.addWidget(QLabel("Opacity:"), i + 1, 0)
         w = self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self.opacity_slider.valueChanged.connect(
-            lambda a: laser_studio.viewer.stage_sight.image.setOpacity(
-                a / self.opacity_slider.maximum()
+            lambda a: (
+                laser_studio.viewer.stage_sight.image.setOpacity(
+                    a / self.opacity_slider.maximum()
+                )
+                if laser_studio.viewer.stage_sight is not None
+                else ()
             )
-            if laser_studio.viewer.stage_sight is not None
-            else ()
         )
         w.setMinimum(0)
         w.setMaximum(100)
         w.setValue(100)
         grid.addWidget(w, i + 1, 1)
 
+        # Image levels adjustment
+        # Add a slider to set the black level
+        grid.addWidget(QLabel("Black Level:"), i + 2, 0)
+        self.black_level_slider = QSlider(Qt.Orientation.Horizontal)
+        self.black_level_slider.setMinimum(0)
+        self.black_level_slider.setMaximum(2550)
+        self.black_level_slider.setValue(int(self.camera.black_level * 2550))
+        self.black_level_slider.valueChanged.connect(
+            lambda x: self.update_levels(black=x / 2550)
+        )
+        grid.addWidget(self.black_level_slider, i + 2, 1)
+
+        # Add a double spinbox to set the black level
+        self.black_level_sb = QDoubleSpinBox()
+        self.black_level_sb.setRange(0, 100)
+        self.black_level_sb.setDecimals(4)
+        self.black_level_sb.setValue(self.camera.black_level * 100)
+        self.black_level_sb.valueChanged.connect(
+            lambda x: self.update_levels(black=x / 100)
+        )
+        grid.addWidget(self.black_level_sb, i + 2, 2)
+
+        # Add a slider to set the white level
+        grid.addWidget(QLabel("White Level:"), i + 3, 0)
+        self.white_level_slider = QSlider(Qt.Orientation.Horizontal)
+        self.white_level_slider.setMinimum(0)
+        self.white_level_slider.setMaximum(2550)
+        self.white_level_slider.setValue(int(self.camera.white_level * 2550))
+        self.white_level_slider.valueChanged.connect(
+            lambda x: self.update_levels(white=x / 2550)
+        )
+        grid.addWidget(self.white_level_slider, i + 3, 1)
+
+        # Add a double spinbox to set the white level
+        self.white_level_sb = QDoubleSpinBox()
+        self.white_level_sb.setRange(0, 100)
+        self.white_level_sb.setDecimals(4)
+        self.white_level_sb.setValue(self.camera.white_level * 100)
+        self.white_level_sb.valueChanged.connect(
+            lambda x: self.update_levels(white=x / 100)
+        )
+        grid.addWidget(self.white_level_sb, i + 3, 2)
+
         self.image_dialog.setLayout(grid)
+        self.image_dialog.setModal(False)
+        self.image_dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+
+        self.charts = QBarSeries()
+        self.charts.setName("Histogram")
+        self.chart = QChart()
+        self.chart.legend().hide()
+        self.chart.addSeries(self.charts)
+        self.chart.setMargins(QMargins())
+        self.chart.setBackgroundRoundness(0)
+        self.chart.setBackgroundBrush(QColor(0, 0, 0, 0))
+        self._chart_view = QChartView(self.chart)
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        grid.addWidget(self._chart_view, i + 4, 0, 1, 3)
+        self.camera.new_image.connect(lambda _: self.update_histogram())
+
+    def update_histogram(self):
+        """Update the histogram chart with the new data.
+
+        :param histogram: The histogram data to update the chart with.
+        """
+        histogram = self.camera.compute_histogram(
+            self.camera.last_frame, width=256 // 4
+        )
+        self.charts.clear()
+        bs = QBarSet("Histogram")
+        bs.append(histogram[0])
+        self.charts.append(bs)
+        self.chart.createDefaultAxes()
+        axes = self.chart.axes()
+        axes[1].setRange(0, max(histogram[0]) * 1.1)
+        for axe in axes:
+            axe.setLabelsVisible(False)
+            axe.setGridLineVisible(False)
+            axe.setLineVisible(False)
+        self.chart.update()
+
+    def update_levels(self, black=None, white=None):
+        if black is None:
+            black = self.black_level_slider.value() / self.black_level_slider.maximum()
+        if white is None:
+            white = self.white_level_slider.value() / self.white_level_slider.maximum()
+
+        self.black_level_slider.blockSignals(True)
+        self.black_level_sb.blockSignals(True)
+        self.white_level_slider.blockSignals(True)
+        self.white_level_sb.blockSignals(True)
+
+        self.black_level_sb.setValue(black * 100)
+        self.white_level_sb.setValue(white * 100)
+        self.black_level_slider.setValue(int(black * 2550))
+        self.white_level_slider.setValue(int(white * 2550))
+
+        self.black_level_slider.blockSignals(False)
+        self.black_level_sb.blockSignals(False)
+        self.white_level_slider.blockSignals(False)
+        self.white_level_sb.blockSignals(False)
+
+        self.camera.black_level = black
+        self.camera.white_level = white

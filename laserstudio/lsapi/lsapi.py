@@ -5,6 +5,7 @@ from typing import Optional, Union, Tuple, List, Dict
 import requests
 from PIL import Image
 import io
+import numpy
 
 
 class LSAPI:
@@ -36,7 +37,7 @@ class LSAPI:
         self.session.close()
 
     def send(
-        self, command: str, params: Optional[dict] = None, is_put=False
+        self, command: str, params: Optional[dict] = None, is_put=False, is_delete=False
     ) -> requests.Response:
         """
         Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
@@ -44,9 +45,12 @@ class LSAPI:
         :param command: The REST command to be executed (eg, the path part of the URL)
         :param params: The payload to be sent in the body of the request, as a JSON
         :param is_put: To force to send a PUT command instead of a POST, when params is not None
+        :param is_put: To force to send a DELETE command
         :return: The response from the server.
         """
         url = f"http://{self.host}:{self.port}/{command}"
+        if is_delete:
+            return self.session.delete(url, json=params)
         if params is None:
             return self.session.get(url)
         else:
@@ -114,7 +118,7 @@ class LSAPI:
         :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send("motion/go_to_memory_point", {"index": index}).json()
+        return self.send(f"motion/go_to_memory_point/{index}", is_put=True).json()
 
     def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """
@@ -131,6 +135,45 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
+
+    def accumulated_image(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+        """
+        Get the camera accumulator's data.
+        """
+
+        if path is None:
+            response = self.send("images/camera/accumulator")
+            c = response.content
+            if type(c) is bytes:
+                frame = numpy.frombuffer(c)
+                return frame
+            return response
+        else:
+            # We request for the data to be saved on the host machine at given path
+            response = self.send("images/camera/accumulator", {"path": path})
+            return numpy.load(response.text.strip().strip("\""))
+
+
+    def averaging(self, reset=False) -> Optional[int]:
+        """
+        Get the number of images accumulated in the camera's accumulator.
+
+        :param reset: If True, reset the accumulator.
+        :return: The number of images accumulated in the camera's accumulator.
+        """
+        return self.send("images/camera/averaging", is_delete=reset).json()
+
+    def reference_image(
+        self, num: Optional[int] = None, unset: bool = False, set: bool = False
+    ) -> Optional[numpy.ndarray]:
+        """
+        Get and/or set the reference image for the camera.
+        """
+        self.send(
+            "images/camera/reference" + (f"/{num}" if num is not None else ""),
+            {} if set else None,
+            is_delete=unset,
+        )
 
     def screenshot(self, path: Optional[str] = None) -> Optional[Image.Image]:
         """
@@ -165,6 +208,23 @@ class LSAPI:
         res = self.send("motion/position", params, is_put=True)
         return res.json()
 
+    def instrument_settings(
+        self, label: str, settings: Optional[dict] = None
+    ) -> Optional[dict]:
+        """
+        Retrieve or update the settings of a specific instrument.
+        This method interacts with the API to either fetch the current settings
+        of an instrument identified by its label or update its settings if a
+        dictionary of settings is provided.
+
+        :param label: The unique identifier for the instrument.
+        :param settings: A dictionary containing the settings to update for the
+                         instrument. If None, the current settings will be retrieved.
+        :return: The response from the API containing the instrument's settings,
+                 or None if the operation fails.
+        """
+        return self.send(f"instruments/{label}/settings", settings, is_put=True).json()
+
     def laser(
         self,
         num: int = 1,
@@ -190,3 +250,29 @@ class LSAPI:
             },
             is_put=True,
         ).json()
+
+    def set_instrument_settings(self, label: str, settings: dict):
+        """
+        Set the settings of a specific instrument.
+        This method interacts with the API to update the settings of an instrument
+        identified by its label.
+
+        :param label: The unique identifier for the instrument.
+        :param settings: A dictionary containing the settings to update for the
+                         instrument.
+        :return: The response from the API containing the instrument's updated settings.
+        """
+        return self.send(
+            f"instruments/{label}/settings", {"settings": settings}, is_put=True
+        ).json()
+
+    def get_instrument_settings(self, label: str):
+        """
+        Get the settings of a specific instrument.
+        This method interacts with the API to retrieve the settings of an instrument
+        identified by its label.
+
+        :param label: The unique identifier for the instrument.
+        :return: The response from the API containing the instrument's settings.
+        """
+        return self.send(f"instruments/{label}/settings").json()["settings"]

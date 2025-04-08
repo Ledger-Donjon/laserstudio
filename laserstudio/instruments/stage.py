@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
-from pystages import Corvus, CNCRouter, Stage, Vector
+from pystages import Corvus, CNCRouter, SMC100, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
@@ -41,8 +41,10 @@ class StageInstrument(Instrument):
         self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
         self.guardrail_enabled = True
 
+        self.backlashes = cast(list[float], config.get("backlashes_um"))
+
         dev = config.get("dev")
-        if device_type in ["Corvus", "CNC"]:
+        if device_type in ["Corvus", "CNC", "SMC100"]:
             if dev is None:
                 logging.getLogger("laserstudio").error(
                     f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
@@ -72,6 +74,13 @@ class StageInstrument(Instrument):
             self.stage: Stage = CNCRouter(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 200
+        elif device_type == "SMC100":
+            logging.getLogger("laserstudio").info(
+                "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
+            )
+            adresses = config.get("adresses", [1, 2])
+            logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
+            self.stage: Stage = SMC100(dev=dev, addresses=adresses)
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
             self.stage: Stage = StageDummy(config=config, stage_instrument=self)
@@ -98,7 +107,29 @@ class StageInstrument(Instrument):
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
-        self.unit_factor = config.get("unit_factor", 1.0)
+        factors = config.get("unit_factor", config.get("unit_factors", [1.0]))
+        position = self.stage.position
+        if type(factors) is not list:
+            factors = [factors] * len(position)
+        else:
+            # We ensure that there is at least one element in the array
+            if len(factors) == 0:
+                factors = [1.0]
+
+            # Truncate array if there is too much values for the number of axes
+            factors = factors[: len(position)]
+
+            # Completion with last value of the array until we get enough number of values
+            factors += [factors[-1]] * abs(len(position) - len(factors))
+
+        self.unit_factors = factors
+
+        assert type(self.unit_factors) is list and len(self.unit_factors) == len(
+            position
+        ), (
+            f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
+        )
+
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
         # Indicate
@@ -111,9 +142,14 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        result = self.stage.position * self.unit_factor
+        position = self.stage.position
         self.mutex.unlock()
-        return result
+        factors = self.unit_factors
+        assert type(factors) is list and len(factors) == len(position)
+        for i in range(len(position)):
+            position[i] = position[i] * factors[i]
+        self.position_changed.emit(position)
+        return position
 
     @position.setter
     def position(self, value: Vector):
@@ -152,6 +188,9 @@ class StageInstrument(Instrument):
         """
         pos = self.position
         for i, v in enumerate(displacement.data):
+            # Prevent crashes if the stage has less axis than the displacement
+            if i >= len(pos):
+                break
             pos[i] += v
         self.move_to(pos, wait=wait)
 
@@ -175,6 +214,19 @@ class StageInstrument(Instrument):
                     )
                     return
         # Move to actual destination
+        factors = self.unit_factors
+        assert type(factors) is list and len(factors) == len(position)
+        for i in range(len(position)):
+            position[i] = position[i] / factors[i]
         self.mutex.lock()
-        self.stage.move_to(position / self.unit_factor, wait=wait)
+        self.stage.move_to(position, wait=wait)
         self.mutex.unlock()
+        _ = self.position
+
+    @property
+    def num_axis(self) -> int:
+        """Get the number of axis of the stage instrument
+
+        :return: Get the number of axis of the stage
+        """
+        return self.stage.num_axis

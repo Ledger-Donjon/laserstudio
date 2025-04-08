@@ -153,6 +153,7 @@ class Viewer(QGraphicsView):
                     (self.focused_element_position(), self.zoom),
                 )
             )
+            self.stage_sight.update_pos()
 
         # Emit the signal if necessary
         if self._follow_stage_sight != value:
@@ -173,6 +174,53 @@ class Viewer(QGraphicsView):
             min(w_ratio, h_ratio),
         )
 
+    def __place_picture_item(self, at_stage_sight: bool = False):
+        item = self.__picture_item
+        if item is None:
+            return
+        # Put if far far away in the back
+        item.setZValue(-10)
+        if not at_stage_sight or self.stage_sight is None:
+            # We place the image at current viewing position
+            transform = QTransform()
+            pos = (
+                self.stage_sight.pos()
+                if self.stage_sight is not None and at_stage_sight
+                else self.cam_pos_zoom[0]
+            )
+            transform.translate(pos.x(), pos.y())
+            # Scene Y-axis is up, while for images it shall be down. We flip the
+            # image over the Y-axis to show it in the right orientation.
+            transform.scale(1, -1)
+            transform.translate(
+                -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
+            )
+        else:
+            # We place the image at current stagesight' position
+            transform = self.stage_sight.image.sceneTransform()
+
+        item.setTransform(transform)
+        self.__scene.addItem(item)
+
+    def __set_picture_item(self, item: QGraphicsPixmapItem):
+        item = self.__picture_item = QGraphicsPixmapItem(item.pixmap())
+
+    def snap_picture_from_camera(self):
+        """Takes the current picture from the current
+        and set it as background picture"""
+        if self.stage_sight is None:
+            return
+        self.clear_picture()
+        self.__set_picture_item(self.stage_sight.image)
+        self.__place_picture_item(at_stage_sight=True)
+
+    def clear_picture(self):
+        """Clears the background picture"""
+        if self.__picture_item is not None:
+            self.__scene.removeItem(self.__picture_item)
+            self.__picture_item = None
+            self.background_picture_path = None
+
     def load_picture(self, picture_path: Optional[str] = None):
         """Requests loading a backgound picture from the user"""
         filename = (
@@ -182,23 +230,11 @@ class Viewer(QGraphicsView):
         )
         if len(filename):
             # Remove previous picture if defined
-            if self.__picture_item is not None:
-                self.__scene.removeItem(self.__picture_item)
-            item = self.__picture_item = QGraphicsPixmapItem(QPixmap(filename))
-            item.setZValue(-10)
-            transform = QTransform()
-            # We place the image at current camera position
-            pos = self.cam_pos_zoom[0]
-            transform.translate(pos.x(), pos.y())
-            # Scene Y-axis is up, while for images it shall be down. We flip the
-            # image over the Y-axis to show it in the right orientation.
-            transform.scale(1, -1)
-            transform.translate(
-                -item.boundingRect().width() / 2, -item.boundingRect().height() / 2
-            )
-            item.setTransform(transform)
-            self.__scene.addItem(item)
-
+            self.clear_picture()
+            # Get the picture and set it as background
+            item = QGraphicsPixmapItem(QPixmap(filename))
+            self.__set_picture_item(item)
+            self.__place_picture_item()
             # Save picture path for when transform is saved.
             self.background_picture_path = filename
 
@@ -650,25 +686,25 @@ class Viewer(QGraphicsView):
         self.__markers.clear()
 
     @property
-    def yaml(self) -> dict:
+    def settings(self) -> dict:
         """Export settings to a dict for yaml serialization."""
-        yaml = {}
-        yaml["marker_size"] = self.default_marker_size
+        data = {}
+        data["marker_size"] = self.default_marker_size
 
         if self.background_picture_path is not None:
-            yaml["background_picture_path"] = self.background_picture_path
+            data["background_picture_path"] = self.background_picture_path
         if (pic := self.__picture_item) is not None:
-            yaml["background_picture_transform"] = qtransform_to_yaml(pic.transform())
-        return yaml
+            data["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+        return data
 
-    @yaml.setter
-    def yaml(self, yaml: dict):
+    @settings.setter
+    def settings(self, data: dict):
         """Import settings from a dict."""
-        if (marker_size := yaml.get("marker_size")) is not None:
+        if (marker_size := data.get("marker_size")) is not None:
             self.marker_size(marker_size)
-        if (path := yaml.get("background_picture_path")) is not None:
+        if (path := data.get("background_picture_path")) is not None:
             self.load_picture(path)
-            if (transform := yaml.get("background_picture_transform")) is not None and (
+            if (transform := data.get("background_picture_transform")) is not None and (
                 pic := self.__picture_item
             ) is not None:
                 pic.setTransform(yaml_to_qtransform(transform))

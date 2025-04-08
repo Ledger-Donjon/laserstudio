@@ -69,7 +69,7 @@ class ZoomToolbar(QToolBar):
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda x: viewer.__setattr__("follow_stage_sight", x))
         viewer.follow_stage_sight_changed.connect(w.setChecked)
-        w.setChecked(True)
+        w.setChecked(False)
         self.addWidget(w)
 
         # Position tracking label

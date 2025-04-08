@@ -1,6 +1,5 @@
 import logging
 from .camera import CameraInstrument
-from typing import Optional, Literal
 
 
 class CameraUSBInstrument(CameraInstrument):
@@ -15,7 +14,7 @@ class CameraUSBInstrument(CameraInstrument):
 
         self.cv2 = cv2
 
-        self.__video_capture = cv2.VideoCapture(config.get("index", 0))
+        self.vc = self.__video_capture = cv2.VideoCapture(config.get("index", 0))
 
         self.width = int(
             config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -37,22 +36,21 @@ class CameraUSBInstrument(CameraInstrument):
     def __del__(self):
         self.__video_capture.release()
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
-        """Retrieve last captured image"""
-        # returns tuple [width, height, fmt, data]. Data is None if acquisition failed.
+    def capture_image(self):
         ret, frame = self.__video_capture.read()
         if not ret or frame is None:
-            return self.width, self.height, "RGB", None
-        data = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-        if data.shape != (self.height, self.width, 3):
+            return None
+        frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+        if frame.shape[2:] != (self.height, self.width):
             size = self.width, self.height
-            data = self.cv2.resize(data, size, interpolation=self.cv2.INTER_AREA)
-        return self.width, self.height, "RGB", bytes(data)
+            frame = self.cv2.resize(frame, size, interpolation=self.cv2.INTER_AREA)
+
+        return frame.reshape((self.width, self.height, -1))
 
     @property
     def brightness(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_BRIGHTNESS)
-        return float(exp)
+        bri = self.__video_capture.get(self.cv2.CAP_PROP_BRIGHTNESS)
+        return float(bri)
 
     @brightness.setter
     def brightness(self, value: float):
@@ -60,8 +58,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def contrast(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_CONTRAST)
-        return float(exp)
+        con = self.__video_capture.get(self.cv2.CAP_PROP_CONTRAST)
+        return float(con)
 
     @contrast.setter
     def contrast(self, value: float):
@@ -78,8 +76,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def gain(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_GAIN)
-        return float(exp)
+        gain = self.__video_capture.get(self.cv2.CAP_PROP_GAIN)
+        return float(gain)
 
     @gain.setter
     def gain(self, value: float):
@@ -96,8 +94,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def saturation(self) -> float:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_SATURATION)
-        return float(exp)
+        sat = self.__video_capture.get(self.cv2.CAP_PROP_SATURATION)
+        return float(sat)
 
     @saturation.setter
     def saturation(self, value: float):
@@ -105,8 +103,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def fps(self) -> int:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_FPS)
-        return int(exp)
+        fps = self.__video_capture.get(self.cv2.CAP_PROP_FPS)
+        return int(fps)
 
     @fps.setter
     def fps(self, value: int):
@@ -123,8 +121,8 @@ class CameraUSBInstrument(CameraInstrument):
 
     @property
     def gamma(self) -> int:
-        exp = self.__video_capture.get(self.cv2.CAP_PROP_GAMMA)
-        return int(exp)
+        gamma = self.__video_capture.get(self.cv2.CAP_PROP_GAMMA)
+        return int(gamma)
 
     @gamma.setter
     def gamma(self, value: int):
