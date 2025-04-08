@@ -317,6 +317,9 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.write_raptor_register(0xEF, (counts >> 16) & 0xFF)
         self.write_raptor_register(0xF0, (counts >> 8) & 0xFF)
         self.write_raptor_register(0xF1, counts & 0xFF)
+        # Adapt the refresh interval in the case when it is more than 0.5s
+        if value > 0.5:
+            self.refresh_interval = int((value - 0.05) * 1e3)
 
     def set_exposure_time_ms(self, value: float):
         self.set_exposure_time(value * 1e-3)
@@ -528,6 +531,9 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # Call the parent class settings setter
         CameraUSBInstrument.settings.__set__(self, data)
 
+        if "alc_enabled" in data:
+            self.set_alc_enabled(data["alc_enabled"])
+            self.parameter_changed.emit("alc_enabled", data["alc_enabled"])
         if "gain_db" in data:
             self.set_digital_gain_db(data["gain_db"])
             self.parameter_changed.emit("gain_db", data["gain_db"])
@@ -545,9 +551,6 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         if "fan_enabled" in data:
             self.set_fan_enabled(data["fan_enabled"])
             self.parameter_changed.emit("fan_enabled", data["fan_enabled"])
-        if "alc_enabled" in data:
-            self.set_alc_enabled(data["alc_enabled"])
-            self.parameter_changed.emit("alc_enabled", data["alc_enabled"])
         if "tec_enabled" in data:
             self.set_tec_enabled(data["tec_enabled"])
             self.parameter_changed.emit("tec_enabled", data["tec_enabled"])
