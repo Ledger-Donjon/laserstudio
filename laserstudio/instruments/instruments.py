@@ -1,4 +1,3 @@
-from pystages import Autofocus, Vector
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
@@ -8,6 +7,7 @@ from .camera_nit import CameraNITInstrument
 from .camera_raptor import CameraRaptorInstrument
 from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
+from .focus import FocusInstrument
 from .instrument import Instrument
 from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
@@ -108,7 +108,12 @@ class Instruments:
 
         # Autofocus helper: stores registered position in order to do automatic camera
         # focusing. This can be considered as an abstract instrument.
-        self.autofocus_helper = Autofocus()
+        if self.camera is not None and self.stage is not None:
+            self.focus_helper = FocusInstrument(
+                config.get("focus", {}), self.camera, self.stage
+            )
+        else:
+            self.focus_helper = None
 
         # Lighting system
         self.light: Optional[LightInstrument] = None
@@ -145,13 +150,3 @@ class Instruments:
         for instrument in self.all_instruments:
             if instrument is not None and instrument.label == label:
                 return instrument
-                
-    def autofocus(self):
-        if self.stage is None:
-            return
-        if len(self.autofocus_helper.registered_points) < 3:
-            return
-        pos = self.stage.position
-        z = self.autofocus_helper.focus(pos.x, pos.y)
-        assert abs(z - pos.z) < 500
-        self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)

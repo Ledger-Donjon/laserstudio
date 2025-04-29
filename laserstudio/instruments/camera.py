@@ -4,9 +4,7 @@ from PIL import Image, ImageQt
 from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
-from .instruments import StageInstrument
 from .shutter import ShutterInstrument, TicShutterInstrument
-from .focus import FocusThread, FocusSearchSettings
 import logging
 import numpy
 import os
@@ -84,10 +82,8 @@ class CameraInstrument(Instrument):
         self.current_reference_image = "Reference 0"
         self.show_negative_values = True
 
-        # Magic Focus
-        # Set when a focus search is running, then cleared.
-        # This is used to prevent launching two search threads at the same time.
-        self.focus_thread: Optional[FocusThread] = None
+        # The value of a white pixel
+        self.white_value = 2**8 - 1
 
     @property
     def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
@@ -260,19 +256,21 @@ class CameraInstrument(Instrument):
         :param image: The image to apply the levels to.
         :return: The image with the levels applied.
         """
-        max = numpy.iinfo(image.dtype).max
+        max = self.white_value * self.average_count
         type_ = image.dtype
+
         image = image - self.black_level * max
         image = (
             image / (self.white_level - self.black_level)
             if self.white_level - self.black_level != 0
             else image
         )
-        return image.clip(0, max).astype(type_)
+        return image.clip(min=0).astype(type_)
 
-    def compute_histogram(
-        self, frame: numpy.ndarray, width: int = os.get_terminal_size().columns - 2
-    ):
+    def compute_histogram(self, frame: numpy.ndarray, width: int = -1):
+        if width <= 0:
+            width = os.get_terminal_size().columns - 2
+
         # Compute histogram of last image
         return numpy.histogram(
             frame,
@@ -291,7 +289,9 @@ class CameraInstrument(Instrument):
             hists.append("".join(bar[i] for i in val))
         return hists[::-1]
 
-    def levels_to_string(self, width: int = os.get_terminal_size().columns - 2):
+    def levels_to_string(self, width: int = -1):
+        if width <= 0:
+            width = os.get_terminal_size().columns - 2
         white_pos = int(width * self.white_level)
         black_pos = int(width * self.black_level)
 
@@ -301,8 +301,10 @@ class CameraInstrument(Instrument):
         self,
         frame: Optional[numpy.ndarray] = None,
         nlines: int = 5,
-        nbins: int = os.get_terminal_size().columns - 2,
+        nbins: int = 0,
     ):
+        if nbins <= 0:
+            nbins = os.get_terminal_size().columns - 2
         hists = self.histogram_to_string(
             self.compute_histogram(frame=frame or self.last_frame, width=nbins)[0],
             nlines=nlines,
@@ -312,7 +314,9 @@ class CameraInstrument(Instrument):
             print("|" + hist + "|")
         print("⸤" + hists[-1] + "⸥")
 
-    def show_levels_terminal(self, width: int = os.get_terminal_size().columns - 2):
+    def show_levels_terminal(self, width: int = -1):
+        if width <= 0:
+            width = os.get_terminal_size().columns - 2
         levels = self.levels_to_string(width=width)
         print("B" + levels[0])
         print("W" + levels[1])
@@ -471,39 +475,3 @@ class CameraInstrument(Instrument):
         # this->result = std_dev[0];
         self._result = float(std_dev[0][0])
         return self._result
-
-    def magic_focus(
-        self,
-        stage: StageInstrument,
-        coarse: Optional[FocusSearchSettings] = None,
-        fine: Optional[FocusSearchSettings] = None,
-    ):
-        """
-        Estimates automatically the correct focus by moving the stage and analysing the
-        resulting camera image. This is executed in a thread.
-        """
-        assert self.focus_thread is None
-
-        # Adapt range depending on currently selected microscope objective.
-        objective = self.objective
-        t = FocusThread(
-            self,
-            stage,
-            coarse
-            or FocusSearchSettings(
-                4000 / objective, 50, 4, multi_peaks=True, best_is_hightest=False
-            ),
-            fine
-            or FocusSearchSettings(
-                200 / objective, 20, 16, multi_peaks=True, best_is_hightest=False
-            ),
-            None,
-        )
-        self.focus_thread = t
-        t.finished.connect(self.magic_focus_finished)
-        return t
-
-    def magic_focus_finished(self):
-        """Called when focus search thread has finished."""
-        assert self.focus_thread is not None
-        self.focus_thread = None

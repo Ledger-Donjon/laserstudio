@@ -42,10 +42,39 @@ class RestProxy(QObject):
             response = self.laser_studio.handle_go_next()
         return QVariant(response)
 
-    @pyqtSlot(result="QVariant")
-    def handle_autofocus(self):
-        self.laser_studio.instruments.autofocus()
-        return QVariant({})
+    @pyqtSlot(QVariant, result="QVariant")
+    def handle_magicfocus(self, parameters: Optional[dict]):
+        if (f := self.laser_studio.instruments.focus_helper) is None:
+            return QVariant({"error": "No focus helper available"})
+        if parameters is None:
+            return QVariant(f.magic_focus_state())
+        return QVariant(f.magic_focus(parameters=parameters))
+
+    @pyqtSlot(QVariant, result="QVariant")
+    def handle_autofocus(self, do_register: QVariant):
+        if self.laser_studio.instruments.focus_helper is None:
+            return QVariant({"error": "No focus helper available"})
+        return self.laser_studio.instruments.focus_helper.autofocus()
+
+        # if type((d := do_register)) is bool and d is True:
+        #     # Register current position
+        #     self.laser_studio.instruments.focus_helper.register()
+        #     return QVariant(
+        #         self.laser_studio.instruments.focus_helper.autofocus_helper.registered_points
+        #     )
+        # elif type(d) is dict:
+        #     # Register given position
+        #     self.laser_studio.instruments.focus_helper.register(d.get("new_point"))
+        #     return QVariant(
+        #         self.laser_studio.instruments.focus_helper.autofocus_helper.registered_points
+        #     )
+        # elif d is None:
+        #     # Get registered points
+        #     return QVariant(
+        #         self.laser_studio.instruments.focus_helper.autofocus_helper.registered_points
+        #     )
+        # else:
+        #     # Perform autofocus
 
     @pyqtSlot(int, result="QVariant")
     def handle_go_to_memory_point(self, index: int):
@@ -338,11 +367,37 @@ class GoNext(Resource):
         return RestServer.invoke("handle_go_next")
 
 
-# @motion.route("/autofocus")
-# class Autofocus(Resource):
-#     @motion.response(200, "Autofocus is done", stage_pos)
-#     def get(self):
-#         return RestServer.invoke("handle_autofocus")
+@motion.route("/autofocus")
+class Autofocus(Resource):
+    @motion.response(200, "Autofocus is done")
+    def post(self):
+        """Perform autofocus"""
+        return RestServer.invoke("handle_autofocus", QVariant(False))
+
+    def put(self):
+        """Register current position for autofocus"""
+        return RestServer.invoke("handle_autofocus", QVariant(True))
+
+    def get(self):
+        """Get current registered points for autofocus"""
+        return RestServer.invoke("handle_autofocus", QVariant(None))
+
+
+@motion.route("/magicfocus")
+class MagicFocus(Resource):
+    @motion.response(200, "Get status of magicfocus")
+    def get(self):
+        return RestServer.invoke("handle_magicfocus", QVariant(None))
+
+    def post(self):
+        """Perform magicfocus with given parameters"""
+        if not flask.request.is_json:
+            return "Given value is not a JSON", 415
+        json = flask.request.json
+        if not isinstance(json, dict):
+            return "Given value is not a dictionary", 415
+        r = RestServer.invoke("handle_magicfocus", QVariant(json))
+        return {"OK": True}
 
 
 @motion.route("/go_to_memory_point/<int:index>")
@@ -446,40 +501,3 @@ class Instrument(Resource):
             QVariant(json["settings"]),
         )
         return cast(dict, qvar)
-
-
-# @instruments.route("/laser/<int:num>")
-# @instruments.param("num", "Index of the laser, starting from 1")
-# class Laser(Resource):
-#     @instruments.doc("get_laser")
-#     @instruments.marshal_with(laser)
-#     def get(self, num: int):
-#         qvar = RestServer.invoke(
-#             "handle_laser",
-#             QVariant(num),
-#             QVariant(None),
-#             QVariant(None),
-#             QVariant(None),
-#         )
-#         return cast(dict, qvar)
-
-#     @instruments.doc("put_laser")
-#     @instruments.expect(laser)
-#     @instruments.marshal_with(laser)
-#     def put(self, num: int):
-#         if not flask.request.is_json:
-#             return "Given value is not a JSON", 415
-#         json = flask.request.json
-#         if not isinstance(json, dict):
-#             return "Given value is not a dictionary", 415
-#         active = json.get("active")
-#         power = json.get("power")
-#         offset_current = json.get("offset_current")
-#         qvar = RestServer.invoke(
-#             "handle_laser",
-#             QVariant(num),
-#             QVariant(active),
-#             QVariant(power),
-#             QVariant(offset_current),
-#         )
-#         return cast(dict, qvar)
