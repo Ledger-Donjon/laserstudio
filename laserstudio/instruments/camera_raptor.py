@@ -318,8 +318,8 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.write_raptor_register(0xF0, (counts >> 8) & 0xFF)
         self.write_raptor_register(0xF1, counts & 0xFF)
         # Adapt the refresh interval in the case when it is more than 0.5s
-        if value > 0.5:
-            self.refresh_interval = int((value - 0.05) * 1e3)
+        # if value > 0.5:
+        #     self.refresh_interval = int((value - 0.05) * 1e3)
 
     def set_exposure_time_ms(self, value: float):
         self.set_exposure_time(value * 1e-3)
