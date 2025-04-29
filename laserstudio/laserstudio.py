@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
 from typing import Optional, Any
 
@@ -15,20 +15,21 @@ from .instruments.instruments import (
 )
 from .instruments.stage import Vector
 from .widgets.toolbars import (
-    PictureToolbar,
-    ZoomToolbar,
-    ScanToolbar,
-    StageToolbar,
-    CameraToolbar,
-    MainToolbar,
-    MarkersToolbar,
-    PDMToolbar,
-    LaserDriverToolbar,
+    PictureToolBar,
+    ZoomToolBar,
+    ScanToolBar,
+    StageToolBar,
+    CameraToolBar,
+    CameraImageAdjustmentToolBar,
+    MainToolBar,
+    MarkersToolBar,
+    PDMToolBar,
+    LaserDriverToolBar,
     CameraNITToolBar,
     CameraRaptorToolBar,
-    PhotoEmissionToolbar,
-    LightToolbar,
-    FocusToolbar,
+    PhotoEmissionToolBar,
+    LightToolBar,
+    FocusToolBar,
 )
 import yaml
 from .restserver.server import RestProxy
@@ -114,23 +115,27 @@ class LaserStudio(QMainWindow):
             )
             self.addToolBar(toolbar)
 
-        # Toolbar: Scanning zone definition and usage
-        toolbar = ScanToolbar(self)
+        # ToolBar: Scanning zone definition and usage
+        toolbar = ScanToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Camera Image control
+        # ToolBar: Camera Image control
         if self.instruments.camera is not None:
             if isinstance(self.instruments.camera, CameraRaptorInstrument):
                 toolbar = CameraRaptorToolBar(self)
             else:
-                toolbar = CameraToolbar(self)
+                toolbar = CameraToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
-            self.photoemission_toolbar = PhotoEmissionToolbar(self)
+            self.addToolBar(
+                Qt.ToolBarArea.BottomToolBarArea, CameraImageAdjustmentToolBar(self)
+            )
+
+            self.photoemission_toolbar = PhotoEmissionToolBar(self)
             self.addToolBar(
                 Qt.ToolBarArea.BottomToolBarArea, self.photoemission_toolbar
             )
 
-        # Toolbar: NIT Camera Image control
+        # ToolBar: NIT Camera Image control
         if isinstance(self.instruments.camera, CameraNITInstrument):
             toolbar = CameraNITToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
@@ -138,16 +143,16 @@ class LaserStudio(QMainWindow):
         # Laser toolbars
         for i, laser in enumerate(self.instruments.lasers):
             if isinstance(laser, PDMInstrument):
-                toolbar = PDMToolbar(laser, i)
+                toolbar = PDMToolBar(laser, i)
             elif isinstance(laser, LaserDriverInstrument):
-                toolbar = LaserDriverToolbar(laser, i)
+                toolbar = LaserDriverToolBar(laser, i)
             else:
                 continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Light toolbar
         if isinstance(self.instruments.light, LightInstrument):
-            toolbar = LightToolbar(self.instruments.light)
+            toolbar = LightToolBar(self.instruments.light)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
@@ -216,6 +221,10 @@ class LaserStudio(QMainWindow):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
+        # Close all other windows of the application
+        for w in QGuiApplication.allWindows():
+            if w != self:
+                w.close()
         super().closeEvent(a0)
 
     def handle_go_next(self) -> dict:
