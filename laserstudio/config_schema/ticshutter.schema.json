@@ -1,0 +1,19 @@
+{
+  "$id": "ticshutter.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TIC Shutter",
+  "type": "object",
+  "allOf": [
+    {
+      "properties": {
+        "type": {
+          "const": "TIC"
+        }
+      }
+    },
+    {
+      "$ref": "instrument.schema.json"
+    }
+  ],
+  "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
+}

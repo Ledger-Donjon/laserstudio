@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class MainToolbar(QToolBar):
+class MainToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         """
         :param viewer: Required for the menu to remove markers.

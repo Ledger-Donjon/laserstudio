@@ -49,7 +49,7 @@ class MarkersListItem(QTreeWidgetItem):
             group.number_of_checked += 1
 
 
-class MarkersListToolbar(QToolBar):
+class MarkersListToolBar(QToolBar):
     def show_selected(self):
         for item in self.list.selectedItems():
             item.setCheckState(0, Qt.CheckState.Checked)
