@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class PictureToolbar(QToolBar):
+class PictureToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Background picture", laser_studio)
         self.setObjectName(

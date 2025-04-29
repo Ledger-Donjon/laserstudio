@@ -1,24 +1,24 @@
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel
+from PyQt6.QtGui import QIcon, QPainter
+from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMessageBox
 import numpy
-from pystages import Autofocus, Vector
+from pystages import Vector
 from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
 from ...instruments.camera import CameraInstrument
 from ...instruments.stage import StageInstrument
-from ...instruments.focus import FocusThread
-from typing import Optional
+from ...instruments.focus import FocusInstrument
+from PyQt6.QtCharts import QLineSeries, QChart, QChartView
 
 
-class FocusToolbar(QToolBar):
-    """Toolbar for focus registration and autofocus."""
+class FocusToolBar(QToolBar):
+    """ToolBar for focus registration and autofocus."""
 
     def __init__(
         self,
         stage: StageInstrument,
         camera: CameraInstrument,
-        autofocus_helper: Autofocus,
+        focus_helper: FocusInstrument,
     ):
         """
         :param autofocus_helper: Stores the registered points and calculates focus on demand.
@@ -28,11 +28,7 @@ class FocusToolbar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
-        # Set when a focus search is running, then cleared.
-        # This is used to prevent launching two search threads at the same time.
-        self.focus_thread: Optional[FocusThread] = None
-
-        self.autofocus_helper = autofocus_helper
+        self.focus_helper: FocusInstrument = focus_helper
         self.stage = stage
         self.camera = camera
 
@@ -79,16 +75,41 @@ class FocusToolbar(QToolBar):
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
         """
-        assert self.camera.focus_thread is None
+        assert (
+            self.focus_helper.focus_thread is None
+            or not self.focus_helper.focus_thread.isRunning()
+        ), "Magic Focus thread is already running"
         self.button_magic_focus.setEnabled(False)
-        t = self.camera.magic_focus(self.stage)
+        t = self.focus_helper.magic_focus()
         t.finished.connect(self.magic_focus_finished)
-        t.start()
 
     def magic_focus_finished(self):
         """Called when focus search thread has finished."""
+        # Reenable the button
         self.button_magic_focus.setChecked(False)
         self.button_magic_focus.setEnabled(True)
+
+        # Show the graphs
+        assert (t := self.focus_helper.focus_thread) is not None
+        if (tab := t.tab_coarse) is not None:
+            self.cv = w = QChartView()
+            w.setChart(c := QChart())
+            w.setRenderHint(QPainter.RenderHint.Antialiasing)
+            w.setMinimumSize(600, 400)
+            s = QLineSeries()
+            s.setName("Coarse")
+            for z, sharpness in tab:
+                s.append(z, sharpness)
+            c.addSeries(s)
+
+            if (tab := t.tab_fine) is not None:
+                s = QLineSeries()
+                s.setName("Fine")
+                for z, sharpness in tab:
+                    s.append(z, sharpness)
+                c.addSeries(s)
+            c.createDefaultAxes()
+            w.show()
 
     def register(self):
         """
@@ -96,22 +117,35 @@ class FocusToolbar(QToolBar):
         farther point is replaced.
         """
         pos = self.stage.position
-        if len(self.autofocus_helper) == 3:
+        if len(self.focus_helper.autofocus_helper) == 3:
             dists = [
                 numpy.linalg.norm((Vector(*p).xy - pos.xy).data)
-                for p in self.autofocus_helper.registered_points
+                for p in self.focus_helper.autofocus_helper.registered_points
             ]
-            del self.autofocus_helper.registered_points[dists.index(min(dists))]
-        self.autofocus_helper.register(pos.x, pos.y, pos.z)
+            del self.focus_helper.autofocus_helper.registered_points[
+                dists.index(min(dists))
+            ]
+        self.focus_helper.register((pos.x, pos.y, pos.z))
 
     def autofocus(self):
         """
         Calculate focus for the given position and apply it, if possible.
         """
-        pos = self.stage.position
-        z = self.autofocus_helper.focus(pos.x, pos.y)
-        if abs(z - pos.z < 250):
-            print("DIFF", z, pos.z)
-            self.stage.position = Vector(pos.x, pos.y, z)
-        else:
-            print("Warning: too big Z difference")
+        if len(self.focus_helper.autofocus_helper) < 3:
+            # Prompt a dialog
+            QMessageBox.critical(
+                self,
+                "Focus",
+                f"Not enough points registered for autofocus ({len(self.focus_helper.autofocus_helper)} over 3 required).",
+            )
+            return
+
+        try:
+            self.focus_helper.autofocus()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Focus",
+                str(e),
+            )
+            return

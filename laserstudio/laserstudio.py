@@ -78,36 +78,39 @@ class LaserStudio(QMainWindow):
         group.idClicked.connect(lambda mode: self.viewer.select_mode(mode, True))
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
-        # Toolbar: Main
-        toolbar = MainToolbar(self)
+        # ToolBar: Main
+        toolbar = MainToolBar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
-        # Toolbar: Background picture
-        toolbar = PictureToolbar(self)
+        # ToolBar: Background picture
+        toolbar = PictureToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Zoom
-        toolbar = ZoomToolbar(self.viewer)
+        # ToolBar: Zoom
+        toolbar = ZoomToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Markers
-        toolbar = MarkersToolbar(self.viewer)
+        # ToolBar: Markers
+        toolbar = MarkersToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar.markers_list_toolbar)
 
-        # Toolbar: Stage positioning
+        # ToolBar: Stage positioning
         if self.instruments.stage is not None:
-            toolbar = StageToolbar(self)
+            toolbar = StageToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
-        # Toolbar: Focusing
-        if (self.instruments.stage is not None) and (
-            self.instruments.camera is not None
+        # ToolBar: Focusing
+        if (
+            self.instruments.stage is not None
+            and self.instruments.stage.num_axis > 2
+            and self.instruments.camera is not None
+            and self.instruments.focus_helper is not None
         ):
-            toolbar = FocusToolbar(
+            toolbar = FocusToolBar(
                 self.instruments.stage,
                 self.instruments.camera,
-                self.instruments.autofocus_helper,
+                self.instruments.focus_helper,
             )
             self.addToolBar(toolbar)
 

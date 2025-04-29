@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
+from PyQt6.QtGui import QGuiApplication
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
 from ...instruments.stage import MoveFor, CNCRouter, SMC100
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class StageToolbar(QToolBar):
+class StageToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
@@ -73,7 +74,8 @@ class StageToolbar(QToolBar):
 
         w = QPushButton(self)
         w.setText("Get Position")
-        w.clicked.connect(lambda: print(self.stage.stage.position))
+        w.setToolTip("Get current stage position and copy in clipboard")
+        w.clicked.connect(lambda: (print(pos := list(self.stage.position), "(copied in clipboard)"), QGuiApplication.clipboard().setText(str(pos))))
         hbox.addWidget(w)
 
         if isinstance(self.stage.stage, CNCRouter):

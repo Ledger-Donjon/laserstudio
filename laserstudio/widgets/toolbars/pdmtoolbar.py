@@ -13,9 +13,10 @@ from laserstudio.instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox
 from PyQt6.QtWidgets import QToolBar
+from ..coloredbutton import ColoredPushButton
 
 
-class PDMToolbar(QToolBar):
+class PDMToolBar(QToolBar):
     def __init__(self, laser: PDMInstrument, laser_num: int):
         """
         :param laser: Alphanov PDM instrument.
@@ -132,6 +133,19 @@ class PDMToolbar(QToolBar):
         grid.addWidget(w, row, 1)
         row += 1
 
+        # Laser shutter
+        if self.laser.shutter is not None:
+            w = ColoredPushButton(
+                ":/icons/shutter-open2.svg", ":/icons/shutter-closed.svg"
+            )
+            w.setToolTip("Open/Close shutter")
+            w.setCheckable(True)
+            w.setChecked(False)
+            w.setIconSize(QSize(24, 24))
+            w.toggled.connect(self.open_shutter)
+            grid.addWidget(w, row, 1)
+            row += 1
+
         w = QWidget()
         w.setLayout(grid)
         self.addWidget(w)
@@ -139,8 +153,12 @@ class PDMToolbar(QToolBar):
         self.reload_parameters()
         self.laser.parameter_changed.connect(self.refresh_interface)
 
+    def open_shutter(self, b):
+        if self.laser.shutter is not None:
+            self.laser.shutter.open = b
+
     def refresh_interface(self, name: str, value: Any):
-        """Refresh the Toolbar UI according to given parameter and value"""
+        """Refresh the ToolBar UI according to given parameter and value"""
         if name == "on_off":
             self.on_off_button.blockSignals(True)
             self.on_off_button.setChecked(value)

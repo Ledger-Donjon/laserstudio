@@ -7,7 +7,7 @@ from ...instruments.hayashilight import HayashiLRInstrument
 from ...instruments.lmscontroller import LMSControllerInstrument
 
 
-class LightToolbar(QToolBar):
+class LightToolBar(QToolBar):
     def __init__(self, light: LightInstrument):
         """
         :param light: Light instrument to be controlled by the toolbar.
@@ -55,7 +55,7 @@ class LightToolbar(QToolBar):
 
         if type(light) is LMSControllerInstrument:
             w = ColoredPushButton(
-                ":/icons/shutter-closed.svg", ":/icons/shutter-closed.svg"
+                ":/icons/shutter-open2.svg", ":/icons/shutter-closed.svg"
             )
             w.setToolTip("Open/Close shutter")
             w.setCheckable(True)

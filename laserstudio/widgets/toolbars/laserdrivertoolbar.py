@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QToolBar
 
 
-class LaserDriverToolbar(QToolBar):
+class LaserDriverToolBar(QToolBar):
     def __init__(self, laser: LaserDriverInstrument, laser_num: int):
         """
         :param laser: Laser Driver instrument.

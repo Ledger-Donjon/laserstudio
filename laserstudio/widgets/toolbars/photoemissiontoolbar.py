@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class PhotoEmissionToolbar(QToolBar):
+class PhotoEmissionToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None

@@ -4,7 +4,7 @@ from ...instruments.camera_raptor import (
     RaptorCameraControlReg0,
     RaptorCameraControlReg1,
 )
-from .cameratoolbar import CameraToolbar
+from .cameratoolbar import CameraToolBar
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -13,18 +13,16 @@ from PyQt6.QtWidgets import (
     QLabel,
     QDoubleSpinBox,
     QComboBox,
-    QSpinBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from ...utils import util
-import os
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class CameraRaptorToolBar(CameraToolbar):
+class CameraRaptorToolBar(CameraToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
@@ -70,24 +68,6 @@ class CameraRaptorToolBar(CameraToolbar):
         w.setChecked(reg_1.__contains__(RaptorCameraControlReg1.AGMC_ENABLED))
         w.toggled.connect(self.camera.set_agmc_enabled)
         vbox.addWidget(w)
-
-        # Histogram size configuration
-        hbox = QHBoxLayout()
-        vbox.addWidget(QLabel("Histogram:"))
-        vbox.addLayout(hbox)
-        self.hist_width = w = QSpinBox()
-        w.setToolTip("Number of bins in the histogram")
-        w.setRange(20, 1000)
-        w.setValue(os.get_terminal_size().columns - 2)
-        w.setSuffix(" bins")
-        hbox.addWidget(w)
-        self.hist_height = w = QSpinBox()
-        w.setToolTip("Number of lines in the histogram")
-        w.setRange(1, 1000)
-        w.setValue(5)
-        w.setSuffix(" lines")
-        hbox.addWidget(w)
-
         vbox.addStretch()
 
         w = QWidget()
@@ -182,7 +162,6 @@ class CameraRaptorToolBar(CameraToolbar):
             self.camera.set_tec_temperature_setpoint
         )
         vbox.addWidget(self.temperature_setpoint)
-
         vbox.addStretch()
 
         # At each new image:

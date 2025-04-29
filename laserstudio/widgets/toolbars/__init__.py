@@ -1,32 +1,33 @@
-from .cameratoolbar import CameraToolbar
+from .cameratoolbar import CameraToolBar, CameraImageAdjustmentToolBar
 from .cameranittoolbar import CameraNITToolBar
 from .cameraraptortoolbar import CameraRaptorToolBar
-from .photoemissiontoolbar import PhotoEmissionToolbar
-from .pdmtoolbar import PDMToolbar
-from .lighttoolbar import LightToolbar
-from .laserdrivertoolbar import LaserDriverToolbar
-from .maintoolbar import MainToolbar
-from .markerstoolbar import MarkersToolbar
-from .scantoolbar import ScanToolbar
-from .picturetoolbar import PictureToolbar
-from .stagetoolbar import StageToolbar
-from .zoomtoolbar import ZoomToolbar
-from .focustoolbar import FocusToolbar
+from .photoemissiontoolbar import PhotoEmissionToolBar
+from .pdmtoolbar import PDMToolBar
+from .lighttoolbar import LightToolBar
+from .laserdrivertoolbar import LaserDriverToolBar
+from .maintoolbar import MainToolBar
+from .markerstoolbar import MarkersToolBar
+from .scantoolbar import ScanToolBar
+from .picturetoolbar import PictureToolBar
+from .stagetoolbar import StageToolBar
+from .zoomtoolbar import ZoomToolBar
+from .focustoolbar import FocusToolBar
 
 
 __all__ = [
-    "MainToolbar",
-    "ScanToolbar",
-    "ZoomToolbar",
-    "StageToolbar",
-    "CameraToolbar",
+    "MainToolBar",
+    "ScanToolBar",
+    "ZoomToolBar",
+    "StageToolBar",
+    "CameraToolBar",
+    "CameraImageAdjustmentToolBar",
     "CameraNITToolBar",
     "CameraRaptorToolBar",
-    "PhotoEmissionToolbar",
-    "PictureToolbar",
-    "LaserDriverToolbar",
-    "PDMToolbar",
-    "MarkersToolbar",
-    "LightToolbar",
-    "FocusToolbar",
+    "PhotoEmissionToolBar",
+    "PictureToolBar",
+    "LaserDriverToolBar",
+    "PDMToolBar",
+    "MarkersToolBar",
+    "LightToolBar",
+    "FocusToolBar",
 ]

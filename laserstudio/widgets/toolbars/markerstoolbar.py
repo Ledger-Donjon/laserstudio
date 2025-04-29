@@ -4,10 +4,10 @@ from PyQt6.QtWidgets import QToolBar, QPushButton
 from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
-from .markerslisttoolbar import MarkersListToolbar
+from .markerslisttoolbar import MarkersListToolBar
 
 
-class MarkersToolbar(QToolBar):
+class MarkersToolBar(QToolBar):
     def __init__(self, viewer: Viewer):
         super().__init__("Markers")
         self.setObjectName("toolbar-markers")  # For settings save and restore
@@ -52,8 +52,8 @@ class MarkersToolbar(QToolBar):
         )
         self.addWidget(self.marker_size_sp)
 
-        # Toolbar: Markers' List
-        self.markers_list_toolbar = MarkersListToolbar(viewer)
+        # ToolBar: Markers' List
+        self.markers_list_toolbar = MarkersListToolBar(viewer)
 
     def show_markers_list(self, state: bool):
         if state:
