@@ -23,10 +23,17 @@ from ..instruments.laser import LaserInstrument
 from typing import Optional, Union
 import logging
 from .marker import ProbeMarker
+from enum import Enum, auto
 
 
 class StageSightViewer(QGraphicsView):
     """Simple version of Viewer, containing a StageSight"""
+
+    class Mode(int, Enum):
+        """Viewer modes."""
+
+        NONE = auto()
+        STAGE = auto()
 
     def __init__(self, stage_sight: "StageSight", parent=None):
         super().__init__(parent)
