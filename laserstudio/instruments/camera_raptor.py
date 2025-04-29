@@ -193,6 +193,9 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         objective = cast(float, config.get("objective", 10.0))
         self.select_objective(objective)
 
+        # The value of a white pixel
+        self.white_value = 2**14 - 1
+
     def query_command(
         self,
         command: RaptorCommand,
