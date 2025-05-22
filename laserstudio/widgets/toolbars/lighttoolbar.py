@@ -28,7 +28,7 @@ class LightToolBar(QToolBar):
 
         w = ColoredPushButton(
             icon_path=":/icons/fontawesome-free/lightbulb-regular.svg",
-            color=LedgerColors.SafetyOrange,
+            color=LedgerColors.SafetyOrange.value,
         )
         w.setToolTip("On/Off Light")
         w.setCheckable(True)

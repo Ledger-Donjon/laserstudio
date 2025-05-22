@@ -48,7 +48,8 @@ class RestProxy(QObject):
             return QVariant({"error": "No focus helper available"})
         if parameters is None:
             return QVariant(f.magic_focus_state())
-        return QVariant(f.magic_focus(parameters=parameters))
+        f.magic_focus(parameters=parameters).start()
+        return QVariant(f.magic_focus_state())
 
     @pyqtSlot(QVariant, result="QVariant")
     def handle_autofocus(self, do_register: QVariant):

@@ -121,20 +121,25 @@ class CameraInstrument(Instrument):
         self.height_um = self.height * self.pixel_size_in_um[1] / factor
 
     def get_last_qImage(self) -> QImage:
-        width, height, mode, data = self.get_last_image()
-        size = (width, height)
         # PIL.ImageQt.ImageQt is a subclass of QImage
-        if data is None:
-            im = Image.new("L", size=size)
-        else:
-            im = Image.frombytes(mode=mode, data=data, size=size)
-        qImage = ImageQt.ImageQt(im)
+        qImage = ImageQt.ImageQt(self.get_last_PIL_image())
         self.new_image.emit(qImage)
-
         QTimer.singleShot(
             self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
         )
         return qImage
+
+    def get_last_PIL_image(self) -> Image.Image:
+        """
+        Returns the last image as a PIL image.
+        """
+        width, height, mode, data = self.get_last_image()
+        size = (width, height)
+        if data is None:
+            im = Image.new("L", size=size)
+        else:
+            im = Image.frombytes(mode=mode, data=data, size=size)
+        return im
 
     def capture_image(self) -> Optional[numpy.ndarray]:
         """
@@ -241,6 +246,13 @@ class CameraInstrument(Instrument):
         # We accumulate the value of the frame
         self._last_frame_accumulator += new_frame
         self.number_of_averaged_images += 1
+
+    @property
+    def is_average_valid(self) -> bool:
+        """
+        Returns True if the number of averaged images is sufficient.
+        """
+        return self.average_count >= self.image_averaging
 
     @property
     def average_count(self) -> int:

@@ -78,6 +78,16 @@ def test_set_settings():
 
 def test_get_accumulated_image():
     api = LSAPI()
-    image = api.accumulated_image()
+    image = api.accumulated_image(None)
     assert image is not None
     assert isinstance(image, numpy.ndarray)
+
+
+def test_autofocus_register():
+    api = LSAPI()
+    api.autofocus()
+
+
+def test_magicfocus():
+    api = LSAPI()
+    api.magicfocus()

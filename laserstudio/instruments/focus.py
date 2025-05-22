@@ -1,12 +1,11 @@
-from time import sleep
-from PyQt6.QtCore import QThread
+from PyQt6.QtCore import QThread, pyqtSignal
 from .stage import StageInstrument, Vector
 from .instrument import Instrument
 import scipy.signal
 from typing import Optional, Any, TYPE_CHECKING
 import numpy
 from PyQt6.QtCore import QCoreApplication
-from pystages import Autofocus, Vector
+from pystages import Autofocus
 
 if TYPE_CHECKING:
     from .camera import CameraInstrument
@@ -53,6 +52,9 @@ class FocusThread(QThread):
     images of a camera.
     """
 
+    # Signal to be emitted when the a new point of focus is found.
+    new_point = pyqtSignal(float, float)
+
     def __init__(
         self,
         camera: "CameraInstrument",
@@ -77,6 +79,7 @@ class FocusThread(QThread):
         self.__coarse = coarse
         self.__fine = fine
         self.__positions = positions
+        self.z_mid = None
         self.best_z = None
         self.best_positions = None
         self.tab_coarse = None
@@ -84,6 +87,23 @@ class FocusThread(QThread):
         self.tab_fine = None
         self.peaks_fine = None
         self.objective = objective
+
+    def z_range(
+        self,
+        z_mid: Optional[float] = None,
+        settings: Optional[FocusSearchSettings] = None,
+    ) -> tuple[float, float]:
+        """
+        Return the Z range of the focus search.
+
+        :return: Z range of the focus search.
+        """
+        z_mid = z_mid or self.__stage.position.z
+        settings = settings or self.__coarse
+        return (
+            z_mid - (settings.span / 2.0) / self.objective,
+            z_mid + (settings.span / 2.0) / self.objective,
+        )
 
     def run_search(self, settings: FocusSearchSettings):
         """
@@ -93,8 +113,7 @@ class FocusThread(QThread):
         """
         stage = self.__stage
         z_mid = (pos := stage.position).z
-        z_max = z_mid + (settings.span / 2.0) / self.objective
-        z_min = z_mid - (settings.span / 2.0) / self.objective
+        z_min, z_max = self.z_range(z_mid, settings)
         z_step = (z_max - z_min) / (settings.steps - 1)
         self.__camera.image_averaging = settings.avg
         best_z = None
@@ -123,6 +142,7 @@ class FocusThread(QThread):
 
             std_dev = self.__camera.laplacian_std_dev
             tab.append((z, std_dev))
+            self.new_point.emit(z, std_dev)
             if (best_std_dev is None) or (std_dev > best_std_dev):
                 best_std_dev = std_dev
                 best_z = z
@@ -318,7 +338,6 @@ class FocusInstrument(Instrument):
         )
         self.focus_thread = t
         t.finished.connect(self.magic_focus_finished)
-        t.start()
         return t
 
     def magic_focus_finished(self):

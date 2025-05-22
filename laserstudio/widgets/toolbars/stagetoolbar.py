@@ -75,7 +75,13 @@ class StageToolBar(QToolBar):
         w = QPushButton(self)
         w.setText("Get Position")
         w.setToolTip("Get current stage position and copy in clipboard")
-        w.clicked.connect(lambda: (print(pos := list(self.stage.position), "(copied in clipboard)"), QGuiApplication.clipboard().setText(str(pos))))
+
+        w.clicked.connect(
+            lambda: (
+                print(pos := self.stage.position.data, "(copied in clipboard)"),
+                QGuiApplication.clipboard().setText(str(pos)),
+            )
+        )
         hbox.addWidget(w)
 
         if isinstance(self.stage.stage, CNCRouter):
