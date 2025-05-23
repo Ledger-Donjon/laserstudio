@@ -55,53 +55,39 @@
     },
     {
       "title": "SMC100",
-      "allOf": [
-        {
-          "properties": {
-            "type": {
-              "const": "SMC100",
-              "description": "A Newport SMC100."
-            },
-            "adresses": {
-              "description": "Adresses.",
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "integer"
-              },
-              "default": [1, 2]
-            }
-          }
+      "properties": {
+        "type": {
+          "const": "SMC100",
+          "description": "A Newport SMC100."
         },
-        {
-          "$ref": "serial.schema.json"
+        "adresses": {
+          "description": "Adresses.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          },
+          "default": [1, 2]
         }
-      ]
+      }
     },
     {
       "title": "PI",
-      "allOf": [
-        {
-          "properties": {
-            "type": {
-              "const": "PI",
-              "description": "A Physik Instrumente, Daisy-chain Mercury Servo Controller, or GCS-compatible."
-            },
-            "adresses": {
-              "description": "Adresses.",
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "integer"
-              },
-              "default": [1, 2, 3]
-            }
-          }
+      "properties": {
+        "type": {
+          "const": "PI",
+          "description": "A Physik Instrumente, Daisy-chain Mercury Servo Controller, or GCS-compatible."
         },
-        {
-          "$ref": "serial.schema.json"
+        "adresses": {
+          "description": "Adresses.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          },
+          "default": [1, 2, 3]
         }
-      ]
+      }
     },
     {
       "title": "Dummy",
