@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
-from pystages import Corvus, CNCRouter, SMC100, Stage, Vector
+from pystages import Corvus, CNCRouter, PI, SMC100, Stage, Vector
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from pystages.exceptions import ProtocolError
@@ -44,13 +44,15 @@ class StageInstrument(Instrument):
         self.backlashes = cast(list[float], config.get("backlashes_um"))
 
         dev = config.get("dev")
-        if device_type in ["Corvus", "CNC", "SMC100"]:
-            if dev is None:
-                logging.getLogger("laserstudio").error(
-                    f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
-                )
-                raise
+        if dev == "":
+            dev = None
+        if device_type in ["Corvus", "CNC", "SMC100"] and dev is None:
+            logging.getLogger("laserstudio").error(
+                f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
+            )
+            raise
 
+        if device_type in ["Corvus", "CNC", "SMC100", "PI"] and dev is not None:
             try:
                 dev = get_serial_device(dev)
             except DeviceSearchError as e:
@@ -74,6 +76,14 @@ class StageInstrument(Instrument):
             self.stage: Stage = CNCRouter(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 200
+        elif device_type == "PI":
+            logging.getLogger("laserstudio").info(
+                "Creating a PI/Mercury stage... "
+                + f"Connecting to {device_type} {dev}... "
+            )
+            adresses = config.get("adresses", [1, 2, 3])
+            logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
+            self.stage: Stage = PI(dev=dev, addresses=adresses)
         elif device_type == "SMC100":
             logging.getLogger("laserstudio").info(
                 "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
