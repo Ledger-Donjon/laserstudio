@@ -136,7 +136,7 @@ class PDMToolBar(QToolBar):
         # Laser shutter
         if self.laser.shutter is not None:
             w = ColoredPushButton(
-                ":/icons/shutter-open2.svg", ":/icons/shutter-closed.svg"
+                ":/icons/shutter-open.svg", ":/icons/shutter-closed.svg"
             )
             w.setToolTip("Open/Close shutter")
             w.setCheckable(True)

@@ -188,7 +188,7 @@ class StageInstrument(Instrument):
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
             )
 
-    def move_relative(self, displacement: Vector, wait: bool):
+    def move_relative(self, displacement: Vector, wait: bool, backlash=False):
         """
         Moves the stage for a specific displacement.
 
@@ -202,9 +202,9 @@ class StageInstrument(Instrument):
             if i >= len(pos):
                 break
             pos[i] += v
-        self.move_to(pos, wait=wait)
+        self.move_to(pos, wait=wait, backlash=backlash)
 
-    def move_to(self, position: Vector, wait: bool):
+    def move_to(self, position: Vector, wait: bool, backlash=False):
         """
         Moves associated stage to a specific position, optionally waits for stage to stop moving.
 
@@ -225,11 +225,22 @@ class StageInstrument(Instrument):
                     return
         # Move to actual destination
         factors = self.unit_factors
+        result = Vector(dim=len(position))
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
-            position[i] = position[i] / factors[i]
+            result[i] = position[i] / factors[i]
         self.mutex.lock()
-        self.stage.move_to(position, wait=wait)
+        if (
+            backlash
+            and self.backlashes is not None
+            and len(self.backlashes) == len(position)
+        ):
+            backlash = Vector(*self.backlashes)
+            # Apply unit factors
+            for i in range(len(backlash)):
+                backlash[i] = backlash[i] / factors[i]
+            self.stage.move_to(result - backlash, wait=True)
+        self.stage.move_to(result, wait=wait)
         self.mutex.unlock()
         _ = self.position
 

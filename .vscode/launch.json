@@ -9,6 +9,12 @@
             "type": "debugpy",
             "request": "launch",
             "module": "laserstudio"
+        },
+        {
+            "name": "Chipscan",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio.utils.chipscan"
         }
     ]
 }

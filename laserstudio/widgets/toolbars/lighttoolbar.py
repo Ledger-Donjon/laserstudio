@@ -28,7 +28,7 @@ class LightToolBar(QToolBar):
 
         w = ColoredPushButton(
             icon_path=":/icons/fontawesome-free/lightbulb-regular.svg",
-            color=LedgerColors.SafetyOrange,
+            color=LedgerColors.SafetyOrange.value,
         )
         w.setToolTip("On/Off Light")
         w.setCheckable(True)
@@ -55,7 +55,7 @@ class LightToolBar(QToolBar):
 
         if type(light) is LMSControllerInstrument:
             w = ColoredPushButton(
-                ":/icons/shutter-open2.svg", ":/icons/shutter-closed.svg"
+                ":/icons/shutter-open.svg", ":/icons/shutter-closed.svg"
             )
             w.setToolTip("Open/Close shutter")
             w.setCheckable(True)
