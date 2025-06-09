@@ -27,7 +27,7 @@ class CameraNITInstrument(CameraInstrument):
         objective = cast(float, config.get("objective", 5.0))
         self.select_objective(objective)
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
+    def get_last_image(self) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
         """
         Retrieves the last image captured by the camera.
 

@@ -40,13 +40,13 @@
         "$ref": "probe.schema.json"
       }
     },
-    "hayashi": {
+    "lighting": {
       "allOf": [
         {
-          "$ref": "hayashi.schema.json"
+          "$ref": "light.schema.json"
         },
         {
-          "description": "Hayashi light controlled through a dongle from https://github.com/Ledger-Donjon/hayashi-light-remote"
+          "description": "Lighting system"
         }
       ]
     },

@@ -1,10 +1,12 @@
 import os
-from PyQt6.QtGui import QTransform, QPixmap, QColor
+from PyQt6.QtGui import QTransform, QPixmap, QColor, QPen
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPointF
 from typing import Union
 from .colors import LedgerColors
 import yaml
+from PyQt6.QtCharts import QChartView
+from typing import Optional
 
 __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -78,3 +80,31 @@ def save_configuration_file(config: dict):
             )
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to save configuration: {e}")
+
+
+class ChartViewWithVMarker(QChartView):
+    _x: Optional[float] = None
+
+    @property
+    def vmarker(self):
+        return self._x
+
+    @vmarker.setter
+    def vmarker(self, x: Optional[float]):
+        self._x = x
+        self.update()
+
+    def drawForeground(self, painter, rect):
+        if (c := self.chart()) is None or painter is None or self.vmarker is None:
+            super().drawForeground(painter, rect)
+            return
+        painter.save()
+        pen = QPen(LedgerColors.Grellow.value)
+        pen.setWidth(3)
+        painter.setPen(pen)
+        p = c.mapToPosition(QPointF(self.vmarker, 0))
+        r = c.plotArea()
+        p1 = QPointF(p.x(), r.top())
+        p2 = QPointF(p.x(), r.bottom())
+        painter.drawLine(p1, p2)
+        painter.restore()

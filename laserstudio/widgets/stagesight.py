@@ -23,10 +23,17 @@ from ..instruments.laser import LaserInstrument
 from typing import Optional, Union
 import logging
 from .marker import ProbeMarker
+from enum import Enum, auto
 
 
 class StageSightViewer(QGraphicsView):
     """Simple version of Viewer, containing a StageSight"""
+
+    class Mode(int, Enum):
+        """Viewer modes."""
+
+        NONE = auto()
+        STAGE = auto()
 
     def __init__(self, stage_sight: "StageSight", parent=None):
         super().__init__(parent)
@@ -275,11 +282,15 @@ class StageSight(QGraphicsItemGroup):
         else:
             self.setPos(position)
 
-    def update_pos(self, position: Vector):
+    def update_pos(self, position: Optional[Vector] = None):
         """Update Widget position according to the stage's position, received in parameter
 
         :param position: The stage's current position.
         """
+        if position is None and self.stage is not None:
+            position = self.stage.position
+        if position is None:
+            return
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 

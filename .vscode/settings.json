@@ -1,12 +1,9 @@
 {
-    "yaml.schemas": {
-        "config_schema/config.schema.json": "config.yaml"
-    },
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": [],
     "python.testing.pytestArgs": [
-        "tests",
-        "-s"
+        "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "python.analysis.typeCheckingMode": "standard"
+    "python.testing.pytestEnabled": true
 }

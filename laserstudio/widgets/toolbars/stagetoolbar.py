@@ -10,9 +10,10 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
+from PyQt6.QtGui import QGuiApplication
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter
+from ...instruments.stage import MoveFor, CNCRouter, SMC100
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 import os
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class StageToolbar(QToolBar):
+class StageToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
@@ -73,7 +74,14 @@ class StageToolbar(QToolBar):
 
         w = QPushButton(self)
         w.setText("Get Position")
-        w.clicked.connect(lambda: print(self.stage.stage.position))
+        w.setToolTip("Get current stage position and copy in clipboard")
+
+        w.clicked.connect(
+            lambda: (
+                print(pos := self.stage.position.data, "(copied in clipboard)"),
+                QGuiApplication.clipboard().setText(str(pos)),
+            )
+        )
         hbox.addWidget(w)
 
         if isinstance(self.stage.stage, CNCRouter):
@@ -85,6 +93,19 @@ class StageToolbar(QToolBar):
             w = QPushButton(self)
             w.setText("Reset GRBL")
             w.clicked.connect(self.stage.stage.reset_grbl)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
+        if type(stage := self.stage.stage) is SMC100:
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Reset")
+            w.clicked.connect(lambda: stage.reset())
+            hbox.addWidget(w)
+
+            w = QPushButton(self)
+            w.setText("Stop")
+            w.clicked.connect(stage.stop)
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
@@ -180,10 +201,19 @@ class StageToolbar(QToolBar):
         if not pressed:
             return
         axe = button // 2
-        if axe != 2:
-            return
-        coefficient = (button % 2) * 2.0 - 1.0
-        self.joystick_axis(axe, coefficient)
+        if axe == 2:
+            coefficient = (button % 2) * 2.0 - 1.0
+            self.joystick_axis(axe, coefficient)
+        elif axe == 0 and self.keyboardbox.displacement_z_spinbox is not None:
+            # First pair of number of buttons (0 and 1) is for changing the step of Z
+            self.keyboardbox.displacement_z_spinbox.setValue(
+                self.keyboardbox.displacement_z * (2.0 if button % 2 else 0.5)
+            )
+        elif axe == 1 and self.keyboardbox.displacement_xy_spinbox is not None:
+            # Second pair of number of buttons (7 and 8) is for changing the step of XY
+            self.keyboardbox.displacement_xy_spinbox.setValue(
+                self.keyboardbox.displacement_xy * (2.0 if button % 2 else 0.5)
+            )
 
     def joystick_axis(self, axe: int, coefficient: float):
         """

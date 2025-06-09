@@ -1,0 +1,25 @@
+stage:
+  enable: yes
+  dev:
+    sn: "A600AANB"
+
+camera:
+  enable: yes
+  # Pixel size in micrometers, for 1X objective
+  pixel-size-1x: 15.115
+
+shutter:
+  enable: yes
+
+halogen:
+  enable: yes
+
+# Silicium refractive index for 1000 µm wavelength
+# This is very approximative
+silicium-refractive-index: 3.5
+
+margin-x: 128
+margin-y: 102
+overlap: 0
+#gimp_path: "C:\Program Files\GIMP 2\bin\gimp-2.10.exe"
+gimp-path: "gimp"

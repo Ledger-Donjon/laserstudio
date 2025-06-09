@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class ScanToolbar(QToolBar):
+class ScanToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         super().__init__("Scanning Zones", laser_studio)
         self.setObjectName("toolbar-scanning")  # For settings save and restore
