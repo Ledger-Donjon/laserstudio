@@ -139,7 +139,6 @@ class FocusThread(QThread):
                 self.__camera.clear_averaged_images()
                 while self.__camera.average_count < self.__camera.image_averaging:
                     QCoreApplication.processEvents()
-
             std_dev = self.__camera.laplacian_std_dev
             tab.append((z, std_dev))
             self.new_point.emit(z, std_dev)
@@ -226,15 +225,14 @@ class FocusInstrument(Instrument):
         if "coarse" in config:
             self.coarse_focus_settings = FocusSearchSettings(**config["coarse"])
 
-        # Autofocus settings
-        points = config.get("autofocus_points", [])
-        if len(points) == 3:
-            for point in points:
-                if type(point) is list and len(point) == 3:
-                    self.autofocus_helper.register(point[0], point[1], point[2])
-
-        print("Autofocus points:")
-        print(self.autofocus_helper.registered_points)
+    def clear(self):
+        """
+        Clear all focused points
+        """
+        self.autofocus_helper.clear()
+        self.parameter_changed.emit(
+            "autofocus_points", self.autofocus_helper.registered_points
+        )
 
     def register(self, position: Optional[tuple[float, float, float]] = None):
         """
@@ -245,13 +243,16 @@ class FocusInstrument(Instrument):
         if position is None:
             position = tuple(self.stage.position.data)
         self.autofocus_helper.register(position[0], position[1], position[2])
+        self.parameter_changed.emit(
+            "autofocus_points", self.autofocus_helper.registered_points
+        )
 
     def autofocus(self, register_point: bool = False):
         if self.stage is None:
             return
         pos = self.stage.position
         if register_point:
-            self.autofocus_helper.register(pos.x, pos.y, pos.z)
+            self.register((pos.x, pos.y, pos.z))
             return
         if len(self.autofocus_helper.registered_points) < 3:
             return
@@ -349,3 +350,28 @@ class FocusInstrument(Instrument):
         print(f"{self.focus_thread.best_positions=}")
         print(f"{self.focus_thread.tab_coarse=}")
         print(f"{self.focus_thread.tab_fine=}")
+
+    @property
+    def settings(self) -> dict:
+        """Export settings to a dict for yaml serialization."""
+        settings = super().settings
+        points = self.autofocus_helper.registered_points
+        if len(points) == 3:
+            settings["autofocus_points"] = [
+                list(p) for p in self.autofocus_helper.registered_points
+            ]
+        return settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        """Import settings from a dict."""
+        Instrument.settings.__set__(self, data)
+        points = data.get("autofocus_points", [])
+        if len(points) == 3:
+            self.autofocus_helper.clear()
+            for point in points:
+                if type(point) is list and len(point) == 3:
+                    self.autofocus_helper.register(point[0], point[1], point[2])
+            self.parameter_changed.emit(
+                "autofocus_points", self.autofocus_helper.registered_points
+            )

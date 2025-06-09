@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QWidget,
-    QVBoxLayout,
+    QVBoxLayout, 
+    QMenu
 )
 from ...utils.util import colored_image, ChartViewWithVMarker
 from ..coloredbutton import ColoredPushButton
@@ -131,25 +132,17 @@ class FocusToolBar(QToolBar):
         self.addWidget(w)
 
         # Register focus point at current position
-        self.buttons_autofocus: list[QPushButton] = []
-        for i in range(3):
-            w = ColoredPushButton(
-                ":/icons/fontawesome-free/wrench-solid.svg", parent=self
-            )
-            w.setEnabled(False)
-            self.buttons_autofocus.append(w)
-            w.setText(f"{i + 1}")
-            w.setCheckable(True)
-            w.setIconSize(QSize(24, 24))
-            w.toggled.connect(lambda x, _i=i: self.register(_i, x))
-            self.addWidget(w)
+        self.buttons_autofocus_menu = menu = QMenu("Autofocus Points", self)
+        self.autofocus_action = menu.addAction("Perform autofocus", lambda: self.autofocus())
+        menu.addAction("Register current position", lambda: self.register())
+        menu.addAction("Clear all registered points", lambda: self.clear_all())
 
         # Autofocus
         self.autofocus_button = w = QPushButton(self)
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/glasses-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setToolTip("Automatically focus based on 3 registered positions.")
-        w.clicked.connect(self.autofocus)
+        w.setMenu(menu)
         self.addWidget(w)
 
         self.update_autofocus_buttons()
@@ -165,6 +158,8 @@ class FocusToolBar(QToolBar):
         self.addWidget(self.sharpness)
 
         self.chart_window = FocusChartWindow()
+
+        self.focus_helper.parameter_changed.connect(lambda _: self.update_autofocus_buttons())
 
     def magic_focus(self):
         """
@@ -211,22 +206,15 @@ class FocusToolBar(QToolBar):
         """
         points = self.focus_helper.autofocus_helper.registered_points
         num_points = len(points)
-        for i, b in enumerate(self.buttons_autofocus):
-            b.setEnabled(i == num_points or i + 1 == num_points)
-            b.blockSignals(True)
-            b.setChecked(i < num_points)
-            b.blockSignals(False)
-            b.setToolTip(
-                f"{points[i][0]:.2f} {points[i][1]:.2f} {points[i][2]:.2f}"
-                if i < num_points
-                else "Register current position for focusing."
-            )
-        self.autofocus_button.setEnabled(num_points == 3)
+        self.autofocus_action.setEnabled(num_points >= 3)
+        self.autofocus_button.setText(str(num_points))
 
-    def register(self, index: int, checked: bool):
+    def clear_all(self):
+        self.focus_helper.clear()
+
+    def register(self, index: int=1, checked: bool=True):
         """
-        Registers a new focus point. If three focus points are already defined, the
-        farther point is replaced.
+        Registers a new focus point.
         """
         if checked:
             pos = self.stage.position

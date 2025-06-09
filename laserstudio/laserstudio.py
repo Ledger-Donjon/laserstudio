@@ -486,7 +486,11 @@ class LaserStudio(QMainWindow):
         # Lasers
         data["lasers"] = [laser.settings for laser in self.instruments.lasers]
 
-        # Viewver
+        # Focus
+        if self.instruments.focus_helper is not None:
+            data["focus"] = self.instruments.focus_helper.settings
+
+        # Viewer
         data["viewer"] = self.viewer.settings
 
         yaml.dump(data, open("settings.yaml", "w"))
@@ -525,7 +529,12 @@ class LaserStudio(QMainWindow):
         for pdata, laser in zip(lasers, self.instruments.lasers):
             laser.settings = pdata
 
-        # Viewver's configuration
+        # Focus
+        focus = data.get("focus")
+        if self.instruments.focus_helper is not None and focus is not None:
+            self.instruments.focus_helper.settings = focus
+
+        # Viewer's configuration
         viewer = data.get("viewer")
         if viewer is not None:
             self.viewer.settings = viewer
