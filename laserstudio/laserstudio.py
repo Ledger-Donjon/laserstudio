@@ -510,11 +510,11 @@ class LaserStudio(QMainWindow):
                 )
 
         # Lighting system settings
-        light = data.get("light")
-        if (self.instruments.light is not None) and (light is not None):
-            self.instruments.light.settings = light
+        lighting = data.get("lighting")
+        if (self.instruments.light is not None) and (lighting is not None):
+            self.instruments.light.settings = lighting
 
-        # Scanning geometry
+        # Scanning geometr
         geometry = data.get("scangeometry")
         if geometry is not None:
             self.viewer.scan_geometry.settings = geometry
