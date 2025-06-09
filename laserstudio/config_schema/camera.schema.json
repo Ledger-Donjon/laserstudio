@@ -49,6 +49,16 @@
       "description": "If there is a optical magnifier, specify the zooming factor of the objective.",
       "suffix": "x"
     },
+    "invert_vertical": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the image will be flipped vertically. This is useful for some cameras that have a different orientation."
+    },
+    "invert_horizontal": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, the image will be flipped horizontally. This is useful for some cameras that have a different orientation."
+    },
     "shutter": {
       "allOf": [{ "$ref": "ticshutter.schema.json" }]
     }

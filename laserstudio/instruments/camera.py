@@ -29,8 +29,13 @@ class CameraInstrument(Instrument):
             self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
         )
 
+        # Image size in pixels
         self.width = cast(int, config.get("width", 640))
         self.height = cast(int, config.get("height", 512))
+
+        # Image flip
+        self.invert_vertical = cast(bool, config.get("invert_vertical", False))
+        self.invert_horizontal = cast(bool, config.get("invert_horizontal", False))
 
         # Unit factor to apply in order to get coordinates in micrometers
         self.pixel_size_in_um = cast(
@@ -161,6 +166,14 @@ class CameraInstrument(Instrument):
         frame = self.capture_image()
         if frame is None:
             return self.width, self.height, "L", None
+
+        frame = frame.reshape((self.height, self.width, -1))
+        if self.invert_horizontal:
+            # Invert the frame horizontally
+            frame = numpy.fliplr(frame)
+        if self.invert_vertical:
+            # Invert the frame vertically
+            frame = numpy.flipud(frame)
 
         # Put the frame in the accumulator
         self.accumulate_frame(frame)
