@@ -154,8 +154,9 @@ class CameraImageAdjustmentToolBar(QToolBar):
 
         :param histogram: The histogram data to update the chart with.
         """
+        lf = self.camera.last_frame.copy()
         histogram = self.camera.compute_histogram(
-            self.camera.last_frame, width=256 // 4
+            lf, width=256 // 4
         )
         self.charts.clear()
         bs = QBarSet("Histogram")
