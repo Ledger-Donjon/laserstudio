@@ -55,7 +55,7 @@ class LightToolBar(QToolBar):
 
         if type(light) is LMSControllerInstrument:
             w = ColoredPushButton(
-                ":/icons/shutter-open.svg", ":/icons/shutter-closed.svg"
+                ":/icons/shutter-closed.svg", ":/icons/shutter-open.svg"
             )
             w.setToolTip("Open/Close shutter")
             w.setCheckable(True)

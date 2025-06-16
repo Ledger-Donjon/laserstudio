@@ -8,6 +8,18 @@
       "properties": {
         "type": {
           "const": "LMSController"
+        },
+        "open_is_slidein": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, the LMS controller 'open' state corresponds to a 'slide-in' motor position state."
+        },
+        "motor": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 3,
+          "description": "The index of the motor used for this instrument."
         }
       }
     },

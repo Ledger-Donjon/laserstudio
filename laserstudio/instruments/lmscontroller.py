@@ -26,6 +26,8 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
         self.motor = cast(int, config.get("motor", 1))
         assert self.motor in (1, 2, 3), "Motor index must be 1, 2, or 3"
 
+        self.open_is_slidein = cast(bool, config.get("open_is_slidein", True))
+
         self.lms.motors_control_mode = ControlMode.SOFTWARE
         self.lms.led_control = ControlMode.SOFTWARE
         self.lms.apply()
@@ -38,7 +40,15 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     @open.setter
     def open(self, value: bool):
         ShutterInstrument.open.__set__(self, value)
-        state = MotorState.SLIDE_IN if value else MotorState.SLIDE_OUT
+        # open == true  & open_is_slidein == true  => open^open_is_slidein == false => SLIDE_IN
+        # open == false & open_is_slidein == true  => open^open_is_slidein == true  => SLIDE_OUT
+        # open == true  & open_is_slidein == false => open^open_is_slidein == true  => SLIDE_OUT
+        # open == false & open_is_slidein == false => open^open_is_slidein == false => SLIDE_IN
+        state = (
+            MotorState.SLIDE_OUT
+            if (value ^ self.open_is_slidein)
+            else MotorState.SLIDE_IN
+        )
         if self.motor == 1:
             self.lms.motor_1_position = state
         elif self.motor == 2:
