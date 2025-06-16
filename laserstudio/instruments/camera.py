@@ -393,8 +393,10 @@ class CameraInstrument(Instrument):
         Construct the display image from the positive and negative images.
         """
         average_count = self.average_count
+        # In some cases (when clear_average_images has been called, average_count may be equal 0)
+        # pos and neg should be coming from _last_pos and _last_neg, so bound to self.image_averaging
         if average_count == 0:
-            average_count = 1
+            average_count = self.image_averaging
         pos_8 = (
             (pos / average_count)
             .clip(
@@ -483,10 +485,8 @@ class CameraInstrument(Instrument):
 
         :return: The standard deviation of the Laplacian operator on the last image.
         """
-        if self.last_frame is None:
+        if (last_frame := self.last_frame) is None:
             return 0.0
-
-        last_frame = self.last_frame
 
         # cv::Laplacian(src, dst, CV_16S, 3);
         # KSIZE (3): Aperture size used to compute the
