@@ -153,7 +153,7 @@ class CameraNITInstrument(CameraInstrument):
     @property
     def settings(self) -> dict:
         settings = CameraInstrument.settings.__get__(self)
-        settings["averaging"] = self.get_alc_enabled()
+        settings["averaging"] = self.averaging
         settings["gain"] = list(self.gain)
         return settings
 

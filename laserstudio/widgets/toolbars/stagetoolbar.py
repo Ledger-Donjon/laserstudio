@@ -80,7 +80,7 @@ class StageToolBar(QToolBar):
         w.clicked.connect(
             lambda: (
                 print(pos := self.stage.position.data, "(copied in clipboard)"),
-                QGuiApplication.clipboard().setText(str(pos)),
+                QGuiApplication.clipboard().setText(str(pos)), # type: ignore
             )
         )
         hbox.addWidget(w)

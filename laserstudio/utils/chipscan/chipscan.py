@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QShortcut, QImage, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
-
 from ...instruments.instruments import (
     Instruments,
     CameraNITInstrument,
@@ -39,11 +38,14 @@ from ...widgets.toolbars import (
 from PIL import Image, ImageDraw
 from pystages import Vector
 import time
-from typing import Optional, Any
+from typing import Optional, Any, cast, TYPE_CHECKING
 import math
 from .scan_file import ScanFile
 import os
 import yaml
+
+if TYPE_CHECKING:
+    from ...laserstudio import LaserStudio
 
 class ScanConfig:
     def __init__(self, config: dict[str, Any]):
@@ -242,15 +244,16 @@ class ChipScan(QMainWindow):
         self.viewer = StageSightViewer(StageSight(stage, camera))
         self.viewer_buttons_group = QButtonGroup(self)
 
-        self.addToolBar(MainToolBar(self))
+        selfls = cast('LaserStudio', self) 
+        self.addToolBar(MainToolBar(selfls))
         if self.camera:
-            self.addToolBar(CameraImageAdjustmentToolBar(self))
-            self.addToolBar(PhotoEmissionToolBar(self))
+            self.addToolBar(CameraImageAdjustmentToolBar(selfls))
+            self.addToolBar(PhotoEmissionToolBar(selfls))
         if isinstance(self.camera, CameraNITInstrument):
-            self.addToolBar(CameraNITToolBar(self))
+            self.addToolBar(CameraNITToolBar(selfls))
         if isinstance(self.camera, CameraRaptorInstrument):
-            self.addToolBar(CameraRaptorToolBar(self))
-        toolbar = StageToolBar(self)
+            self.addToolBar(CameraRaptorToolBar(selfls))
+        toolbar = StageToolBar(selfls)
         self.addToolBar(toolbar)
         if light := self.instruments.light:
             self.addToolBar(LightToolBar(light))

@@ -65,7 +65,7 @@ class StageInstrument(Instrument):
             logging.getLogger("laserstudio").info(
                 f"Connecting to {device_type} {dev}... "
             )
-            self.stage: Stage = Corvus(dev)
+            self.stage = Corvus(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 1000
 
@@ -73,7 +73,7 @@ class StageInstrument(Instrument):
             logging.getLogger("laserstudio").info(
                 f"Connecting to {device_type} {dev}... "
             )
-            self.stage: Stage = CNCRouter(dev)
+            self.stage = CNCRouter(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 200
         elif device_type == "PI":
@@ -83,21 +83,21 @@ class StageInstrument(Instrument):
             )
             adresses = config.get("adresses", [1, 2, 3])
             logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
-            self.stage: Stage = PI(dev=dev, addresses=adresses)
+            self.stage = PI(dev=dev, addresses=adresses)
         elif device_type == "SMC100":
             logging.getLogger("laserstudio").info(
                 "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
             )
             adresses = config.get("adresses", [1, 2])
             logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
-            self.stage: Stage = SMC100(dev=dev, addresses=adresses)
+            self.stage = SMC100(dev=dev, addresses=adresses)
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
-            self.stage: Stage = StageDummy(config=config, stage_instrument=self)
+            self.stage = StageDummy(config=config, stage_instrument=self)
         elif device_type == "REST":
             logging.getLogger("laserstudio").info(f"Connecting to {device_type}...")
             try:
-                self.stage: Stage = StageRest(config)
+                self.stage = StageRest(config)
             except Exception as e:
                 logging.getLogger("laserstudio").error(
                     f"Connection to {device_type} stage failed: {str(e)}. Skipping device."

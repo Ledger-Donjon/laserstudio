@@ -27,7 +27,7 @@ class Instruments:
         :param config: Configuration YAML object
         """
         # Main stage
-        self.stage = None
+        self.stage: Optional[StageInstrument] = None
         stage_config = config.get("stage", None)
         if stage_config is not None and stage_config.get("enable", True):
             try:
@@ -43,17 +43,17 @@ class Instruments:
                 self.stage = None
 
         # Main camera
-        self.camera = None
+        self.camera: Optional[CameraInstrument] = None
         camera_config = config.get("camera", None)
         if camera_config is not None and camera_config.get("enable", True):
             device_type = camera_config.get("type")
             try:
                 if device_type == "USB":
-                    self.camera: Optional[CameraInstrument] = CameraUSBInstrument(
+                    self.camera = CameraUSBInstrument(
                         camera_config
                     )
                 elif device_type == "REST":
-                    self.camera: Optional[CameraInstrument] = CameraRESTInstrument(
+                    self.camera = CameraRESTInstrument(
                         camera_config
                     )
                 elif device_type == "NIT":
@@ -61,11 +61,11 @@ class Instruments:
                         raise Exception(
                             "The NIT camera is not supported on other platforms than Linux or Windows."
                         )
-                    self.camera: Optional[CameraInstrument] = CameraNITInstrument(
+                    self.camera = CameraNITInstrument(
                         camera_config
                     )
                 elif device_type == "Raptor":
-                    self.camera: Optional[CameraInstrument] = CameraRaptorInstrument(
+                    self.camera = CameraRaptorInstrument(
                         camera_config
                     )
             except Exception as e:

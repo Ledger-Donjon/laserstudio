@@ -217,7 +217,7 @@ class LSAPI:
 
     def position(self) -> List[float]:
         res = self.send("motion/position")
-        return res.json()
+        return res.json()["pos"]
 
     def go_to_position(self, pos: List[float] = []) -> List[float]:
         """
