@@ -1,4 +1,4 @@
-from lsapi import LSAPI
+from laserstudio.lsapi import LSAPI
 from time import sleep
 import quicklog
 import datetime

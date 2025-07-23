@@ -34,6 +34,7 @@ from ...widgets.toolbars import (
     LightToolBar,
     FocusToolBar,
     PhotoEmissionToolBar,
+    MainToolBar
 )
 from PIL import Image, ImageDraw
 from pystages import Vector
@@ -42,7 +43,7 @@ from typing import Optional, Any
 import math
 from .scan_file import ScanFile
 import os
-
+import yaml
 
 class ScanConfig:
     def __init__(self, config: dict[str, Any]):
@@ -240,6 +241,8 @@ class ChipScan(QMainWindow):
 
         self.viewer = StageSightViewer(StageSight(stage, camera))
         self.viewer_buttons_group = QButtonGroup(self)
+
+        self.addToolBar(MainToolBar(self))
         if self.camera:
             self.addToolBar(CameraImageAdjustmentToolBar(self))
             self.addToolBar(PhotoEmissionToolBar(self))
@@ -513,19 +516,61 @@ class ChipScan(QMainWindow):
         disp_x = (self.camera.pixel_size_in_um[0] / mag) * self.camera.width
         # Calculate side pos and move stage
         side_pos = (start_pos[0] + disp_x, start_pos[1], start_pos[2])
-        self.stage.stage.wait_routine = lambda: QApplication.processEvents()
+        self.stage.stage.wait_routine = lambda: (print('routine'))
+        print("move")
         self.stage.move_to(Vector(*side_pos), wait=True, backlash=True)
         # Wait for 2 seconds
+        print("wait")
         d = 20
         while d > 0:
             time.sleep(0.1)
             d -= 1
             QApplication.processEvents()
         # Take image
+        print("wait done")
         im = self.camera.get_last_qimage()
         self.image_label_right.setPixmap(QPixmap.fromImage(im))
         self.image_label_right.show()
         # Return to starting position
+        print("moveback")
         self.stage.move_to(start_pos, wait=True, backlash=True)
-
+        print("moveback done")
         # self.instruments.stage.enable_joystick()
+
+
+
+
+    def save_settings(self):
+        """
+        Save some settings in the settings.yaml file.
+        """
+        data: dict[str, Any] = {}
+
+        # Camera settings
+        if self.instruments.camera is not None:
+            data["camera"] = self.instruments.camera.settings
+
+        # Focus
+        if self.instruments.focus_helper is not None:
+            data["focus"] = self.instruments.focus_helper.settings
+
+        yaml.dump(data, open("settings.yaml", "w"))
+
+    def reload_settings(self):
+        """
+        Restore settings in the settings.yaml file.
+        """
+        data = yaml.load(open("chipscan_settings.yaml", "r"), yaml.SafeLoader)
+        # Camera settings (maybe missing from settings)
+        camera = data.get("camera")
+        if (self.instruments.camera is not None) and (camera is not None):
+            self.instruments.camera.settings = camera
+            if self.viewer.stage_sight is not None:
+                self.viewer.stage_sight.distortion = (
+                    self.instruments.camera.correction_matrix
+                )
+        # Focus
+        focus = data.get("focus")
+        if self.instruments.focus_helper is not None and focus is not None:
+            self.instruments.focus_helper.settings = focus
+

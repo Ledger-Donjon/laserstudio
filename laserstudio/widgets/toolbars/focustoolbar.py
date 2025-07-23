@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QWidget,
-    QVBoxLayout, 
-    QMenu
+    QVBoxLayout,
+    QMenu,
 )
 from ...utils.util import colored_image, ChartViewWithVMarker
 from ..coloredbutton import ColoredPushButton
@@ -133,7 +133,9 @@ class FocusToolBar(QToolBar):
 
         # Register focus point at current position
         self.buttons_autofocus_menu = menu = QMenu("Autofocus Points", self)
-        self.autofocus_action = menu.addAction("Perform autofocus", lambda: self.autofocus())
+        action = menu.addAction("Perform autofocus", lambda: self.autofocus())
+        assert action is not None, "Autofocus action could not be created"
+        self.autofocus_action = action
         menu.addAction("Register current position", lambda: self.register())
         menu.addAction("Clear all registered points", lambda: self.clear_all())
 
@@ -159,7 +161,9 @@ class FocusToolBar(QToolBar):
 
         self.chart_window = FocusChartWindow()
 
-        self.focus_helper.parameter_changed.connect(lambda _: self.update_autofocus_buttons())
+        self.focus_helper.parameter_changed.connect(
+            lambda _: self.update_autofocus_buttons()
+        )
 
     def magic_focus(self):
         """
@@ -212,7 +216,7 @@ class FocusToolBar(QToolBar):
     def clear_all(self):
         self.focus_helper.clear()
 
-    def register(self, index: int=1, checked: bool=True):
+    def register(self, index: int = 1, checked: bool = True):
         """
         Registers a new focus point.
         """
