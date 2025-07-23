@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING, Optional, Union
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -13,10 +14,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QGuiApplication
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter, SMC100
+from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
-import os
+
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -96,16 +97,24 @@ class StageToolBar(QToolBar):
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
-        if type(stage := self.stage.stage) is SMC100:
+        if isinstance(stage := self.stage.stage, SMC100):
             hbox = QHBoxLayout()
             w = QPushButton(self)
             w.setText("Reset")
-            w.clicked.connect(lambda: stage.reset())
+            w.clicked.connect(stage.reset)
             hbox.addWidget(w)
 
             w = QPushButton(self)
             w.setText("Stop")
             w.clicked.connect(stage.stop)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
+        if isinstance(stage := self.stage.stage, Corvus):
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Enable Joystick")
+            w.clicked.connect(stage.enable_joystick)
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
@@ -150,6 +159,9 @@ class StageToolBar(QToolBar):
             vbox.addLayout(hbox)
 
     def home(self):
+        """
+        Called when the home button is clicked.
+        """
         # Request a confirmation from the user
         if QMessageBox.StandardButton.Apply == QMessageBox.warning(
             None,
@@ -162,6 +174,11 @@ class StageToolBar(QToolBar):
             self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
+        """
+        Called when the move for selection is changed.
+
+        :param index: The index of the selected item.
+        """
         move_for = self.move_for_selector.itemData(index, Qt.ItemDataRole.UserRole)
         if not isinstance(move_for, MoveFor):
             return

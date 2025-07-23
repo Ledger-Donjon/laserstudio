@@ -522,18 +522,10 @@ class ChipScan(QMainWindow):
             d -= 1
             QApplication.processEvents()
         # Take image
-        im = self.camera.get_last_qImage()
+        im = self.camera.get_last_qimage()
         self.image_label_right.setPixmap(QPixmap.fromImage(im))
         self.image_label_right.show()
         # Return to starting position
         self.stage.move_to(start_pos, wait=True, backlash=True)
 
         # self.instruments.stage.enable_joystick()
-
-
-"""
-- [-12552.47, -20536.8, -19087.45]
-- [-10874.73, -19204.74, -19132.47]
-- [-10774.710000000001, -20504.52, -19139.15]
-- [-12474.5, -19228.0, -19109.35]
-"""

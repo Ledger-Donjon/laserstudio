@@ -1,14 +1,14 @@
+import os
+import logging
+from typing import Optional, Literal, cast
+import numpy
+import cv2
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
 from PIL import Image, ImageQt
-from typing import Optional, Literal, cast
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
 from .shutter import ShutterInstrument, TicShutterInstrument
-import logging
-import numpy
-import os
-import cv2
 
 
 class CameraInstrument(Instrument):
@@ -26,7 +26,7 @@ class CameraInstrument(Instrument):
         # To refresh image regularly, in real-time
         self.refresh_interval = cast(int, config.get("refresh_interval_ms", 200))
         QTimer.singleShot(
-            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
+            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qimage
         )
 
         # Image size in pixels
@@ -76,6 +76,9 @@ class CameraInstrument(Instrument):
         # The number of images that have been averaged
         self.number_of_averaged_images = 0
 
+        self._last_neg = None
+        self._last_pos = numpy.zeros((self.width, self.height), dtype=numpy.uint8)
+
         # Window averaging makes to store all averaged image to make a 'rotating' average
         # When the number of images to average is hit, and a new frame is retrieved,
         # the oldest one is removed from the accumulator and the new one is added.
@@ -92,6 +95,11 @@ class CameraInstrument(Instrument):
 
     @property
     def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
+        """
+        Returns the current reference image.
+
+        :return: The current reference image, or None if no reference image is set.
+        """
         return self.reference_image_accumulators.get(self.current_reference_image)
 
     @reference_image_accumulator.setter
@@ -108,7 +116,9 @@ class CameraInstrument(Instrument):
     @property
     def last_frame_accumulator(self) -> Optional[numpy.ndarray]:
         """
-        Returns the last frame accumulator.
+        Returns the last frame accumulator. See accumulate_frame, and image_averaging for more details.
+
+        :return: The last frame accumulator (eg, averaged), or None if no frame has been accumulated yet.
         """
         return (
             self._last_frame_accumulator.copy()
@@ -125,18 +135,25 @@ class CameraInstrument(Instrument):
         self.width_um = self.width * self.pixel_size_in_um[0] / factor
         self.height_um = self.height * self.pixel_size_in_um[1] / factor
 
-    def get_last_qImage(self) -> QImage:
-        # PIL.ImageQt.ImageQt is a subclass of QImage
-        qImage = ImageQt.ImageQt(self.get_last_PIL_image())
-        self.new_image.emit(qImage)
-        QTimer.singleShot(
-            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qImage
-        )
-        return qImage
+    def get_last_qimage(self) -> QImage:
+        """
+        Returns the last image as a QImage.
 
-    def get_last_PIL_image(self) -> Image.Image:
+        :return: The last image as a QImage.
+        """
+        # PIL.ImageQt.ImageQt is a subclass of QImage
+        qimage = ImageQt.ImageQt(self.get_last_pil_image())
+        self.new_image.emit(qimage)
+        QTimer.singleShot(
+            self.refresh_interval, Qt.TimerType.CoarseTimer, self.get_last_qimage
+        )
+        return qimage
+
+    def get_last_pil_image(self) -> Image.Image:
         """
         Returns the last image as a PIL image.
+
+        :return: The last image as a PIL image.
         """
         width, height, mode, data = self.get_last_image()
         size = (width, height)
@@ -204,20 +221,6 @@ class CameraInstrument(Instrument):
         """
         Sets the number of images that must be averaged.
         """
-        # if self._last_frame_accumulator is not None and self.windowed_averaging:
-        #     # In the case we are in windowed_average mode and we have already accumulated images
-        #     if len(self._last_frames) > value:
-        #         # We reduce the number of images to average
-        #         # Drop the oldest frames (at the begining of the array)
-        #         to_substract = self._last_frames[: len(self._last_frames) - value]
-        #         self._last_frames = self._last_frames[len(self._last_frames) - value :]
-        #         self._last_frame_accumulator -= sum(to_substract)
-        #         self.number_of_averaged_images -= len(to_substract)
-        #         assert len(self._last_frames) == self.number_of_averaged_images
-        #         assert len(self._last_frames) == value, (
-        #             f"List of frames {self._last_frames} is inconsistent with new number of image_averaging {value}"
-        #         )
-        # else:
         self._image_averaging = value
         self.clear_averaged_images()
 
@@ -293,6 +296,13 @@ class CameraInstrument(Instrument):
         return image.clip(min=0).astype(type_)
 
     def compute_histogram(self, frame: numpy.ndarray, width: int = -1):
+        """
+        Computes the histogram of the given frame.
+
+        :param frame: The frame to compute the histogram of.
+        :param width: The width of the histogram.
+        :return: The histogram.
+        """
         if width <= 0:
             width = os.get_terminal_size().columns - 2
 
@@ -304,6 +314,13 @@ class CameraInstrument(Instrument):
         )
 
     def histogram_to_string(self, hist: numpy.ndarray, nlines=2):
+        """
+        Returns the histogram as a string representation.
+
+        :param hist: The histogram to convert to a string.
+        :param nlines: The number of lines to print (height of the histogram).
+        :return: A list of strings representing the histogram (one per line).
+        """
         bar = " ▁▂▃▄▅▆▇█"
         hist = nlines * (hist / max(hist)) * (len(bar) - 1)
         hists = []
@@ -314,12 +331,20 @@ class CameraInstrument(Instrument):
             hists.append("".join(bar[i] for i in val))
         return hists[::-1]
 
-    def levels_to_string(self, width: int = -1):
+    def levels_to_string(self, width: int = -1) -> tuple[str, str]:
+        """
+        Returns the black and white levels
+            as a tuple of strings reprensenting the position of the
+            black and white levels with markers (^).
+
+        :param width: The width of the terminal.
+        :return: A tuple of strings reprensenting the position of the
+            black and white levels with markers (^).
+        """
         if width <= 0:
             width = os.get_terminal_size().columns - 2
         white_pos = int(width * self.white_level)
         black_pos = int(width * self.black_level)
-
         return " " * black_pos + "^", " " * white_pos + "^"
 
     def show_histogram_terminal(
@@ -328,6 +353,13 @@ class CameraInstrument(Instrument):
         nlines: int = 5,
         nbins: int = 0,
     ):
+        """
+        Prints the histogram of the last frame in the terminal.
+
+        :param frame: The frame to compute the histogram of.
+        :param nlines: The number of lines to print.
+        :param nbins: The number of bins to use for the histogram.
+        """
         if nbins <= 0:
             nbins = os.get_terminal_size().columns - 2
         hists = self.histogram_to_string(
@@ -340,6 +372,11 @@ class CameraInstrument(Instrument):
         print("⸤" + hists[-1] + "⸥")
 
     def show_levels_terminal(self, width: int = -1):
+        """
+        Prints the black and white levels in the terminal.
+
+        :param width: The width of the terminal.
+        """
         if width <= 0:
             width = os.get_terminal_size().columns - 2
         levels = self.levels_to_string(width=width)
@@ -349,14 +386,21 @@ class CameraInstrument(Instrument):
     def take_reference_image(self, do_take: bool):
         """
         Take a reference image to substract from the next frames.
+
+        :param do_take: True if a reference image should be taken,
+            False if the reference image should be reset.
         """
         if do_take and self._last_frame_accumulator is not None:
             self.reference_image_accumulator = self._last_frame_accumulator.copy()
         else:
             self.reference_image_accumulator = None
 
-    def substract_reference_image(self):
-        """Substract the reference_image_accumulator from the current accumulator"""
+    def substract_reference_image(self) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
+        """
+        Substract the reference_image_accumulator from the current accumulator
+
+        :return: A tuple containing the positive and negative images.
+        """
         assert self._last_frame_accumulator is not None
         if self.reference_image_accumulator is None:
             self._last_pos = self._last_frame_accumulator
@@ -380,7 +424,9 @@ class CameraInstrument(Instrument):
     @property
     def last_frame(self) -> numpy.ndarray:
         """
-        Return the frame that should be analysed by histogram computation
+        Return the frame that should be analysed or displayed.
+
+        :return: The frame that should be analysed or displayed.
         """
         pos = self._last_pos
         neg = self._last_neg
@@ -391,6 +437,10 @@ class CameraInstrument(Instrument):
     ) -> numpy.ndarray:
         """
         Construct the display image from the positive and negative images.
+
+        :param pos: The positive image.
+        :param neg: The negative image.
+        :return: The display image.
         """
         average_count = self.average_count
         # In some cases (when clear_average_images has been called, average_count may be equal 0)
@@ -487,16 +537,9 @@ class CameraInstrument(Instrument):
         """
         if (last_frame := self.last_frame) is None:
             return 0.0
-
-        # cv::Laplacian(src, dst, CV_16S, 3);
         # KSIZE (3): Aperture size used to compute the
         #   second-derivative filters. See getDerivKernels for details.
         #   The size must be positive and odd.
         dst = cv2.Laplacian(last_frame, cv2.CV_8U, ksize=3)
-
-        # cv::meanStdDev(dst, mean, std_dev);
         _, std_dev = cv2.meanStdDev(dst)
-
-        # this->result = std_dev[0];
-        self._result = float(std_dev[0][0])
-        return self._result
+        return float(std_dev[0][0])
