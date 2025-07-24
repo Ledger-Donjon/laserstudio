@@ -19,16 +19,16 @@ from .widgets.toolbars import (
     ZoomToolBar,
     ScanToolBar,
     StageToolBar,
-    CameraToolBar,
-    CameraImageAdjustmentToolBar,
+    CameraDockWidget,
+    CameraImageAdjustementDockWidget,
     MainToolBar,
     MarkersToolBar,
-    PDMToolBar,
-    LaserDriverToolBar,
-    CameraNITToolBar,
-    CameraRaptorToolBar,
-    PhotoEmissionToolBar,
-    LightToolBar,
+    PDMDockWidget,
+    LaserDriverDockWidget,
+    CameraNITDockWidget,
+    CameraRaptorDockWidget,
+    PhotoEmissionDockWidget,
+    LightDockWidget,
     FocusToolBar,
 )
 import yaml
@@ -94,7 +94,8 @@ class LaserStudio(QMainWindow):
         # ToolBar: Markers
         toolbar = MarkersToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar.markers_list_toolbar)
+        # Dock widget: Markers list
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget)
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
@@ -119,41 +120,41 @@ class LaserStudio(QMainWindow):
         toolbar = ScanToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # ToolBar: Camera Image control
+        # Dock widget: Camera Image control
         if self.instruments.camera is not None:
             if isinstance(self.instruments.camera, CameraRaptorInstrument):
-                toolbar = CameraRaptorToolBar(self)
+                dockwidget = CameraRaptorDockWidget(self)
             else:
-                toolbar = CameraToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
-            self.addToolBar(
-                Qt.ToolBarArea.BottomToolBarArea, CameraImageAdjustmentToolBar(self)
+                dockwidget = CameraDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dockwidget)
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, CameraImageAdjustementDockWidget(self)
             )
 
-            self.photoemission_toolbar = PhotoEmissionToolBar(self)
-            self.addToolBar(
-                Qt.ToolBarArea.BottomToolBarArea, self.photoemission_toolbar
+            self.photoemission_dockwidget = PhotoEmissionDockWidget(self)
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, self.photoemission_dockwidget
             )
 
-        # ToolBar: NIT Camera Image control
+        # Dock widget: NIT Camera Image control extra panel
         if isinstance(self.instruments.camera, CameraNITInstrument):
-            toolbar = CameraNITToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            dockwidget = CameraNITDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dockwidget)
 
-        # Laser toolbars
+        # Dock widgets: Lasers
         for i, laser in enumerate(self.instruments.lasers):
             if isinstance(laser, PDMInstrument):
-                toolbar = PDMToolBar(laser, i)
+                dockwidget = PDMDockWidget(laser, i)
             elif isinstance(laser, LaserDriverInstrument):
-                toolbar = LaserDriverToolBar(laser, i)
+                dockwidget = LaserDriverDockWidget(laser, i)
             else:
                 continue
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockwidget)
 
-        # Light toolbar
+        # Dock widget: Light
         if isinstance(self.instruments.light, LightInstrument):
-            toolbar = LightToolBar(self.instruments.light)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            dockwidget = LightDockWidget(self.instruments.light)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockwidget)
 
         # Instantiate proxy for REST command reception
         self.rest_proxy = RestProxy(self, config.get("restserver", {}))
@@ -347,7 +348,7 @@ class LaserStudio(QMainWindow):
             camera.current_reference_image = refname
         if dotake is not None:
             camera.take_reference_image(dotake)
-        self.photoemission_toolbar.update_ref_image_controls()
+        self.photoemission_dockwidget.update_ref_image_controls()
         return camera.current_reference_image
 
     def handle_instrument_settings(

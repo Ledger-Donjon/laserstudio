@@ -2,7 +2,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QPushButton,
-    QToolBar,
+    QDockWidget,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -49,7 +49,7 @@ class MarkersListItem(QTreeWidgetItem):
             group.number_of_checked += 1
 
 
-class MarkersListToolBar(QToolBar):
+class MarkersListDockWidget(QDockWidget):
     def show_selected(self):
         for item in self.list.selectedItems():
             item.setCheckState(0, Qt.CheckState.Checked)
@@ -88,9 +88,8 @@ class MarkersListToolBar(QToolBar):
         super().__init__("Markers List")
         self.setObjectName("toolbar-markers-list")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
-        self.setFloatable(True)
 
         self.viewer = viewer
         self.list = QTreeWidget()
@@ -99,7 +98,7 @@ class MarkersListToolBar(QToolBar):
         self.list.itemChanged.connect(self.item_changed)
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         vbox = QVBoxLayout()
         w.setLayout(vbox)
 

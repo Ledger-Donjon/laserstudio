@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QToolBar, QPushButton
 from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
-from .markerslisttoolbar import MarkersListToolBar
+from .markerslistdockwidget import MarkersListDockWidget
 
 
 class MarkersToolBar(QToolBar):
@@ -52,12 +52,12 @@ class MarkersToolBar(QToolBar):
         )
         self.addWidget(self.marker_size_sp)
 
-        # ToolBar: Markers' List
-        self.markers_list_toolbar = MarkersListToolBar(viewer)
+        # Dock widget: Markers' List
+        self.markers_list_dockwidget = MarkersListDockWidget(viewer)
 
     def show_markers_list(self, state: bool):
         if state:
-            self.markers_list_toolbar.refresh_list()
-            self.markers_list_toolbar.show()
+            self.markers_list_dockwidget.refresh_list()
+            self.markers_list_dockwidget.show()
         else:
-            self.markers_list_toolbar.hide()
+            self.markers_list_dockwidget.hide()

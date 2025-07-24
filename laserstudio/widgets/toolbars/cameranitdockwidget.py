@@ -3,7 +3,7 @@ import pickle
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
-    QToolBar,
+    QDockWidget,
     QPushButton,
     QComboBox,
     QWidget,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 from PyQt6.QtCore import QTimer
 
 
-class CameraNITToolBar(QToolBar):
+class CameraNITDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         """
         Initialize the camera NIT toolbar.
@@ -35,14 +35,13 @@ class CameraNITToolBar(QToolBar):
         super().__init__("NIT Camera parameters", laser_studio)
         self.setObjectName("toolbar-camera-nit")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         vbox = QVBoxLayout()
         w.setLayout(vbox)
 

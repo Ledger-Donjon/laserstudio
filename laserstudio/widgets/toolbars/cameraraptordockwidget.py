@@ -4,7 +4,7 @@ from ...instruments.camera_raptor import (
     RaptorCameraControlReg0,
     RaptorCameraControlReg1,
 )
-from .cameratoolbar import CameraToolBar
+from .cameratoolbar import CameraDockWidget
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class CameraRaptorToolBar(CameraToolBar):
+class CameraRaptorDockWidget(CameraDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
@@ -32,17 +32,20 @@ class CameraRaptorToolBar(CameraToolBar):
         self.camera = laser_studio.instruments.camera
 
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
 
+        # Create central widget and layout
         w = QWidget()
-        self.addWidget(w)
-        vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        self.setWidget(w)
 
+        hbox = QHBoxLayout()
+        w.setLayout(hbox)
+
+        vbox = QVBoxLayout()
+        hbox.addLayout(vbox)
         # Button to set the Gain Mode
         w = QCheckBox("High Gain")
         w.setToolTip("Get the camera to use high gain mode")
@@ -70,10 +73,8 @@ class CameraRaptorToolBar(CameraToolBar):
         vbox.addWidget(w)
         vbox.addStretch()
 
-        w = QWidget()
-        self.addWidget(w)
         vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        hbox.addLayout(vbox)
         # Set the exposure time
         self.exposure_time_sb = w = QDoubleSpinBox()
         w.setToolTip("Set the camera's exposure time")
@@ -115,10 +116,8 @@ class CameraRaptorToolBar(CameraToolBar):
 
         vbox.addStretch()
 
-        w = QWidget()
-        self.addWidget(w)
         vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        hbox.addLayout(vbox)
 
         # Checkbox to activate the FAN
         w = QCheckBox("Fan")

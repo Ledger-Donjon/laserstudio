@@ -26,13 +26,13 @@ from ...instruments.instruments import (
 )
 from ...widgets.stagesight import StageSight, StageSightViewer
 from ...widgets.toolbars import (
-    CameraNITToolBar,
-    CameraRaptorToolBar,
+    CameraNITDockWidget,
+    CameraRaptorDockWidget,
     StageToolBar,
-    CameraImageAdjustmentToolBar,
-    LightToolBar,
+    CameraImageAdjustementDockWidget,
+    LightDockWidget,
     FocusToolBar,
-    PhotoEmissionToolBar,
+    PhotoEmissionDockWidget,
     MainToolBar
 )
 from PIL import Image, ImageDraw
@@ -247,16 +247,16 @@ class ChipScan(QMainWindow):
         selfls = cast('LaserStudio', self) 
         self.addToolBar(MainToolBar(selfls))
         if self.camera:
-            self.addToolBar(CameraImageAdjustmentToolBar(selfls))
-            self.addToolBar(PhotoEmissionToolBar(selfls))
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraImageAdjustementDockWidget(selfls))
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, PhotoEmissionDockWidget(selfls))
         if isinstance(self.camera, CameraNITInstrument):
-            self.addToolBar(CameraNITToolBar(selfls))
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraNITDockWidget(selfls))
         if isinstance(self.camera, CameraRaptorInstrument):
-            self.addToolBar(CameraRaptorToolBar(selfls))
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraRaptorDockWidget(selfls))
         toolbar = StageToolBar(selfls)
         self.addToolBar(toolbar)
         if light := self.instruments.light:
-            self.addToolBar(LightToolBar(light))
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, LightDockWidget(light))
         if focus_helper := self.instruments.focus_helper:
             self.addToolBar(FocusToolBar(stage, camera, focus_helper))
 

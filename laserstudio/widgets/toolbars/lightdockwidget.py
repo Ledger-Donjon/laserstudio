@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QToolBar, QSlider, QHBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QDockWidget, QSlider, QHBoxLayout, QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import Qt, QSize
 from ...utils.colors import LedgerColors
 from ..coloredbutton import ColoredPushButton
@@ -7,7 +7,7 @@ from ...instruments.hayashilight import HayashiLRInstrument
 from ...instruments.lmscontroller import LMSControllerInstrument
 
 
-class LightToolBar(QToolBar):
+class LightDockWidget(QDockWidget):
     def __init__(self, light: LightInstrument):
         """
         :param light: Light instrument to be controlled by the toolbar.
@@ -17,14 +17,16 @@ class LightToolBar(QToolBar):
         super().__init__(light.label)
         self.setObjectName("toolbar-light")  # For settings save and restore
 
-        self.setAllowedAreas(Qt.ToolBarArea.AllToolBarAreas)
-        self.setFloatable(True)
+        self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+
 
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
         w = QWidget()
-        w.setLayout(hbox)
-        self.addWidget(w)
+        vbox = QVBoxLayout()
+        w.setLayout(vbox)
+        self.setWidget(w)
+        vbox.addLayout(hbox)
 
         w = ColoredPushButton(
             icon_path=":/icons/fontawesome-free/lightbulb-regular.svg",
@@ -51,7 +53,7 @@ class LightToolBar(QToolBar):
             w = self.label_burnout = QLabel("Lamp burnout!")
             w.setStyleSheet("color: red")
             w.setVisible(light.hyslr.burnout)
-            self.addWidget(w)
+            vbox.addWidget(w)
 
         if type(light) is LMSControllerInstrument:
             w = ColoredPushButton(

@@ -1,3 +1,4 @@
+from typing import Any
 from PyQt6.QtWidgets import (
     QPushButton,
     QLabel,
@@ -5,18 +6,17 @@ from PyQt6.QtWidgets import (
     QWidget,
     QSpinBox,
     QDoubleSpinBox,
+    QDockWidget,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
-from typing import Any
-from laserstudio.instruments.pdm import PDMInstrument
+from ...instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox
-from PyQt6.QtWidgets import QToolBar
 from ..coloredbutton import ColoredPushButton
 
 
-class PDMToolBar(QToolBar):
+class PDMDockWidget(QDockWidget):
     def __init__(self, laser: PDMInstrument, laser_num: int):
         """
         :param laser: Alphanov PDM instrument.
@@ -25,17 +25,27 @@ class PDMToolBar(QToolBar):
         assert isinstance(laser, PDMInstrument)
         self.laser = laser
         super().__init__(f"Laser {laser_num} (PDM)")
+
+        if self.laser.label is not None:
+            self.setWindowTitle(f"Laser {laser_num} (PDM) - " + self.laser.label)
+
         self.setObjectName(
             f"toolbox-laser-pdm-{laser_num}"
         )  # For settings save and restore
 
+        w = QWidget()
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
-        self.setFloatable(True)
+        self.setWidget(w)
+
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 4, 0, 0)
+        row = 0
 
         w = self.on_off_button = QPushButton(self)
         if self.laser.label is not None:
+            self.setWindowTitle(self.laser.label)
             w.setText(self.laser.label)
         w.setToolTip("On/Off Laser")
         w.setCheckable(True)
@@ -54,11 +64,7 @@ class PDMToolBar(QToolBar):
         w.setIcon(icon)
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))
-        self.addWidget(w)
-
-        grid = QGridLayout()
-        grid.setContentsMargins(0, 4, 0, 0)
-        row = 0
+        grid.addWidget(w, row, 0)
 
         # Laser pulsed power
         grid.addWidget(QLabel("Pulse power:"), row, 0)
@@ -146,9 +152,7 @@ class PDMToolBar(QToolBar):
             grid.addWidget(w, row, 1)
             row += 1
 
-        w = QWidget()
         w.setLayout(grid)
-        self.addWidget(w)
 
         self.reload_parameters()
         self.laser.parameter_changed.connect(self.refresh_interface)

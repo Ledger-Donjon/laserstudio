@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtWidgets import (
-    QToolBar,
+    QDockWidget,
     QPushButton,
     QSpinBox,
     QHBoxLayout,
@@ -17,23 +17,26 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class PhotoEmissionToolBar(QToolBar):
+class PhotoEmissionDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         super().__init__("Photoemission", laser_studio)
+
+        if self.camera.label is not None:
+            self.setWindowTitle("Photoemission - " + self.camera.label)
+
         self.setObjectName("toolbar-photoemission")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
         assert isinstance(laser_studio.instruments.camera, CameraInstrument)
         self.camera = laser_studio.instruments.camera
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         vbox = QVBoxLayout()
         w.setLayout(vbox)
 

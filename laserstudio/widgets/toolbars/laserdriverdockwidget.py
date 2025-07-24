@@ -4,10 +4,10 @@ except Exception:
     LaserDriverPanel = None
 from ...instruments.laserdriver import LaserDriverInstrument
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QToolBar
+from PyQt6.QtWidgets import QDockWidget
 
 
-class LaserDriverToolBar(QToolBar):
+class LaserDriverDockWidget(QDockWidget):
     def __init__(self, laser: LaserDriverInstrument, laser_num: int):
         """
         :param laser: Laser Driver instrument.
@@ -21,9 +21,8 @@ class LaserDriverToolBar(QToolBar):
         )  # For settings save and restore
 
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea | Qt.ToolBarArea.RightToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
-        self.setFloatable(True)
 
         # Construct a UI Panel for the Laser Driver
         assert LaserDriverPanel is not None
@@ -31,4 +30,4 @@ class LaserDriverToolBar(QToolBar):
         panel.refresh_interval_edit.setMinimum(1000)
         panel.refresh_interval_edit.setMaximum(5000)
         panel.refresh_interval_edit.setValue(2000)
-        self.addWidget(panel)
+        self.setWidget(panel)

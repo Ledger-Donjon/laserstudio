@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize, QMargins
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt6.QtWidgets import (
-    QToolBar,
+    QDockWidget,
     QPushButton,
     QWidget,
     QGridLayout,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class CameraImageAdjustmentToolBar(QToolBar):
+class CameraImageAdjustementDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
@@ -29,18 +29,20 @@ class CameraImageAdjustmentToolBar(QToolBar):
 
         super().__init__("Image Adjustment parameters", laser_studio)
 
+        if self.camera.label is not None:
+            self.setWindowTitle("Image Adjustment parameters - " + self.camera.label)
+
         self.setObjectName(
             "toolbar-camera-imageadjustment"
         )  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
         w.setLayout(grid)
@@ -196,22 +198,25 @@ class CameraImageAdjustmentToolBar(QToolBar):
         self.camera.white_level = white
 
 
-class CameraToolBar(QToolBar):
+class CameraDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
         super().__init__("Camera parameters", laser_studio)
+
+        if self.camera.label is not None:
+            self.setWindowTitle(self.camera.label)
+
         self.setObjectName("toolbar-camera")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
         w.setLayout(grid)

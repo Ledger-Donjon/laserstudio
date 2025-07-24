@@ -1,12 +1,12 @@
-from .cameratoolbar import CameraToolBar, CameraImageAdjustmentToolBar
-from .cameranittoolbar import CameraNITToolBar
-from .cameraraptortoolbar import CameraRaptorToolBar
-from .photoemissiontoolbar import PhotoEmissionToolBar
-from .pdmtoolbar import PDMToolBar
-from .lighttoolbar import LightToolBar
-from .laserdrivertoolbar import LaserDriverToolBar
+from .cameradockwidget import CameraDockWidget, CameraImageAdjustementDockWidget
+from .cameranitdockwidget import CameraNITDockWidget
+from .cameraraptordockwidget import CameraRaptorDockWidget
+from .photoemissiondockwidget import PhotoEmissionDockWidget
+from .pdmdockwidget import PDMDockWidget
+from .lightdockwidget import LightDockWidget
+from .laserdriverdockwidget import LaserDriverDockWidget
 from .maintoolbar import MainToolBar
-from .markerstoolbar import MarkersToolBar
+from .markerstoolbar import MarkersToolBar, MarkersListDockWidget
 from .scantoolbar import ScanToolBar
 from .picturetoolbar import PictureToolBar
 from .stagetoolbar import StageToolBar
@@ -19,15 +19,16 @@ __all__ = [
     "ScanToolBar",
     "ZoomToolBar",
     "StageToolBar",
-    "CameraToolBar",
-    "CameraImageAdjustmentToolBar",
-    "CameraNITToolBar",
-    "CameraRaptorToolBar",
-    "PhotoEmissionToolBar",
+    "CameraDockWidget",
+    "CameraImageAdjustementDockWidget",
+    "CameraNITDockWidget",
+    "CameraRaptorDockWidget",
+    "PhotoEmissionDockWidget",
     "PictureToolBar",
-    "LaserDriverToolBar",
-    "PDMToolBar",
+    "LaserDriverDockWidget",
+    "PDMDockWidget",
     "MarkersToolBar",
-    "LightToolBar",
+    "MarkersListDockWidget",
+    "LightDockWidget",
     "FocusToolBar",
 ]
