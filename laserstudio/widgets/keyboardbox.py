@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QApplication,
     QDoubleSpinBox,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt
 from ..instruments.instruments import StageInstrument
@@ -51,11 +52,11 @@ class KeyboardBox(QGroupBox):
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.left))
             grid.addWidget(w, 2, 1, alignment=Qt.AlignmentFlag.AlignRight)
+            grid.setColumnStretch(1, 1)
             w = QPushButton(Direction.right)
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.right))
             grid.addWidget(w, 2, 3, alignment=Qt.AlignmentFlag.AlignLeft)
-            grid.setColumnStretch(1, 1)
             grid.setColumnStretch(3, 1)
 
             self.displacement_xy_spinbox = w = QDoubleSpinBox()
@@ -86,7 +87,6 @@ class KeyboardBox(QGroupBox):
             w.setFixedWidth(30)
             w.pressed.connect(lambda: self.move_stage(Direction.zdown))
             grid.addWidget(w, 2, 4, alignment=Qt.AlignmentFlag.AlignCenter)
-            grid.setColumnStretch(4, 1)
 
             self.displacement_z_spinbox = w = QDoubleSpinBox()
             w.setMinimum(0)
@@ -100,6 +100,9 @@ class KeyboardBox(QGroupBox):
 
         vbox.addLayout(grid)
 
+
+        # Set size policy to prefer minimum size
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self._set_background_color()
