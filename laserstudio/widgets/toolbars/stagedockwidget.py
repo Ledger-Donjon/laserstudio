@@ -2,7 +2,6 @@ import os
 from typing import TYPE_CHECKING, Optional, Union
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
-    QToolBar,
     QPushButton,
     QComboBox,
     QHBoxLayout,
@@ -10,6 +9,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QWidget,
     QMessageBox,
+    QDockWidget,
 )
 from PyQt6.QtGui import QGuiApplication
 from ..coloredbutton import ColoredPushButton
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class StageToolBar(QToolBar):
+class StageDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
@@ -31,17 +31,16 @@ class StageToolBar(QToolBar):
         self.setObjectName("toolbar-stage")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
         )
-        self.setFloatable(True)
 
         w = QWidget()
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         w.setLayout(vbox)
-        self.addWidget(w)
+        self.setWidget(w)
 
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
@@ -80,7 +79,7 @@ class StageToolBar(QToolBar):
         w.clicked.connect(
             lambda: (
                 print(pos := self.stage.position.data, "(copied in clipboard)"),
-                QGuiApplication.clipboard().setText(str(pos)), # type: ignore
+                QGuiApplication.clipboard().setText(str(pos)),  # type: ignore
             )
         )
         hbox.addWidget(w)
@@ -157,6 +156,7 @@ class StageToolBar(QToolBar):
             hbox.addWidget(QLabel("Joystick:"))
             hbox.addWidget(w)
             vbox.addLayout(hbox)
+        vbox.addStretch(1000)
 
     def home(self):
         """

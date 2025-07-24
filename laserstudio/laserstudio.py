@@ -18,7 +18,7 @@ from .widgets.toolbars import (
     PictureToolBar,
     ZoomToolBar,
     ScanToolBar,
-    StageToolBar,
+    StageDockWidget,
     CameraDockWidget,
     CameraImageAdjustementDockWidget,
     MainToolBar,
@@ -99,8 +99,8 @@ class LaserStudio(QMainWindow):
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
-            toolbar = StageToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            dockwidget = StageDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockwidget)
 
         # ToolBar: Focusing
         if (

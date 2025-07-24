@@ -9,7 +9,7 @@ from .maintoolbar import MainToolBar
 from .markerstoolbar import MarkersToolBar, MarkersListDockWidget
 from .scantoolbar import ScanToolBar
 from .picturetoolbar import PictureToolBar
-from .stagetoolbar import StageToolBar
+from .stagedockwidget import StageDockWidget
 from .zoomtoolbar import ZoomToolBar
 from .focustoolbar import FocusToolBar
 
@@ -18,7 +18,7 @@ __all__ = [
     "MainToolBar",
     "ScanToolBar",
     "ZoomToolBar",
-    "StageToolBar",
+    "StageDockWidget",
     "CameraDockWidget",
     "CameraImageAdjustementDockWidget",
     "CameraNITDockWidget",

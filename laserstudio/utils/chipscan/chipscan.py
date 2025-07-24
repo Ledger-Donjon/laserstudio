@@ -28,12 +28,12 @@ from ...widgets.stagesight import StageSight, StageSightViewer
 from ...widgets.toolbars import (
     CameraNITDockWidget,
     CameraRaptorDockWidget,
-    StageToolBar,
+    StageDockWidget,
     CameraImageAdjustementDockWidget,
     LightDockWidget,
     FocusToolBar,
     PhotoEmissionDockWidget,
-    MainToolBar
+    MainToolBar,
 )
 from PIL import Image, ImageDraw
 from pystages import Vector
@@ -46,6 +46,7 @@ import yaml
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
+
 
 class ScanConfig:
     def __init__(self, config: dict[str, Any]):
@@ -244,19 +245,30 @@ class ChipScan(QMainWindow):
         self.viewer = StageSightViewer(StageSight(stage, camera))
         self.viewer_buttons_group = QButtonGroup(self)
 
-        selfls = cast('LaserStudio', self) 
+        selfls = cast("LaserStudio", self)
         self.addToolBar(MainToolBar(selfls))
         if self.camera:
-            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraImageAdjustementDockWidget(selfls))
-            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, PhotoEmissionDockWidget(selfls))
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea,
+                CameraImageAdjustementDockWidget(selfls),
+            )
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, PhotoEmissionDockWidget(selfls)
+            )
         if isinstance(self.camera, CameraNITInstrument):
-            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraNITDockWidget(selfls))
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, CameraNITDockWidget(selfls)
+            )
         if isinstance(self.camera, CameraRaptorInstrument):
-            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, CameraRaptorDockWidget(selfls))
-        toolbar = StageToolBar(selfls)
-        self.addToolBar(toolbar)
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, CameraRaptorDockWidget(selfls)
+            )
+        toolbar = StageDockWidget(selfls)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, toolbar)
         if light := self.instruments.light:
-            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, LightDockWidget(light))
+            self.addDockWidget(
+                Qt.DockWidgetArea.LeftDockWidgetArea, LightDockWidget(light)
+            )
         if focus_helper := self.instruments.focus_helper:
             self.addToolBar(FocusToolBar(stage, camera, focus_helper))
 
@@ -519,7 +531,7 @@ class ChipScan(QMainWindow):
         disp_x = (self.camera.pixel_size_in_um[0] / mag) * self.camera.width
         # Calculate side pos and move stage
         side_pos = (start_pos[0] + disp_x, start_pos[1], start_pos[2])
-        self.stage.stage.wait_routine = lambda: (print('routine'))
+        self.stage.stage.wait_routine = lambda: (print("routine"))
         print("move")
         self.stage.move_to(Vector(*side_pos), wait=True, backlash=True)
         # Wait for 2 seconds
@@ -539,9 +551,6 @@ class ChipScan(QMainWindow):
         self.stage.move_to(start_pos, wait=True, backlash=True)
         print("moveback done")
         # self.instruments.stage.enable_joystick()
-
-
-
 
     def save_settings(self):
         """
@@ -576,4 +585,3 @@ class ChipScan(QMainWindow):
         focus = data.get("focus")
         if self.instruments.focus_helper is not None and focus is not None:
             self.instruments.focus_helper.settings = focus
-

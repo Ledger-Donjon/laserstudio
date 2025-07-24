@@ -4,15 +4,15 @@ from ...instruments.camera_raptor import (
     RaptorCameraControlReg0,
     RaptorCameraControlReg1,
 )
-from .cameratoolbar import CameraDockWidget
+from .cameradockwidget import CameraDockWidget
 from PyQt6.QtWidgets import (
-    QWidget,
     QVBoxLayout,
     QCheckBox,
     QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
     QComboBox,
+    QGridLayout,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -37,15 +37,18 @@ class CameraRaptorDockWidget(CameraDockWidget):
             | Qt.DockWidgetArea.BottomDockWidgetArea
         )
 
-        # Create central widget and layout
-        w = QWidget()
-        self.setWidget(w)
+        parentwidget = self.widget()
+        assert parentwidget is not None
+        grid = parentwidget.layout()
+        assert isinstance(grid, QGridLayout)
 
-        hbox = QHBoxLayout()
-        w.setLayout(hbox)
+        col = grid.columnCount()
+        row = grid.rowCount()
 
         vbox = QVBoxLayout()
-        hbox.addLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
+
         # Button to set the Gain Mode
         w = QCheckBox("High Gain")
         w.setToolTip("Get the camera to use high gain mode")
@@ -74,7 +77,7 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addStretch()
 
         vbox = QVBoxLayout()
-        hbox.addLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
         # Set the exposure time
         self.exposure_time_sb = w = QDoubleSpinBox()
         w.setToolTip("Set the camera's exposure time")

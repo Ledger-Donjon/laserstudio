@@ -23,9 +23,6 @@ class PhotoEmissionDockWidget(QDockWidget):
         assert laser_studio.instruments.camera is not None
         super().__init__("Photoemission", laser_studio)
 
-        if self.camera.label is not None:
-            self.setWindowTitle("Photoemission - " + self.camera.label)
-
         self.setObjectName("toolbar-photoemission")  # For settings save and restore
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea
@@ -34,6 +31,9 @@ class PhotoEmissionDockWidget(QDockWidget):
         )
         assert isinstance(laser_studio.instruments.camera, CameraInstrument)
         self.camera = laser_studio.instruments.camera
+
+        if self.camera.label is not None:
+            self.setWindowTitle("Photoemission - " + self.camera.label)
 
         w = QWidget()
         self.setWidget(w)
