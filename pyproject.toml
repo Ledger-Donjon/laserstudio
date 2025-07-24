@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "pyqt6",
-    "pystages>=1.2",
+    "pystages>=1.3",
     "pillow>=10.4.0",
     "opencv-python>=4.9.0.80",
     "pyyaml",
