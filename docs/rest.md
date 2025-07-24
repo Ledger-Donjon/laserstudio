@@ -46,8 +46,7 @@ It returns a JSON object with the following structure:
 
 ```json
 {
-  "pos": [42.5, 44.1, -10.22],
-  "moving": true
+  "pos": [42.5, 44.1, -10.22]
 }
 ```
 

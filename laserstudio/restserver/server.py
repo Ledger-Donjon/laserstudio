@@ -408,9 +408,7 @@ class GoToMemoryPoint(Resource):
         return RestServer.invoke("handle_go_to_memory_point", index)
 
 
-position_move = motion.model(
-    "Stage State", {"pos": stage_pos, "moving": fields.Boolean}
-)
+position_move = motion.model("Stage State", {"pos": stage_pos})
 
 
 @motion.route("/position")

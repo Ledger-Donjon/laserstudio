@@ -3,11 +3,12 @@ from time import sleep
 import quicklog
 import datetime
 import os
+
 api = LSAPI()
 # Full chip
 n_steps = 15, 15, 1
-bottom_left = [-11_540.58,-26_480.31,-14_594.67]
-top_right = [-9_361.81,-24_803.59,-14_583.17]
+bottom_left = [-11_540.58, -26_480.31, -14_594.67]
+top_right = [-9_361.81, -24_803.59, -14_583.17]
 step = [(top_right[i] - bottom_left[i]) / n_steps[i] for i in range(len(top_right))]
 ir_settings = {
     "raptor": {
@@ -29,6 +30,7 @@ date_str = datetime.datetime.now().strftime("%Y%m%d%H%M")
 imagespath = os.path.abspath(os.path.join(os.curdir, "images", date_str))
 os.makedirs(imagespath, exist_ok=True)
 
+
 def take_images(name):
     name_ir = os.path.join(imagespath, "ir_image" + name)
     api.set_instrument_settings("raptor", ir_settings["raptor"])
@@ -47,14 +49,15 @@ def take_images(name):
     while not api.magicfocus()["finished"]:
         sleep(5)
     sleep(1)
-    pos = api.position()["pos"]
+    pos = api.position()
     rec["automagicfocus_pos"] = str(pos)
 
     # store the image(s)
     api.accumulated_image(path=name_ir + ".npy")
     api.camera(path=name_ir + ".png")
 
-z = api.position()["pos"][2]
+
+z = api.position()[2]
 
 log = quicklog.Log("photoemission.quicklog")
 
