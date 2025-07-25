@@ -30,6 +30,15 @@ class ScanToolBar(QToolBar):
         group.setId(w, laser_studio.viewer.Mode.ZONE)
         self.addWidget(w)
 
+        # Activate scan-zone definition mode
+        w = ColoredPushButton(":/icons/region.svg", parent=self)
+        w.setToolTip("Define scanning regions (polygon)")
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        group.addButton(w)
+        group.setId(w, laser_studio.viewer.Mode.ZONE_POLY)
+        self.addWidget(w)
+
         # Go-to-next position button
         w = QPushButton(self)
         w.setToolTip("Go to next Scan Point")

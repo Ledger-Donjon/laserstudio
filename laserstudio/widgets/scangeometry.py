@@ -1,3 +1,5 @@
+import logging
+from typing import Optional, Union
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
@@ -5,26 +7,103 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QPolygonF, QPen, QPainterPath, QBrush, QColor
-import logging
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
-from typing import Optional, Union
 from .scanpath import ScanPath
 from ..utils.scanning import ScanPathGenerator, EmptyGeometryError
 
 
 class ScanGeometry(QGraphicsItemGroup):
+    def remove(self, zone: QPolygonF):
+        self.__add_remove(zone, isAdd=False)
+
+    def add(self, zone: QPolygonF):
+        self.__add_remove(zone)
+
+    def __add_remove(self, zone: QPolygonF, isAdd: bool = True):
+        polygon = Polygon([(p.x(), p.y()) for p in zone])
+        if not polygon.is_valid:
+            return
+        if polygon.is_empty:
+            return
+        self.scan_geometries.append((polygon, isAdd))
+        self.__update()
+
     def __init__(self, parent: Optional[QGraphicsItem] = None):
         super().__init__(parent)
+
+        self.scan_geometries: list[tuple[Polygon, bool]] = []
         self.__scan_geometry = MultiPolygon()
 
+        # Scan geometry path item for representation
+        self.__scan_geometry_items = QGraphicsItemGroup()
+        self.addToGroup(self.__scan_geometry_items)
         # Scanning Path
         self.__scan_path = ScanPath(diameter=10.0)
         self.addToGroup(self.__scan_path)
-        self.__scan_zones_group = QGraphicsItemGroup()
-        self.addToGroup(self.__scan_zones_group)
-
         # Scan generator
         self.scan_path_generator = ScanPathGenerator()
+
+    def __clear_scan_geometry_items(self):
+        """Clear the scan geometry items."""
+        children = self.__scan_geometry_items.childItems()
+        for child in children:
+            child.setParentItem(None)
+            del child
+        children = []
+
+    def __update_scan_geometry(self):
+        """Update the scan geometry."""
+        overall_geometry = MultiPolygon()
+        for polygon, add in self.scan_geometries:
+            if not polygon.is_valid:
+                # print("polygon is not valid")
+                continue
+            if add:
+                # print("add", polygon)
+                overall_geometry |= polygon
+            else:
+                # print("remove", polygon)
+                overall_geometry -= polygon
+        self.__scan_geometry = overall_geometry
+        return (
+            overall_geometry.geoms
+            if isinstance(overall_geometry, MultiPolygon)
+            else [overall_geometry]
+        )
+
+    def __update(self):
+        """
+        Rebuild the scene item which displays the scanning geometry.
+        """
+        geoms = self.__update_scan_geometry()
+
+        self.__clear_scan_geometry_items()
+
+        for geom in geoms:
+            # print("TREATING geom", geom)
+            if not isinstance(geom, Polygon):
+                # print("geom is not a Polygon")
+                continue
+            if not geom.is_valid:
+                # print("geom is not valid")
+                continue
+            item = ScanGeometry.__poly_to_path_item(geom)
+            # print("GEOM is now an item", item)
+            self.__scan_geometry_items.addToGroup(item)
+
+        self.scan_path_generator.geometry = self.__scan_geometry
+        self.__update_scan_path()
+
+    def __update_scan_path(self):
+        """Update scanning path display."""
+        try:
+            points_hist = self.scan_path_generator.hist_list(10)
+            points_next = self.scan_path_generator.next_list(10)
+        except EmptyGeometryError:
+            points_hist = []
+            points_next = []
+        qPoints = [QPointF(*p) for p in points_hist + points_next]
+        self.__scan_path.set(qPoints, len(points_hist), self.__scan_path.diameter)
 
     @staticmethod
     def __poly_to_path_item(poly: Polygon) -> QGraphicsPathItem:
@@ -55,70 +134,6 @@ class ScanGeometry(QGraphicsItemGroup):
         item.setPen(QPen(QColor(100, 255, 0), 0))
         item.setBrush(QBrush(QColor(0, 255, 0, 10)))
         return item
-
-    def __update(self):
-        """
-        Rebuild the scene item which displays the scanning geometry. This will
-        create a Qt item from a shapely geometry polygon.
-        """
-        # Remove previous display if defined
-        children = self.__scan_zones_group.childItems()
-        for child in children:
-            child.setParentItem(None)
-            del child
-        children = []
-
-        if isinstance(self.__scan_geometry, Polygon):
-            self.__scan_zones_group.addToGroup(
-                ScanGeometry.__poly_to_path_item(self.__scan_geometry)
-            )
-        else:
-            for poly in self.__scan_geometry.geoms:
-                if isinstance(poly, Polygon):
-                    self.__scan_zones_group.addToGroup(
-                        ScanGeometry.__poly_to_path_item(poly)
-                    )
-                else:
-                    logging.getLogger("laserstudio").error(
-                        "Unsupported geometry type in scan geometry."
-                    )
-        self.addToGroup(self.__scan_zones_group)
-
-        # Also, update the scan path with the new geometry
-        self.scan_path_generator.geometry = self.__scan_geometry
-        self.__update_scan_path()
-
-    def __update_scan_path(self):
-        """Update scanning path display."""
-        try:
-            points_hist = self.scan_path_generator.hist_list(10)
-            points_next = self.scan_path_generator.next_list(10)
-        except EmptyGeometryError:
-            points_hist = []
-            points_next = []
-        qPoints = [QPointF(*p) for p in points_hist + points_next]
-        self.__scan_path.set(qPoints, len(points_hist), self.__scan_path.diameter)
-
-    def __add_remove(self, zone: QPolygonF, isAdd: bool = True):
-        # Converts the Polygon to a shapely instance.
-        g = Polygon([(p.x(), p.y()) for p in zone])
-        if isAdd:
-            self.__scan_geometry |= g
-        else:
-            self.__scan_geometry -= g
-        # In case that shapely converts it to a Polygon, we stick at a MultiPolygon
-        logging.getLogger("laserstudio").debug(self.__scan_geometry)
-        if isinstance(self.__scan_geometry, Polygon):
-            self.__scan_geometry = MultiPolygon([self.__scan_geometry])
-
-        # Rebuild scan zone shape in the view to display the new zone.
-        self.__update()
-
-    def remove(self, zone: QPolygonF):
-        self.__add_remove(zone, isAdd=False)
-
-    def add(self, zone: QPolygonF):
-        self.__add_remove(zone)
 
     def next_point(self) -> Optional[tuple[float, float]]:
         if self.scan_path_generator.is_empty():

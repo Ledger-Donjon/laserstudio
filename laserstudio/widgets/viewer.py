@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import (
+    QGraphicsPolygonItem,
     QGraphicsView,
     QGraphicsScene,
     QFileDialog,
@@ -12,9 +13,9 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QKeyEvent,
     QGuiApplication,
-    QPalette,
     QPainter,
     QPixmap,
+    QPolygonF,
     QTransform,
 )
 from enum import Enum, auto
@@ -46,6 +47,7 @@ class Viewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
         ZONE = auto()
+        ZONE_POLY = auto()
         PIN = auto()
 
     # Signal emitted when a new mode is set
@@ -102,10 +104,6 @@ class Viewer(QGraphicsView):
         # Augment the scene rect to a very big size.
         self.setSceneRect(-1e6, -1e6, 2e6, 2e6)
 
-        self._default_highlight_color = QGuiApplication.palette().color(
-            QPalette.ColorRole.Highlight
-        )
-
         # Background picture
         self.__picture_item = None
         self.background_picture_path = None
@@ -120,6 +118,12 @@ class Viewer(QGraphicsView):
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
+
+        # Polygon for zone creation
+        self.zone_poly = QPolygonF()
+        self.zone_poly_item = QGraphicsPolygonItem(self.zone_poly)
+        self.zone_poly_item.setZValue(2)
+        self.__scene.addItem(self.zone_poly_item)
 
         self.setMouseTracking(True)
 
@@ -264,7 +268,7 @@ class Viewer(QGraphicsView):
     def mode(self, new_mode: Mode):
         self.__mode = new_mode
         self.__update_drag_mode()
-        self.__update_highlight_color()
+        self.__update_selection_color()
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
@@ -277,6 +281,10 @@ class Viewer(QGraphicsView):
 
         if toggle and self.mode == mode:
             mode = Viewer.Mode.NONE
+
+        if mode == Viewer.Mode.ZONE_POLY:
+            self.zone_poly.clear()
+            self.zone_poly_item.setPolygon(self.zone_poly)
 
         self.mode = mode
 
@@ -295,23 +303,22 @@ class Viewer(QGraphicsView):
                 self.stage_sight.move_to(QPointF(*next_point))
         return result
 
-    def __update_highlight_color(self, has_shift: Optional[bool] = None):
+    def __update_selection_color(self, has_shift: Optional[bool] = None):
         """Convenience function to change the current Application Palette to modify
         the highlight color. It permits to the Zone creation tool to have green / red
         colors
         """
-        if self.mode != Viewer.Mode.ZONE:
-            color = self._default_highlight_color
-        else:
-            if has_shift is None:
-                has_shift = (
-                    Qt.KeyboardModifier.ShiftModifier
-                    in QGuiApplication.queryKeyboardModifiers()
-                )
-            color = QColorConstants.Red if has_shift else QColorConstants.Green
-        p = QGuiApplication.palette()
-        p.setColor(QPalette.ColorRole.Highlight, color)
-        QGuiApplication.setPalette(p)
+        if has_shift is None:
+            has_shift = (
+                Qt.KeyboardModifier.ShiftModifier
+                in QGuiApplication.queryKeyboardModifiers()
+            )
+        color = "red" if has_shift else "green"
+        self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
+        c = QColorConstants.Red if has_shift else QColorConstants.Green
+        self.zone_poly_item.setPen(c)
+        c.setAlpha(64)
+        self.zone_poly_item.setBrush(QBrush(c))
 
     def __update_drag_mode(self):
         if self.mode == Viewer.Mode.ZONE:
@@ -393,6 +400,8 @@ class Viewer(QGraphicsView):
         """
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
+        In case of Mode being PIN, triggers a pin of the background picture.
+        In case of Mode being ZONE_POLY, triggers a zone polygon creation.
         """
         if event is None:
             return
@@ -408,6 +417,10 @@ class Viewer(QGraphicsView):
 
             if self.mode == Viewer.Mode.PIN:
                 self.pin(scene_pos.x(), scene_pos.y())
+
+            if self.mode == Viewer.Mode.ZONE_POLY:
+                self.zone_poly.append(scene_pos)
+                self.zone_poly_item.setPolygon(self.zone_poly)
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
@@ -437,10 +450,18 @@ class Viewer(QGraphicsView):
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
             self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
-        if self.mode == Viewer.Mode.ZONE:
+
+            if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
+                # Check if mouse button is pressed
+                if Qt.MouseButton.LeftButton not in event.buttons():
+                    self.zone_poly.remove(self.zone_poly.count() - 1)
+                self.zone_poly.append(scene_pos)
+                self.zone_poly_item.setPolygon(self.zone_poly)
+
+        if self.mode == Viewer.Mode.ZONE or self.mode == Viewer.Mode.ZONE_POLY:
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
-            self.__update_highlight_color()
+            self.__update_selection_color()
 
         super().mouseMoveEvent(event)
 
@@ -471,6 +492,22 @@ class Viewer(QGraphicsView):
             else:
                 self.scan_geometry.add(zone)
         super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+        if event is None:
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.mode == Viewer.Mode.ZONE_POLY:
+                self.zone_poly.append(self.mapToScene(event.pos()))
+                modifiers = QGuiApplication.queryKeyboardModifiers()
+                if Qt.KeyboardModifier.ShiftModifier in modifiers:
+                    self.scan_geometry.remove(self.zone_poly)
+                else:
+                    self.scan_geometry.add(self.zone_poly)
+                self.zone_poly_item.setPolygon(QPolygonF())
+                self.zone_poly.clear()
+
+        return super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event: Optional[QKeyEvent]):
         """
