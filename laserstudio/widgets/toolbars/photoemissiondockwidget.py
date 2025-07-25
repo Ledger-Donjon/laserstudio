@@ -32,8 +32,8 @@ class PhotoEmissionDockWidget(QDockWidget):
         assert isinstance(laser_studio.instruments.camera, CameraInstrument)
         self.camera = laser_studio.instruments.camera
 
-        if self.camera.label is not None:
-            self.setWindowTitle("Photoemission - " + self.camera.label)
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
 
         w = QWidget()
         self.setWidget(w)
@@ -94,6 +94,7 @@ class PhotoEmissionDockWidget(QDockWidget):
         w = QWidget()
         vbox.addWidget(w)
         hbox = QHBoxLayout(w)
+        hbox.setContentsMargins(0, 0, 0, 0)
         w.setLayout(hbox)
         w = QLabel("Image Averaging")
         hbox.addWidget(w)

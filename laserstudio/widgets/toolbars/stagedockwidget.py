@@ -27,7 +27,11 @@ class StageDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
-        super().__init__("Stage control", laser_studio)
+        super().__init__("Stage Control", laser_studio)
+
+        if self.stage.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.stage.label)
+
         self.setObjectName("toolbar-stage")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(
@@ -38,7 +42,6 @@ class StageDockWidget(QDockWidget):
 
         w = QWidget()
         vbox = QVBoxLayout()
-        vbox.setContentsMargins(0, 0, 0, 0)
         w.setLayout(vbox)
         self.setWidget(w)
 

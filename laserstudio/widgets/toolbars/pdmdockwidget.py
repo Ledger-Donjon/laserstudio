@@ -40,6 +40,7 @@ class PDMDockWidget(QDockWidget):
         self.setWidget(w)
 
         grid = QGridLayout()
+        w.setLayout(grid)
         grid.setContentsMargins(0, 4, 0, 0)
         row = 0
 
@@ -64,7 +65,8 @@ class PDMDockWidget(QDockWidget):
         w.setIcon(icon)
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))
-        grid.addWidget(w, row, 0)
+        grid.addWidget(w, row, 0, 1, 2)
+        row += 1
 
         # Laser pulsed power
         grid.addWidget(QLabel("Pulse power:"), row, 0)
@@ -133,14 +135,9 @@ class PDMDockWidget(QDockWidget):
         grid.addWidget(w, row, 1)
         row += 1
 
-        # Laser interlock status
-        grid.addWidget(QLabel("Interlock status:"), row, 0)
-        self.interlock_label = w = QLabel("Unknown")
-        grid.addWidget(w, row, 1)
-        row += 1
-
         # Laser shutter
         if self.laser.shutter is not None:
+            grid.addWidget(QLabel("Shutter:"), row, 0)
             w = ColoredPushButton(
                 ":/icons/shutter-open.svg", ":/icons/shutter-closed.svg"
             )
@@ -152,7 +149,11 @@ class PDMDockWidget(QDockWidget):
             grid.addWidget(w, row, 1)
             row += 1
 
-        w.setLayout(grid)
+        # Laser interlock status
+        grid.addWidget(QLabel("Interlock status:"), row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        self.interlock_label = w = QLabel("Unknown")
+        grid.addWidget(w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        row += 1
 
         self.reload_parameters()
         self.laser.parameter_changed.connect(self.refresh_interface)

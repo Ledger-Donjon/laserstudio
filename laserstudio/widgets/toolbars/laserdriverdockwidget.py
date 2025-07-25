@@ -16,6 +16,10 @@ class LaserDriverDockWidget(QDockWidget):
         assert isinstance(laser, LaserDriverInstrument)
         self.laser = laser
         super().__init__(f"Laser {laser_num} (Donjon Driver)")
+
+        if self.laser.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.laser.label)
+
         self.setObjectName(
             f"toolbox-laser-donjon-{laser_num}"
         )  # For settings save and restore

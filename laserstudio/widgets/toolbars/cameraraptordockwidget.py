@@ -27,9 +27,14 @@ class CameraRaptorDockWidget(CameraDockWidget):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
         super().__init__(laser_studio)
-        self.setWindowTitle("Raptor Camera parameters")
+
         self.setObjectName("toolbar-camera-raptor")  # For settings save and restore
         self.camera = laser_studio.instruments.camera
+
+        self.setWindowTitle("Raptor Camera Parameters")
+
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
 
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea

@@ -27,10 +27,10 @@ class CameraImageAdjustementDockWidget(QDockWidget):
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
 
-        super().__init__("Image Adjustment parameters", laser_studio)
+        super().__init__("Image Adjustment", laser_studio)
 
-        if self.camera.label is not None:
-            self.setWindowTitle("Image Adjustment parameters - " + self.camera.label)
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
 
         self.setObjectName(
             "toolbar-camera-imageadjustment"
@@ -44,7 +44,6 @@ class CameraImageAdjustementDockWidget(QDockWidget):
         w = QWidget()
         self.setWidget(w)
         grid = QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
         w.setLayout(grid)
 
         # Image adjustment dialog (for USB camera)
@@ -157,9 +156,7 @@ class CameraImageAdjustementDockWidget(QDockWidget):
         :param histogram: The histogram data to update the chart with.
         """
         lf = self.camera.last_frame.copy()
-        histogram = self.camera.compute_histogram(
-            lf, width=256 // 4
-        )
+        histogram = self.camera.compute_histogram(lf, width=256 // 4)
         self.charts.clear()
         bs = QBarSet("Histogram")
         bs.append(histogram[0])
@@ -203,10 +200,10 @@ class CameraDockWidget(QDockWidget):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
-        super().__init__("Camera parameters", laser_studio)
+        super().__init__("Camera Parameters", laser_studio)
 
-        if self.camera.label is not None:
-            self.setWindowTitle(self.camera.label)
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
 
         self.setObjectName("toolbar-camera")  # For settings save and restore
         self.setAllowedAreas(
@@ -218,7 +215,6 @@ class CameraDockWidget(QDockWidget):
         w = QWidget()
         self.setWidget(w)
         grid = QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
         w.setLayout(grid)
 
         # Button to toggle off or on the camera image presentation in main viewer

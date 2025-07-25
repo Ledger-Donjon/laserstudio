@@ -32,7 +32,11 @@ class CameraNITDockWidget(QDockWidget):
         self.camera = laser_studio.instruments.camera
         self.laser_studio = laser_studio
 
-        super().__init__("NIT Camera parameters", laser_studio)
+        super().__init__("NIT Camera Parameters", laser_studio)
+
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
+
         self.setObjectName("toolbar-camera-nit")  # For settings save and restore
         self.setAllowedAreas(
             Qt.DockWidgetArea.LeftDockWidgetArea
@@ -49,7 +53,6 @@ class CameraNITDockWidget(QDockWidget):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Gain:"))
-        vbox.setContentsMargins(0, 0, 0, 0)
         w = self.hist_low_input = ReturnSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)

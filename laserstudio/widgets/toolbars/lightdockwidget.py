@@ -1,4 +1,11 @@
-from PyQt6.QtWidgets import QDockWidget, QSlider, QHBoxLayout, QWidget, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import (
+    QDockWidget,
+    QSlider,
+    QHBoxLayout,
+    QWidget,
+    QLabel,
+    QVBoxLayout,
+)
 from PyQt6.QtCore import Qt, QSize
 from ...utils.colors import LedgerColors
 from ..coloredbutton import ColoredPushButton
@@ -14,11 +21,14 @@ class LightDockWidget(QDockWidget):
         """
         self.light = light
 
-        super().__init__(light.label)
+        super().__init__("Lighting Parameters")
+
+        if self.light.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.light.label)
+
         self.setObjectName("toolbar-light")  # For settings save and restore
 
         self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
-
 
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
