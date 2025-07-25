@@ -115,6 +115,16 @@ class Viewer(QGraphicsView):
 
         # Pin points for background picture
         self.pins = []
+        # PIN Markers
+        self.pin_markers = [
+            Marker(color=LedgerColors.SerenityPurple.value),
+            Marker(color=LedgerColors.SerenityPurple.value),
+            Marker(color=LedgerColors.SerenityPurple.value),
+        ]
+        for m in self.pin_markers:
+            m.setZValue(4)
+            self.__scene.addItem(m)
+            m.hide()
 
         # Markers
         self.__markers: list[Marker] = []
@@ -585,6 +595,15 @@ class Viewer(QGraphicsView):
         # work.
         pix_pos = pic.sceneTransform().inverted()[0].map(x, y)
 
+        # Hide all markers
+        for m in self.pin_markers:
+            m.hide()
+
+        # Show the new markers
+        for i, pin in enumerate(self.pins):
+            self.pin_markers[i].setPos(pin[0][0], pin[0][1])
+            self.pin_markers[i].show()
+
         self.pins.append((stage_pos, pix_pos))
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
@@ -730,8 +749,7 @@ class Viewer(QGraphicsView):
         """
         marker = IdMarker(color=color)
         self.__markers.append(marker)
-        assert (s := self.scene()) is not None
-        s.addItem(marker)
+        self.__scene.addItem(marker)
         if position is None:
             p = self.focused_element_position()
             position = p.x(), p.y()
