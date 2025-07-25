@@ -17,9 +17,14 @@ from PyQt6.QtGui import (
     QPixmap,
     QPolygonF,
     QTransform,
+    QPen,
 )
 from enum import Enum, auto
 from typing import Optional, Union
+
+from shapely import Polygon
+
+from laserstudio.utils.colors import LedgerColors
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -282,9 +287,8 @@ class Viewer(QGraphicsView):
         if toggle and self.mode == mode:
             mode = Viewer.Mode.NONE
 
-        if mode == Viewer.Mode.ZONE_POLY:
-            self.zone_poly.clear()
-            self.zone_poly_item.setPolygon(self.zone_poly)
+        self.zone_poly.clear()
+        self.zone_poly_item.setPolygon(self.zone_poly)
 
         self.mode = mode
 
@@ -303,7 +307,9 @@ class Viewer(QGraphicsView):
                 self.stage_sight.move_to(QPointF(*next_point))
         return result
 
-    def __update_selection_color(self, has_shift: Optional[bool] = None):
+    def __update_selection_color(
+        self, has_shift: Optional[bool] = None, is_valid: bool = True
+    ):
         """Convenience function to change the current Application Palette to modify
         the highlight color. It permits to the Zone creation tool to have green / red
         colors
@@ -313,11 +319,17 @@ class Viewer(QGraphicsView):
                 Qt.KeyboardModifier.ShiftModifier
                 in QGuiApplication.queryKeyboardModifiers()
             )
-        color = "red" if has_shift else "green"
+        color = ("red" if has_shift else "green") if is_valid else "orange"
         self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
-        c = QColorConstants.Red if has_shift else QColorConstants.Green
-        self.zone_poly_item.setPen(c)
+        c = (
+            (QColorConstants.Red if has_shift else QColorConstants.Green)
+            if is_valid
+            else QColorConstants.DarkYellow
+        )
+        pen = QPen(c)
         c.setAlpha(64)
+        pen.setCosmetic(True)
+        self.zone_poly_item.setPen(pen)
         self.zone_poly_item.setBrush(QBrush(c))
 
     def __update_drag_mode(self):
@@ -442,10 +454,22 @@ class Viewer(QGraphicsView):
 
         super().mousePressEvent(event)
 
+    @property
+    def is_valid_zone(self) -> bool:
+        """
+        Check if the zone is valid.
+        """
+        if self.zone_poly.count() < 3:
+            return False
+        points = [(p.x(), p.y()) for p in self.zone_poly]
+        shapely_poly = Polygon(points)
+        return shapely_poly.is_valid
+
     def mouseMoveEvent(self, event: Optional[QMouseEvent]):
         """
         Called when mouse moves.
         """
+        is_valid = True
         if event is not None:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
@@ -457,11 +481,12 @@ class Viewer(QGraphicsView):
                     self.zone_poly.remove(self.zone_poly.count() - 1)
                 self.zone_poly.append(scene_pos)
                 self.zone_poly_item.setPolygon(self.zone_poly)
+                is_valid = self.is_valid_zone
 
         if self.mode == Viewer.Mode.ZONE or self.mode == Viewer.Mode.ZONE_POLY:
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
-            self.__update_selection_color()
+            self.__update_selection_color(is_valid=is_valid)
 
         super().mouseMoveEvent(event)
 
@@ -513,17 +538,17 @@ class Viewer(QGraphicsView):
         """
         Called when a keyboard button is pressed.
         """
+        if self.mode == Viewer.Mode.ZONE_POLY or self.mode == Viewer.Mode.ZONE:
+            self.__update_selection_color(is_valid=True)
         super().keyPressEvent(event)
-        if event is None:
-            return
 
     def keyReleaseEvent(self, event: Optional[QKeyEvent]):
         """
         Called when a keyboard button is released.
         """
-        super().keyReleaseEvent(event)
-        if event is None:
-            return
+        if self.mode == Viewer.Mode.ZONE_POLY or self.mode == Viewer.Mode.ZONE:
+            self.__update_selection_color(is_valid=True)
+        super().keyReleaseEvent(event).is_valid
 
     def pin(self, x: float, y: float):
         """

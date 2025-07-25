@@ -131,8 +131,11 @@ class ScanGeometry(QGraphicsItemGroup):
             path2.addPolygon(qPoly)
             path = path.subtracted(path2)
         item = QGraphicsPathItem(path)
-        item.setPen(QPen(QColor(100, 255, 0), 0))
-        item.setBrush(QBrush(QColor(0, 255, 0, 10)))
+        pen = QPen(QColor(100, 255, 0))
+        pen.setCosmetic(True)
+        item.setPen(pen)
+        brush = QBrush(QColor(0, 255, 0, 10))
+        item.setBrush(brush)
         return item
 
     def next_point(self) -> Optional[tuple[float, float]]:
