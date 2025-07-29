@@ -16,6 +16,8 @@ from PyQt6.QtCore import (
     QPointF,
     QObject,
 )
+
+from laserstudio.utils.colors import LedgerColors
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
@@ -91,7 +93,7 @@ class StageSight(QGraphicsItemGroup):
         parent=None,
     ):
         super(QGraphicsItemGroup, self).__init__(parent)
-        pen = QPen(QColor(0, 100, 255, 150))
+        pen = QPen(LedgerColors.SecurityBlue.value.lighter(300))
         pen.setCosmetic(True)
 
         self.image_group = QGraphicsItemGroup()
@@ -157,6 +159,18 @@ class StageSight(QGraphicsItemGroup):
                 self.camera.new_image.connect(self.set_image)
         self._pause_update = value
 
+    def _update_pen(self):
+        if self.camera is None:
+            return
+        pen = QPen(
+            LedgerColors.SecurityBlue.value.lighter(300)
+            if self.camera.is_average_valid
+            else LedgerColors.SafetyOrange.value
+        )
+        self.__rect.setPen(pen)
+        self.__line1.setPen(pen)
+        self.__line2.setPen(pen)
+
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
 
@@ -205,6 +219,7 @@ class StageSight(QGraphicsItemGroup):
             width / (image_size.width() or 1.0), -height / (image_size.height() or 1.0)
         )
         image.setTransform(transform)
+        self._update_pen()
 
     def set_pixmap(self, pixmap: QPixmap):
         """

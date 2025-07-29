@@ -52,6 +52,7 @@ class Viewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
         ZONE = auto()
+        ZONE_TILTED = auto()
         ZONE_POLY = auto()
         PIN = auto()
 
@@ -243,7 +244,14 @@ class Viewer(QGraphicsView):
     def load_picture(self, picture_path: Optional[str] = None):
         """Requests loading a backgound picture from the user"""
         filename = (
-            QFileDialog.getOpenFileName(self, "Open picture")[0]
+            # Make the file dialog visible and on top
+            QFileDialog.getOpenFileName(
+                self,
+                "Open picture",
+                "",
+                "Images (*.png *.jpg *.jpeg)",
+                options=QFileDialog.Option.DontUseNativeDialog,
+            )[0]
             if picture_path is None
             else picture_path
         )
@@ -423,7 +431,8 @@ class Viewer(QGraphicsView):
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
         In case of Mode being PIN, triggers a pin of the background picture.
-        In case of Mode being ZONE_POLY, triggers a zone polygon creation.
+        In case of Mode being ZONE_POLY, triggers a polygon shaped zone creation.
+        In case of Mode being ZONE_TILTED, triggers a tilted rectangle shaped zone creation.
         """
         if event is None:
             return
@@ -440,7 +449,23 @@ class Viewer(QGraphicsView):
             if self.mode == Viewer.Mode.PIN:
                 self.pin(scene_pos.x(), scene_pos.y())
 
-            if self.mode == Viewer.Mode.ZONE_POLY:
+            elif self.mode == Viewer.Mode.ZONE_TILTED:
+                self.zone_poly.append(scene_pos)
+                if self.zone_poly.count() == 3:
+                    fourth_point = scene_pos - (self.zone_poly[1] - self.zone_poly[0])
+                    self.zone_poly.append(fourth_point)
+                    if self.is_valid_zone:
+                        modifiers = QGuiApplication.queryKeyboardModifiers()
+                        if Qt.KeyboardModifier.ShiftModifier in modifiers:
+                            self.scan_geometry.remove(self.zone_poly)
+                        else:
+                            self.scan_geometry.add(self.zone_poly)
+                        self.zone_poly.clear()
+                        self.zone_poly_item.setPolygon(self.zone_poly)
+                    else:
+                        self.zone_poly.remove(self.zone_poly.count() - 1)
+
+            elif self.mode == Viewer.Mode.ZONE_POLY:
                 self.zone_poly.append(scene_pos)
                 self.zone_poly_item.setPolygon(self.zone_poly)
 
@@ -493,7 +518,23 @@ class Viewer(QGraphicsView):
                 self.zone_poly_item.setPolygon(self.zone_poly)
                 is_valid = self.is_valid_zone
 
-        if self.mode == Viewer.Mode.ZONE or self.mode == Viewer.Mode.ZONE_POLY:
+            elif self.mode == Viewer.Mode.ZONE_TILTED:
+                if (nb_pts := self.zone_poly.count()) == 1:
+                    full_poly = QPolygonF(self.zone_poly)
+                    full_poly.append(scene_pos)
+                    self.zone_poly_item.setPolygon(full_poly)
+                elif nb_pts == 2:
+                    fourth_point = scene_pos - (self.zone_poly[1] - self.zone_poly[0])
+                    full_poly = QPolygonF(self.zone_poly)
+                    full_poly.append(scene_pos)
+                    full_poly.append(fourth_point)
+                    self.zone_poly_item.setPolygon(full_poly)
+
+        if self.mode in [
+            Viewer.Mode.ZONE,
+            Viewer.Mode.ZONE_POLY,
+            Viewer.Mode.ZONE_TILTED,
+        ]:
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
             self.__update_selection_color(is_valid=is_valid)
@@ -526,6 +567,7 @@ class Viewer(QGraphicsView):
                 self.scan_geometry.remove(zone)
             else:
                 self.scan_geometry.add(zone)
+
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
@@ -558,7 +600,7 @@ class Viewer(QGraphicsView):
         """
         if self.mode == Viewer.Mode.ZONE_POLY or self.mode == Viewer.Mode.ZONE:
             self.__update_selection_color(is_valid=True)
-        super().keyReleaseEvent(event).is_valid
+        super().keyReleaseEvent(event)
 
     def pin(self, x: float, y: float):
         """
@@ -580,7 +622,8 @@ class Viewer(QGraphicsView):
             )
         stage_pos = stage_pos.x(), stage_pos.y()
 
-        if len(self.pins) == 0:
+        n = len(self.pins)
+        if n == 0:
             # We are pinning the first point.
             # Apply simple translation as first step
             tx = stage_pos[0] - x
@@ -595,16 +638,15 @@ class Viewer(QGraphicsView):
         # work.
         pix_pos = pic.sceneTransform().inverted()[0].map(x, y)
 
-        # Hide all markers
-        for m in self.pin_markers:
+        # Show the marker
+        self.pin_markers[n].setPos(x, y)
+        for m in self.pin_markers[: n + 1]:
+            m.show()
+        for m in self.pin_markers[n + 1 :]:
             m.hide()
 
-        # Show the new markers
-        for i, pin in enumerate(self.pins):
-            self.pin_markers[i].setPos(pin[0][0], pin[0][1])
-            self.pin_markers[i].show()
-
         self.pins.append((stage_pos, pix_pos))
+
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
             # Time to recalculate the picture transformation matrix!
@@ -775,6 +817,9 @@ class Viewer(QGraphicsView):
             data["background_picture_path"] = self.background_picture_path
         if (pic := self.__picture_item) is not None:
             data["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+            data["background_picture_transform_pins"] = [
+                [m.pos().x(), m.pos().y()] for m in self.pin_markers
+            ]
         return data
 
     @settings.setter
@@ -788,3 +833,7 @@ class Viewer(QGraphicsView):
                 pic := self.__picture_item
             ) is not None:
                 pic.setTransform(yaml_to_qtransform(transform))
+            if (pins := data.get("background_picture_transform_pins")) is not None:
+                for i, pin in enumerate(pins):
+                    self.pin_markers[i].setPos(pin[0], pin[1])
+                    self.pin_markers[i].show()

@@ -95,7 +95,9 @@ class LaserStudio(QMainWindow):
         toolbar = MarkersToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         # Dock widget: Markers list
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget)
+        self.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget
+        )
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
@@ -115,6 +117,10 @@ class LaserStudio(QMainWindow):
                 self.instruments.focus_helper,
             )
             self.addToolBar(toolbar)
+            self.addDockWidget(
+                Qt.DockWidgetArea.RightDockWidgetArea,
+                toolbar.magic_focus_dockwidget,
+            )
 
         # ToolBar: Scanning zone definition and usage
         toolbar = ScanToolBar(self)
@@ -128,7 +134,8 @@ class LaserStudio(QMainWindow):
                 dockwidget = CameraDockWidget(self)
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dockwidget)
             self.addDockWidget(
-                Qt.DockWidgetArea.BottomDockWidgetArea, CameraImageAdjustementDockWidget(self)
+                Qt.DockWidgetArea.BottomDockWidgetArea,
+                CameraImageAdjustementDockWidget(self),
             )
 
             self.photoemission_dockwidget = PhotoEmissionDockWidget(self)

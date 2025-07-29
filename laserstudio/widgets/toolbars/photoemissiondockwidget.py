@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QDockWidget,
     QPushButton,
@@ -12,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from ...instruments.camera import CameraInstrument
+from ...utils.colors import LedgerColors
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -119,7 +121,13 @@ class PhotoEmissionDockWidget(QDockWidget):
         self.camera.new_image.connect(
             lambda _: (
                 self.averaged_images.setText(
-                    f"Images averaged: {self.camera.average_count}"
+                    f"Images averaged: {self.camera.average_count} / {self.camera.image_averaging}"
+                ),
+                # Change the color of the averaged images label
+                self.averaged_images.setStyleSheet(
+                    f"color: {LedgerColors.SafetyOrange.value.name(QColor.NameFormat.HexArgb)}"
+                    if not self.camera.is_average_valid
+                    else None
                 ),
             )
         )

@@ -43,6 +43,8 @@ class StageInstrument(Instrument):
 
         self.backlashes = cast(list[float], config.get("backlashes_um"))
 
+        self.shear = cast(list[float], config.get("shear", [0.0, 0.0]))
+
         dev = config.get("dev")
         if dev == "":
             dev = None
@@ -154,6 +156,14 @@ class StageInstrument(Instrument):
         self.mutex.lock()
         position = self.stage.position
         self.mutex.unlock()
+
+        # Apply shearing transformation
+        x = position[0]
+        y = position[1]
+
+        position[0] = x - self.shear[0] * y
+        position[1] = y - self.shear[1] * x
+
         factors = self.unit_factors
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
@@ -229,6 +239,14 @@ class StageInstrument(Instrument):
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
             result[i] = position[i] / factors[i]
+
+        # Apply shearing transformation
+        x = result[0]
+        y = result[1]
+
+        result[0] = x + self.shear[0] * y
+        result[1] = y + self.shear[1] * x
+
         self.mutex.lock()
         if (
             backlash

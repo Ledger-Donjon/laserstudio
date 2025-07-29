@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QDockWidget,
 )
-from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtGui import QGuiApplication, QFont
+from pystages import Vector
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
 from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus
@@ -159,7 +160,23 @@ class StageDockWidget(QDockWidget):
             hbox.addWidget(QLabel("Joystick:"))
             hbox.addWidget(w)
             vbox.addLayout(hbox)
+
+        # Position tracking label
+        self.position = QLabel("")
+        self.position.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.position.setStyleSheet("padding-left: 10px;padding-right: 10px")
+        self.stage.position_changed.connect(self.update_position)
+        self.position.setToolTip("The stage position")
+        vbox.addWidget(self.position)
+
         vbox.addStretch(1000)
+
+    def update_position(self, position: Vector):
+        self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in position.data]))
+        f = QFont("monospace", 10)
+        f.setStyleHint(QFont.StyleHint.Monospace)
+        self.position.setFont(f)
+        self.position.setMinimumWidth(self.position.sizeHint().width())
 
     def home(self):
         """

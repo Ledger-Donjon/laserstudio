@@ -11,7 +11,7 @@ from .scantoolbar import ScanToolBar
 from .picturetoolbar import PictureToolBar
 from .stagedockwidget import StageDockWidget
 from .zoomtoolbar import ZoomToolBar
-from .focustoolbar import FocusToolBar
+from .focustoolbar import FocusToolBar, MagicFocusDockWidget
 
 
 __all__ = [
@@ -31,4 +31,5 @@ __all__ = [
     "MarkersListDockWidget",
     "LightDockWidget",
     "FocusToolBar",
+    "MagicFocusDockWidget",
 ]

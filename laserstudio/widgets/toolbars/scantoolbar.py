@@ -21,8 +21,8 @@ class ScanToolBar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
-        # Activate scan-zone definition mode
-        w = ColoredPushButton(":/icons/region.svg", parent=self)
+        # Activate scan-zone definition modes
+        w = ColoredPushButton(":/icons/region_rect.svg", parent=self)
         w.setToolTip("Define scanning regions. Hold Shift key to remove zone.")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
@@ -30,8 +30,15 @@ class ScanToolBar(QToolBar):
         group.setId(w, laser_studio.viewer.Mode.ZONE)
         self.addWidget(w)
 
-        # Activate scan-zone definition mode
-        w = ColoredPushButton(":/icons/region.svg", parent=self)
+        w = ColoredPushButton(":/icons/region_tilted.svg", parent=self)
+        w.setToolTip("Define scanning regions (tilted rectangle)")
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        group.addButton(w)
+        group.setId(w, laser_studio.viewer.Mode.ZONE_TILTED)
+        self.addWidget(w)
+
+        w = ColoredPushButton(":/icons/region_poly.svg", parent=self)
         w.setToolTip("Define scanning regions (polygon)")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)

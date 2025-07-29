@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QMargins
 from PyQt6.QtGui import QIcon, QPainter
 from PyQt6.QtWidgets import (
     QToolBar,
@@ -8,7 +8,9 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QMenu,
+    QDockWidget,
 )
+from ...utils.colors import LedgerColors
 from ...utils.util import colored_image, ChartViewWithVMarker
 from ..coloredbutton import ColoredPushButton
 from ...instruments.camera import CameraInstrument
@@ -18,7 +20,29 @@ from PyQt6.QtCharts import QLineSeries, QChart
 from typing import Optional
 
 
-class FocusChartWindow(QWidget):
+class MagicFocusDockWidget(QDockWidget):
+    """
+    Dock widget for the magic focus.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__("Magic Focus Chart", parent)
+        self.setObjectName("magic-focus-dockwidget")  # For settings save and restore
+
+        self.chart_window = FocusChart()
+        self.setLayout(vbox := QVBoxLayout())
+        vbox.addWidget(self.chart_window)
+        self.setWindowTitle("Magic Focus")
+        self.setWidget(self.chart_window)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        self.setVisible(False)
+
+
+class FocusChart(QWidget):
     """
     Window for displaying the focus chart.
     """
@@ -27,12 +51,6 @@ class FocusChartWindow(QWidget):
         super().__init__(parent)
         self.setObjectName("focus-chart-window")  # For settings save and restore
         self.setWindowTitle("Focus Chart")
-        self.setWindowFlags(
-            Qt.WindowType.Window
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
-        )
-        self.setGeometry(100, 100, 800, 600)
         self.setVisible(False)
         # Chart for focus results
         self.chart = QChart()
@@ -41,6 +59,8 @@ class FocusChartWindow(QWidget):
         w.setChart(self.chart)
         w.setRenderHint(QPainter.RenderHint.Antialiasing)
         w.setMinimumSize(600, 400)
+        self.chart.setBackgroundVisible(False)
+        self.chart.setMargins(QMargins(0, 0, 0, 0))
 
         self.coarse_serie = QLineSeries()
         self.coarse_serie.setName("Coarse")
@@ -49,6 +69,12 @@ class FocusChartWindow(QWidget):
         self.chart.addSeries(self.coarse_serie)
         self.chart.addSeries(self.fine_serie)
         self.chart.createDefaultAxes()
+
+        # Text color
+        self.chart.axes()[0].setLabelsColor(LedgerColors.SerenityPurple.value)
+        self.chart.axes()[1].setLabelsColor(LedgerColors.SerenityPurple.value)
+        # Set color of text in legend
+        self.chart.legend().setLabelColor(LedgerColors.SerenityPurple.value)
 
         self.setLayout(vbox := QVBoxLayout())
         vbox.addWidget(w)
@@ -159,7 +185,8 @@ class FocusToolBar(QToolBar):
         self.sharpness.setToolTip("The sharpness value of the current image.")
         self.addWidget(self.sharpness)
 
-        self.chart_window = FocusChartWindow()
+        self.magic_focus_dockwidget = MagicFocusDockWidget()
+        self.chart_window = self.magic_focus_dockwidget.chart_window
 
         self.focus_helper.parameter_changed.connect(
             lambda _: self.update_autofocus_buttons()
@@ -178,6 +205,7 @@ class FocusToolBar(QToolBar):
 
         self.chart_window.clear()
         self.chart_window.show()
+        self.magic_focus_dockwidget.show()
 
         t = self.focus_helper.magic_focus()
         t.new_point.connect(
