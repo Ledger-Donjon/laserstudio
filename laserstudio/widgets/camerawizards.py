@@ -61,6 +61,20 @@ class CameraPicker(StageSightViewer):
             self.panning = True
             pos = event.pos()
             self.clicked.emit((pos.x(), pos.y()))
+        if event.button() == Qt.MouseButton.RightButton:
+            # Scroll gesture mode
+            self.setDragMode(CameraPicker.DragMode.ScrollHandDrag)
+            # Transform as left press button event,
+            # to make the scroll by dragging actually effective.
+            event = QMouseEvent(
+                event.type(),
+                event.position(),
+                Qt.MouseButton.LeftButton,
+                event.buttons(),
+                event.modifiers(),
+                event.pointingDevice(),
+            )
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: Optional[QMouseEvent]):
         """
@@ -70,6 +84,7 @@ class CameraPicker(StageSightViewer):
         if self.panning:
             pos = event.pos()
             self.clicked.emit((pos.x(), pos.y()))
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: Optional[QMouseEvent]):
         """
@@ -80,21 +95,56 @@ class CameraPicker(StageSightViewer):
             self.panning = False
             pos = event.pos()
             self.clicked.emit((pos.x(), pos.y()))
+        if event.button() == Qt.MouseButton.RightButton:
+            self.setDragMode(CameraPicker.DragMode.NoDrag)
+
+    def __compute_pos(self):
+        hsb, vsb = self.horizontalScrollBar(), self.verticalScrollBar()
+        assert vsb and hsb
+        # Get scene positioning in the Viewport thanks to the scrollbars' value
+        doc_left = hsb.minimum()
+        doc_width = hsb.maximum() + hsb.pageStep() - doc_left
+        doc_x = hsb.value() + hsb.pageStep() / 2
+        doc_top = vsb.minimum()
+        doc_height = vsb.maximum() + vsb.pageStep() - doc_top
+        doc_y = vsb.value() + vsb.pageStep() / 2
+
+        # Get scene sizing
+        sr = self.sceneRect()
+
+        # Get doc to scene scale factors (invert of zoom)
+        scale_x, scale_y = sr.width() / doc_width, sr.height() / doc_height
+
+        # Converts previous positioning
+        scene_x = sr.left() + (doc_x - doc_left) * scale_x
+        scene_y = sr.bottom() - (doc_y - doc_top) * scale_y
+
+        return QPointF(scene_x, scene_y)
 
     def wheelEvent(self, event: Optional[QWheelEvent]):
         """
         Handle mouse wheel events to manage zoom.
         """
-        assert event is not None
-        zr = 2 ** ((event.angleDelta().y() * 0.25) / 120)
+        if event is None:
+            return
+        # Get current position of camera
+        pos = self.__compute_pos()
+        # The zoom factor to apply
+        zr = 2 ** (event.angleDelta().y() / (8 * 120))
+        # The pointed position
+        p = self.mapToScene(event.position().toPoint())
+        pos = (pos / zr) + (p * (1 - (1 / zr)))
+
         self.zoom *= zr
         self.resetTransform()
         self.scale(self.zoom, -self.zoom)
+        self.centerOn(pos)
+        event.accept()
 
     def __init__(self, camera: CameraInstrument, *args):
         s = StageSight(stage=None, camera=camera)
         super().__init__(stage_sight=s, *args)
-        self.zoom = 0.1
+        self.zoom = 1.0
         self.panning = False
         self.clicked_point_marker = Marker()
         s = self.scene()
