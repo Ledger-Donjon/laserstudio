@@ -30,8 +30,6 @@ class MagicFocusDockWidget(QDockWidget):
         self.setObjectName("magic-focus-dockwidget")  # For settings save and restore
 
         self.chart_window = FocusChart()
-        self.setLayout(vbox := QVBoxLayout())
-        vbox.addWidget(self.chart_window)
         self.setWindowTitle("Magic Focus")
         self.setWidget(self.chart_window)
         self.setAllowedAreas(
@@ -74,7 +72,9 @@ class FocusChart(QWidget):
         self.chart.axes()[0].setLabelsColor(LedgerColors.SerenityPurple.value)
         self.chart.axes()[1].setLabelsColor(LedgerColors.SerenityPurple.value)
         # Set color of text in legend
-        self.chart.legend().setLabelColor(LedgerColors.SerenityPurple.value)
+        legend = self.chart.legend()
+        if legend is not None:
+            legend.setLabelColor(LedgerColors.SerenityPurple.value)
 
         self.setLayout(vbox := QVBoxLayout())
         vbox.addWidget(w)
@@ -192,16 +192,22 @@ class FocusToolBar(QToolBar):
             lambda _: self.update_autofocus_buttons()
         )
 
-    def magic_focus(self):
+    def magic_focus(self, do_it: bool = True):
         """
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
         """
+        if not do_it:
+            if self.focus_helper.focus_thread is not None:
+                self.focus_helper.focus_thread.requestInterruption()
+                self.focus_helper.focus_thread.wait()
+            self.chart_window.clear()
+            return
+
         assert (
             self.focus_helper.focus_thread is None
             or not self.focus_helper.focus_thread.isRunning()
         ), "Magic Focus thread is already running"
-        self.button_magic_focus.setEnabled(False)
 
         self.chart_window.clear()
         self.chart_window.show()
@@ -225,7 +231,6 @@ class FocusToolBar(QToolBar):
         """Called when focus search thread has finished."""
         # Reenable the button
         self.button_magic_focus.setChecked(False)
-        self.button_magic_focus.setEnabled(True)
 
         # Show the graphs
         assert (t := self.focus_helper.focus_thread) is not None

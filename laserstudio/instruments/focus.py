@@ -139,12 +139,17 @@ class FocusThread(QThread):
                 self.__camera.clear_averaged_images()
                 while self.__camera.average_count < self.__camera.image_averaging:
                     QCoreApplication.processEvents()
+                    if self.isInterruptionRequested():
+                        break
             std_dev = self.__camera.laplacian_std_dev
             tab.append((z, std_dev))
             self.new_point.emit(z, std_dev)
             if (best_std_dev is None) or (std_dev > best_std_dev):
                 best_std_dev = std_dev
                 best_z = z
+
+            if self.isInterruptionRequested():
+                break
 
         tab = numpy.array(tab)
         peaks = None
@@ -186,9 +191,11 @@ class FocusThread(QThread):
         else:
             self.best_positions = []
             for position in self.__positions:
+                if self.isInterruptionRequested():
+                    break
                 self.__stage.move_to(position, wait=True)
                 best_z, _, _ = self.run_search(self.__coarse)
-                if self.__fine is not None:
+                if self.__fine is not None and not self.isInterruptionRequested():
                     best_z, _, _ = self.run_search(self.__fine)
                 self.best_positions.append(Vector(position.x, position.y, best_z))
 
@@ -303,7 +310,7 @@ class FocusInstrument(Instrument):
         coarse: Optional[FocusSearchSettings] = None,
         fine: Optional[FocusSearchSettings] = None,
         parameters: Optional[dict] = None,
-    ):
+    ) -> FocusThread:
         """
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
