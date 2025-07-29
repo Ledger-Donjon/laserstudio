@@ -1,12 +1,13 @@
 from PyQt6.QtWidgets import (
     QGraphicsItemGroup,
+    QGraphicsPathItem,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsLineItem,
     QGraphicsView,
     QGraphicsScene,
 )
-from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
+from PyQt6.QtGui import QPen, QTransform, QImage, QPixmap, QPainterPath
 from PyQt6.QtCore import (
     pyqtSignal,
     pyqtBoundSignal,
@@ -114,6 +115,11 @@ class StageSight(QGraphicsItemGroup):
         item.setPen(pen)
         self.addToGroup(item)
 
+        # Average arc
+        item = self.__arc = QGraphicsPathItem()
+        item.setPen(pen)
+        self.addToGroup(item)
+
         self.__object = StageSightObject()
 
         self.setPos(QPointF(0.0, 0.0))
@@ -167,9 +173,11 @@ class StageSight(QGraphicsItemGroup):
             if self.camera.is_average_valid
             else LedgerColors.SafetyOrange.value
         )
+        pen.setCosmetic(True)
         self.__rect.setPen(pen)
         self.__line1.setPen(pen)
         self.__line2.setPen(pen)
+        self.__arc.setPen(pen)
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -220,6 +228,24 @@ class StageSight(QGraphicsItemGroup):
         )
         image.setTransform(transform)
         self._update_pen()
+
+        # Get the enclosing rect into main scene
+        scene_rect: QRectF = self.image_group.mapRectToScene(self.__rect.rect())
+        # Get the length of the cross' lines according to the size of
+        # the enclosing rect.
+        rad = min(scene_rect.width(), scene_rect.height()) / 20.0
+        if self.camera is not None and not self.camera.is_average_valid:
+            path = QPainterPath()
+            # Add the arc
+            path.arcTo(
+                QRectF(-rad, -rad, rad * 2, rad * 2),
+                -90,
+                360 * self.camera.average_count / self.camera.image_averaging,
+            )
+            self.__arc.setPath(path)
+            self.__arc.setVisible(True)
+        else:
+            self.__arc.setVisible(False)
 
     def set_pixmap(self, pixmap: QPixmap):
         """

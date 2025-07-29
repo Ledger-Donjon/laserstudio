@@ -18,6 +18,7 @@ from PyQt6.QtGui import (
     QPolygonF,
     QTransform,
     QPen,
+    QColor,
 )
 from enum import Enum, auto
 from typing import Optional, Union
@@ -345,7 +346,8 @@ class Viewer(QGraphicsView):
             else QColorConstants.DarkYellow
         )
         pen = QPen(c)
-        c.setAlpha(64)
+        if isinstance(c, QColor):
+            c.setAlpha(64)
         pen.setCosmetic(True)
         self.zone_poly_item.setPen(pen)
         self.zone_poly_item.setBrush(QBrush(c))
