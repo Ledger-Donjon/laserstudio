@@ -57,7 +57,7 @@ class ZoomToolBar(QToolBar):
         w.setToolTip("Reset Viewer to see all elements")
         w.setIcon(QIcon(colored_image(":/icons/magnifying-glass-all-solid.svg")))
         w.setIconSize(QSize(24, 24))
-        w.clicked.connect(viewer.reset_camera)
+        w.clicked.connect(lambda: viewer.reset_camera_to_stage_sight())
         self.addWidget(w)
 
         # Button to enable/disable StageSight position tracking.

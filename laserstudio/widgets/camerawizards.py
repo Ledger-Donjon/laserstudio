@@ -343,7 +343,7 @@ class DistortedImagePresentationPage(CameraPresentationPage):
             s.distortion = self.transform
         if (c := self.wizard().instruments.camera) is not None:
             c.correction_matrix = self.transform
-        # self.wizard().laser_studio.update_stage_sight()
+        self.wizard().laser_studio.viewer.reset_camera_to_stage_sight()
 
     def __init__(self, parent: "CameraDistortionWizard"):
         super().__init__(parent=parent)

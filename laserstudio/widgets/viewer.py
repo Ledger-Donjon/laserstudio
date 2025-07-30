@@ -181,9 +181,12 @@ class Viewer(QGraphicsView):
             self._follow_stage_sight = value
             self.follow_stage_sight_changed.emit(value)
 
-    def reset_camera(self):
+    def reset_camera(self, item: Optional[QGraphicsPixmapItem] = None):
         """Resets the camera to show all elements of the scene"""
-        all_elements_rect = self.__scene.itemsBoundingRect()
+        if item is not None:
+            all_elements_rect = item.sceneTransform().mapRect(item.boundingRect())
+        else:
+            all_elements_rect = self.__scene.itemsBoundingRect()
         viewport = self.viewport()
         viewport_size = (
             viewport.size() if viewport is not None else all_elements_rect.size()
@@ -194,6 +197,12 @@ class Viewer(QGraphicsView):
             all_elements_rect.center(),
             min(w_ratio, h_ratio),
         )
+
+    def reset_camera_to_stage_sight(self):
+        """Resets the camera to show the stage sight"""
+        if self.stage_sight is None:
+            return
+        self.reset_camera(self.stage_sight.image)
 
     def __place_picture_item(self, at_stage_sight: bool = False):
         item = self.__picture_item
