@@ -7,20 +7,18 @@ import serial
 class ChecksumError(Exception):
     """Thrown if a communication checksum error is detected."""
 
-    pass
-
 
 class ProtocolError(Exception):
     """Thrown if an unexpected response from the device is received."""
 
-    pass
-
 
 class ConnectionFailure(Exception):
-    pass
+    """Thrown if a connection to the device cannot be established."""
 
 
 class DeviceSearchError(Exception):
+    """Thrown if a device is not found with the given criteria."""
+
     def __init__(self, sn=None, vid_pid=None, location=None, dev=None):
         self.sn = sn
         if vid_pid is not None and vid_pid[0] is not None:
@@ -44,11 +42,19 @@ class DeviceSearchError(Exception):
 
 
 class DeviceNotFoundError(DeviceSearchError):
-    pass
+    """Thrown if no device is found with the given criteria."""
+
+    def __str__(self) -> str:
+        return (
+            f"Error: No device found with the following criteria: {super().__str__()}"
+        )
 
 
 class MultipleDeviceFound(DeviceSearchError):
-    pass
+    """Thrown if multiple devices are found with the given criteria."""
+
+    def __str__(self) -> str:
+        return f"Error: Multiple devices found with the following criteria: {super().__str__()}"
 
 
 def get_serial_device(config: Union[str, dict]):
