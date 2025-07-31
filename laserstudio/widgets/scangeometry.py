@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QPolygonF, QPen, QPainterPath, QBrush, QColor
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
+from shapely.geometry.base import BaseGeometry
 from .scanpath import ScanPath
 from ..utils.scanning import ScanPathGenerator, EmptyGeometryError
 
@@ -169,7 +170,7 @@ class ScanGeometry(QGraphicsItemGroup):
 
     @staticmethod
     def shapely_to_yaml(
-        geometry: Union[Polygon, MultiPolygon, GeometryCollection],
+        geometry: Union[BaseGeometry, Polygon, MultiPolygon, GeometryCollection],
     ) -> dict:
         """
         :return: A dict for YAML serialization.
@@ -193,6 +194,12 @@ class ScanGeometry(QGraphicsItemGroup):
         elif isinstance(geometry, GeometryCollection):
             # We have this type when the zone is empty.
             return {"geometrycollection": None}
+        elif isinstance(geometry, BaseGeometry):
+            # this should not happen.
+            logging.getLogger("laserstudio").error(
+                "Shapely geometry is not a Polygon, MultiPolygon, or GeometryCollection."
+            )
+            pass
         # If this line is reached, some shapely type handling may be missing.
         assert False
 
