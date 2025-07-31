@@ -25,7 +25,10 @@ class ShutterInstrument(Instrument):
 
     @settings.setter
     def settings(self, data: dict):
-        super().settings = data
+        """
+        Set the settings of the shutter instrument.
+        """
+        Instrument.settings.__set__(self, data)
         if "open" in data:
             self.open = data["open"]
             self.parameter_changed.emit("open", data["open"])
@@ -45,6 +48,6 @@ class TicShutterInstrument(ShutterInstrument):
 
     @open.setter
     def open(self, value: bool):
-        super().open = value
+        ShutterInstrument.open.__set__(self, value)
         if value != self.__open:
             self.tic.position = Vector({False: -106, True: 0}[value])
