@@ -13,6 +13,9 @@ from .instruments.instruments import (
     CameraRaptorInstrument,
     LightInstrument,
 )
+import yaml
+from PIL import Image, ImageQt
+import numpy
 from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolBar,
@@ -31,18 +34,20 @@ from .widgets.toolbars import (
     LightDockWidget,
     FocusToolBar,
 )
-import yaml
 from .restserver.server import RestProxy
-from PIL import Image, ImageQt
-import numpy
 
 
 class LaserStudio(QMainWindow):
+    """
+    Laser Studio main class and main window.
+    """
+
     def __init__(self, config: Optional[dict]):
         """
-        Laser Studio main window.
+        Initialize the Laser Studio main window.
 
         :param config: Optional configuration dictionary.
+            If None, an empty configuration is used.
         """
         super().__init__()
 

@@ -18,7 +18,6 @@ class LightInstrument(Instrument):
         """
         Set the light to on or off.
         """
-        ...
 
     @property
     def intensity(self):
@@ -32,7 +31,6 @@ class LightInstrument(Instrument):
         """
         Set the intensity of the light.
         """
-        ...
 
     @property
     def settings(self) -> dict:

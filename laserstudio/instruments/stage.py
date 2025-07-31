@@ -1,22 +1,37 @@
-from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
-from .list_serials import get_serial_device, DeviceSearchError
 import logging
-from pystages import Corvus, CNCRouter, PI, SMC100, Stage, Vector
-from .stage_rest import StageRest
-from .stage_dummy import StageDummy
-from pystages.exceptions import ProtocolError
 from typing import Optional, cast
 from enum import Enum, auto
+from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
+from pystages import Corvus, CNCRouter, PI, SMC100, Vector
+from pystages.exceptions import ProtocolError
+from .list_serials import get_serial_device, DeviceSearchError
+from .stage_rest import StageRest
+from .stage_dummy import StageDummy
 from .instrument import Instrument
 
 
 class MoveFor(object):
+    """
+    A MoveFor object, used to define the object for focus
+    when performing a move.
+    """
+
     class Type(Enum):
+        """
+        The type of object to focus on.
+        """
+
         CAMERA_CENTER = auto()
         LASER = auto()
         PROBE = auto()
 
     def __init__(self, type: Type, index: int = 0):
+        """
+        Initialize the MoveFor object.
+
+        :param type: The type of object to focus on.
+        :param index: The index of the object to focus on, in the case of Laser or Probe.
+        """
         self.type = type
         self.index = index
 
