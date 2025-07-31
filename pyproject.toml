@@ -34,7 +34,7 @@ dependencies = [
     "donjon_hyshlr",
     "scipy",
     "PyQt6-Charts",
-    # "pylmscontroller",
+    "pylmscontroller",
 ]
 requires-python = ">=3.9,<3.13"
 
