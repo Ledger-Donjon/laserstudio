@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from ...instruments.pdm import PDMInstrument
 from ...utils.util import resource_path, colored_image
-from ..return_line_edit import ReturnDoubleSpinBox
+from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..coloredbutton import ColoredPushButton
 
 
@@ -149,6 +149,20 @@ class PDMDockWidget(QDockWidget):
             grid.addWidget(w, row, 1)
             row += 1
 
+        grid.addWidget(QLabel("Refresh interval:"), row, 0)
+        w = self.refresh_interval_input = ReturnSpinBox()
+        w.setSuffix("\xa0ms")
+        w.setMinimum(1000)
+        w.setMaximum(1000000)
+        w.setValue(2000)
+        w.valueChanged.connect(
+            lambda: self.laser.__setattr__(
+                "refresh_interval", self.refresh_interval_input.value()
+            )
+        )
+        grid.addWidget(w, row, 1)
+        row += 1
+
         # Laser interlock status
         grid.addWidget(
             QLabel("Interlock status:"),
@@ -160,17 +174,6 @@ class PDMDockWidget(QDockWidget):
         grid.addWidget(
             w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
         )
-        row += 1
-
-        grid.addWidget(QLabel("Refresh interval:"), row, 0)
-        w = self.refresh_interval_input = QSpinBox()
-        w.setMinimum(1000)
-        w.setMaximum(1000000)
-        w.setValue(2000)
-        w.valueChanged.connect(
-            lambda: self.laser.__setattr__("refresh_interval", w.value())
-        )
-        grid.addWidget(w, row, 1)
         row += 1
 
         self.reload_parameters()
