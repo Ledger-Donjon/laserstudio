@@ -110,7 +110,7 @@ class PDMDockWidget(QDockWidget):
         grid.addWidget(QLabel("Sweep frequency:"), row, 0)
         w = self.sweep_freq_input = QSpinBox()
         w.setMinimum(1)
-        w.setMaximum(10000)
+        w.setMaximum(1000000)
         w.setValue(10)
         w.valueChanged.connect(
             lambda: self.laser.__setattr__("sweep_freq", self.sweep_freq_input.value())
@@ -150,13 +150,31 @@ class PDMDockWidget(QDockWidget):
             row += 1
 
         # Laser interlock status
-        grid.addWidget(QLabel("Interlock status:"), row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        grid.addWidget(
+            QLabel("Interlock status:"),
+            row,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading,
+        )
         self.interlock_label = w = QLabel("Unknown")
-        grid.addWidget(w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        grid.addWidget(
+            w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
+        )
+        row += 1
+
+        grid.addWidget(QLabel("Refresh interval:"), row, 0)
+        w = self.refresh_interval_input = QSpinBox()
+        w.setMinimum(1000)
+        w.setMaximum(1000000)
+        w.setValue(2000)
+        w.valueChanged.connect(
+            lambda: self.laser.__setattr__("refresh_interval", w.value())
+        )
+        grid.addWidget(w, row, 1)
         row += 1
 
         self.reload_parameters()
-        self.laser.parameter_changed.connect(self.refresh_interface)
+        self.laser.parameter_changed.connect(self.reload_parameters)
 
     def open_shutter(self, b):
         if self.laser.shutter is not None:
@@ -178,6 +196,10 @@ class PDMDockWidget(QDockWidget):
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
             self.interlock_label.setText("Opened" if value else "Closed")
+        elif name == "refresh_interval_ms":
+            self.refresh_interval_input.blockSignals(True)
+            self.refresh_interval_input.setValue(value)
+            self.refresh_interval_input.blockSignals(False)
 
     def reload_parameters(self):
         self.sweep_min_input.setValue(self.laser.sweep_min)
@@ -186,3 +208,4 @@ class PDMDockWidget(QDockWidget):
         self.refresh_interface("current_percentage", self.laser.current_percentage)
         self.refresh_interface("offset_current", self.laser.offset_current)
         self.refresh_interface("interlock_status", self.laser.interlock_status)
+        self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)

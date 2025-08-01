@@ -18,7 +18,7 @@ class PDMInstrument(LaserInstrument):
         super().__init__(config=config)
 
         # To refresh stage position in the view, in real-time
-        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
+        self._refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
 
         device_type = config.get("type")
         dev = config.get("dev")
@@ -63,10 +63,20 @@ class PDMInstrument(LaserInstrument):
         logging.getLogger("laserstudio").debug("Finishing discussion with PDM")
 
         self._interlock_status = None
-        if self.refresh_interval is not None:
+        if self._refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
+                self._refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
             )
+
+    @property
+    def refresh_interval(self) -> Optional[int]:
+        return self._refresh_interval
+
+    @refresh_interval.setter
+    def refresh_interval(self, value: int):
+        self._refresh_interval = value
+        if value is not None:
+            QTimer.singleShot(value, Qt.TimerType.CoarseTimer, self.refresh_pdm)
 
     @property
     def interlock_status(self) -> bool:
@@ -129,8 +139,33 @@ class PDMInstrument(LaserInstrument):
     def refresh_pdm(self):
         """Called regularly to get laser state which can change externally (interlock)"""
         _ = self.interlock_status
-
         if self.refresh_interval is not None:
             QTimer.singleShot(
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
+            )
+
+    @property
+    def settings(self):
+        """
+        Return a dict of settings for the PDM.
+        """
+        super_settings = super().settings
+        super_settings.update(
+            {
+                "interlock_status": self.interlock_status,
+                "refresh_interval_ms": self.refresh_interval,
+            }
+        )
+        return super_settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        """
+        Set the settings of the PDM.
+        """
+        LaserInstrument.settings.__set__(self, data)
+        if "refresh_interval_ms" in data:
+            self.refresh_interval = data["refresh_interval_ms"]
+            self.parameter_changed.emit(
+                "refresh_interval_ms", data["refresh_interval_ms"]
             )
