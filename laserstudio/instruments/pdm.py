@@ -85,10 +85,6 @@ class PDMInstrument(LaserInstrument):
         if state != self._interlock_status:
             self._interlock_status = state
             self.parameter_changed.emit("interlock_status", QVariant(state))
-            if state is True:
-                # The interlock has been opened, it may have changed the state of the
-                # activation
-                _ = self.on_off
         return state
 
     @property
@@ -139,6 +135,7 @@ class PDMInstrument(LaserInstrument):
     def refresh_pdm(self):
         """Called regularly to get laser state which can change externally (interlock)"""
         _ = self.interlock_status
+        _ = self.on_off
         if self.refresh_interval is not None:
             QTimer.singleShot(
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm

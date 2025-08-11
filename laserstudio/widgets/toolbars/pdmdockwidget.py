@@ -202,13 +202,18 @@ class PDMDockWidget(QDockWidget):
         elif name == "refresh_interval_ms":
             self.refresh_interval_input.blockSignals(True)
             self.refresh_interval_input.setValue(value)
+            self.refresh_interval_input.reset()
             self.refresh_interval_input.blockSignals(False)
 
-    def reload_parameters(self):
+    def reload_parameters(self, param_name: str = "", value: Any = None):
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
         self.sweep_freq_input.setValue(self.laser.sweep_freq)
-        self.refresh_interface("current_percentage", self.laser.current_percentage)
-        self.refresh_interface("offset_current", self.laser.offset_current)
-        self.refresh_interface("interlock_status", self.laser.interlock_status)
-        self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
+        if param_name:
+            self.refresh_interface(param_name, value)
+        else:
+            self.refresh_interface("current_percentage", self.laser.current_percentage)
+            self.refresh_interface("offset_current", self.laser.offset_current)
+            self.refresh_interface("interlock_status", self.laser.interlock_status)
+            self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
+            self.refresh_interface("on_off", self.laser.on_off)
