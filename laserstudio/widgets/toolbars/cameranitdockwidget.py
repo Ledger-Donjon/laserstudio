@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QMessageBox,
 )
+from ..coloredbutton import ColoredPushButton
 from ..return_line_edit import ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
 from ...utils import util
@@ -65,7 +66,8 @@ class CameraNITDockWidget(QDockWidget):
         hbox.addWidget(w)
         # Button to trigger the NIT camera gain
         # Checkbox to activate/deactivate the timer
-        self.button_agc = w = QPushButton("AGC")
+        self.button_agc = w = ColoredPushButton()
+        w.setText("AGC")
         w.setToolTip("Auto gain control (every 1 second)")
         w.setCheckable(True)
         # w.setChecked(True)

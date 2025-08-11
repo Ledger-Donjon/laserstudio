@@ -57,7 +57,6 @@ class CameraRaptorDockWidget(CameraDockWidget):
         # Button to set the Gain Mode
         w = QCheckBox("High Gain")
         w.setToolTip("Get the camera to use high gain mode")
-        w.setCheckable(True)
         w.setChecked(self.camera.get_high_gain_enabled())
         w.toggled.connect(self.camera.set_high_gain_enabled)
         vbox.addWidget(w)
@@ -66,7 +65,6 @@ class CameraRaptorDockWidget(CameraDockWidget):
         # Checkbox to activate ALC
         w = QCheckBox("ALC")
         w.setToolTip("Get the camera to use ALC mode")
-        w.setCheckable(True)
         w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.ALC_ENABLED))
         w.toggled.connect(self.camera.set_alc_enabled)
         vbox.addWidget(w)
@@ -75,7 +73,6 @@ class CameraRaptorDockWidget(CameraDockWidget):
         # Checkbox to activate AGMC
         w = QCheckBox("AGMC")
         w.setToolTip("Enable the camera's Automatic Gain Mode Control")
-        w.setCheckable(True)
         w.setChecked(reg_1.__contains__(RaptorCameraControlReg1.AGMC_ENABLED))
         w.toggled.connect(self.camera.set_agmc_enabled)
         vbox.addWidget(w)

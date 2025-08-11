@@ -5,6 +5,7 @@ from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
 from .markerslistdockwidget import MarkersListDockWidget
+from ..coloredbutton import ColoredPushButton
 
 
 class MarkersToolBar(QToolBar):
@@ -31,7 +32,7 @@ class MarkersToolBar(QToolBar):
         self.addWidget(w)
 
         # Show list of all markers
-        w = QPushButton(parent=self)
+        w = ColoredPushButton(parent=self)
         w.setText("Show list")
         w.setToolTip("Show a list of all markers")
         w.setCheckable(True)

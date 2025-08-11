@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
 )
 from PyQt6.QtCharts import QBarSet, QBarSeries, QChart, QChartView
+
+from laserstudio.widgets.coloredbutton import ColoredPushButton
 from ...utils.util import colored_image
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
@@ -218,22 +220,13 @@ class CameraDockWidget(QDockWidget):
         w.setLayout(grid)
 
         # Button to toggle off or on the camera image presentation in main viewer
-        self.show_hide_button = w = QPushButton(self)
+        self.show_hide_button = w = ColoredPushButton(
+            icon_path=":/icons/fontawesome-free/video-slash-solid.svg",
+            pushed_icon_path=":/icons/fontawesome-free/video-solid.svg",
+        )
         w.setToolTip("Show/Hide Image")
         w.setCheckable(True)
         w.setChecked(True)
-        icon = QIcon()
-        icon.addPixmap(
-            colored_image(":/icons/fontawesome-free/video-solid.svg"),
-            QIcon.Mode.Normal,
-            QIcon.State.On,
-        )
-        icon.addPixmap(
-            colored_image(":/icons/fontawesome-free/video-slash-solid.svg"),
-            QIcon.Mode.Normal,
-            QIcon.State.Off,
-        )
-        w.setIcon(icon)
         w.setIconSize(QSize(16, 16))
         w.toggled.connect(
             lambda b: laser_studio.viewer.stage_sight.__setattr__("show_image", b)

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from ...instruments.camera import CameraInstrument
 from ...utils.colors import LedgerColors
+from ..coloredbutton import ColoredPushButton
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -78,7 +79,8 @@ class PhotoEmissionDockWidget(QDockWidget):
         self.memory_buttons: list[QPushButton] = []
         # Button to take a reference image
         for m in ["M1", "M2", "M3", "M4"]:
-            w = QPushButton(m)
+            w = ColoredPushButton()
+            w.setText(m)
             self.memory_buttons.append(w)
             w.setToolTip(f"Set reference image {m}")
             w.setCheckable(True)
