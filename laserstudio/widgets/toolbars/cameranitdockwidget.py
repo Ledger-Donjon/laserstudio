@@ -127,6 +127,9 @@ class CameraNITDockWidget(QDockWidget):
         w.clicked.connect(self.shade_load)
         hbox.addWidget(w)
 
+        # Add stretch of last row
+        vbox.addStretch()
+
     def gain_changed(self):
         """
         Called when histogram gain bound is changed in the UI.

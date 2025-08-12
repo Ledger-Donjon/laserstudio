@@ -250,12 +250,6 @@ class CameraDockWidget(QDockWidget):
             == 0
         )
 
-        # Second representation of the camera image
-        stage_sight = StageSight(None, self.camera)
-        self.second_view = w = StageSightViewer(stage_sight)
-        w.setHidden(True)
-        grid.addWidget(w, 3, 1, 1, 2)
-
         # Refresh interval
         w = QWidget()
         grid.addWidget(QLabel("Refresh interval:"), 3, 1)
@@ -275,24 +269,23 @@ class CameraDockWidget(QDockWidget):
         grid.addWidget(w, 3, 2)
 
         if self.camera.shutter is not None:
-            w = QPushButton("Shutter")
+            grid.addWidget(QLabel("Shutter:"), 4, 1)
+
+            w = ColoredPushButton(
+                ":/icons/shutter-closed.svg",
+                ":/icons/shutter-open.svg",
+            )
             w.setCheckable(True)
             w.setChecked(self.camera.shutter.open)
             w.clicked.connect(lambda b: self.camera.shutter.__setattr__("open", b))
-            icon = QIcon()
-            icon.addPixmap(
-                QPixmap(colored_image(":/icons/fontawesome-free/eye-solid.svg")),
-                QIcon.Mode.Normal,
-                QIcon.State.On,
-            )
-            icon.addPixmap(
-                QPixmap(colored_image(":/icons/fontawesome-free/eye-slash-solid.svg")),
-                QIcon.Mode.Normal,
-                QIcon.State.Off,
-            )
-            w.setIcon(icon)
-            # self.addWidget(w)
-            grid.addWidget(w, 4, 1, 1, 2)
+            grid.addWidget(w, 4, 2)
+
+        
+        # Second representation of the camera image
+        stage_sight = StageSight(None, self.camera)
+        self.second_view = w = StageSightViewer(stage_sight)
+        w.setHidden(True)
+        grid.addWidget(w, 5, 1, 1, 2)
 
         # Add stretch of last row
-        grid.setRowStretch(5, 1)
+        grid.setRowStretch(grid.rowCount(), 1)

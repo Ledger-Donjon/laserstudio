@@ -75,6 +75,9 @@ class LightDockWidget(QDockWidget):
             w.setIconSize(QSize(24, 24))
             w.toggled.connect(self.open_shutter)
             hbox.addWidget(w)
+            
+        # Add stretch on last row
+        vbox.addStretch()
 
     def open_shutter(self, b):
         if type(self.light) is LMSControllerInstrument:

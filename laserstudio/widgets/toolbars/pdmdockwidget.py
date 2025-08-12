@@ -199,7 +199,7 @@ class PDMDockWidget(QDockWidget):
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
             self.interlock_label.setText("Opened" if value else "Closed")
-        elif name == "refresh_interval_ms":
+        elif name == "refresh_interval_ms" and value is not None:
             self.refresh_interval_input.blockSignals(True)
             self.refresh_interval_input.setValue(value)
             self.refresh_interval_input.reset()
