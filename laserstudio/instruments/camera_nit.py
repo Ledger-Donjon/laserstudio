@@ -2,6 +2,7 @@ from .camera import CameraInstrument
 from typing import Optional, cast
 import numpy
 
+
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
 
@@ -28,7 +29,7 @@ class CameraNITInstrument(CameraInstrument):
         self.select_objective(objective)
 
     def capture_image(self) -> Optional[numpy.ndarray]:
-        width, height, _ , data = self.pynit.get_last_image()
+        width, height, _, data = self.pynit.get_last_image()
         if data is None:
             return None
         # get_last_image returns Tuple always 'L' for the 'mode'
@@ -66,14 +67,14 @@ class CameraNITInstrument(CameraInstrument):
             raise ValueError("Low bound out of range!")
         if (high < 0) or (high > 0xFFFF):
             raise ValueError("High bound out of range!")
-        self.pynit.gain_controller.set_range(low / 64, high / 64)
+        self.pynit.gain_controller.set_range(low / 64.0, high / 64.0)
 
-    def gain_autoset(self) -> tuple[int, int]:
+    def gain_autoset(self) -> tuple[float, float]:
         """
         Automatically sets the camera gain based on the current scene.
 
         :return: A tuple containing the low and high bounds of the calculated gain.
-        :rtype: tuple[int, int]
+        :rtype: tuple[float, float]
         """
         return self.pynit.gain_autoset()
 
@@ -157,7 +158,6 @@ class CameraNITInstrument(CameraInstrument):
         settings["gain"] = list(self.gain)
         return settings
 
-
     @settings.setter
     def settings(self, data: dict):
         """Import and apply settings."""
@@ -173,9 +173,7 @@ class CameraNITInstrument(CameraInstrument):
             self.averaging_restart()
         if "averaging" in data:
             self.averaging = data["averaging"]
-            self.parameter_changed.emit("averaging",  data["averaging"])
+            self.parameter_changed.emit("averaging", data["averaging"])
         if "gain" in data and isinstance(gain := data["gain"], list) and len(gain) == 2:
             self.gain = tuple(gain)
             self.parameter_changed.emit("gain", gain)
-
-

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 from ..coloredbutton import ColoredPushButton
-from ..return_line_edit import ReturnSpinBox
+from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
 from ...utils import util
 
@@ -35,7 +35,7 @@ class CameraNITDockWidget(QDockWidget):
 
         super().__init__("NIT Camera Parameters", laser_studio)
 
-        if self.camera.label:
+        if self.camera.label is not None:
             self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
 
         self.setObjectName("toolbar-camera-nit")  # For settings save and restore
@@ -54,12 +54,12 @@ class CameraNITDockWidget(QDockWidget):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Gain:"))
-        w = self.hist_low_input = ReturnSpinBox()
+        w = self.hist_low_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
         w.returnPressed.connect(self.gain_changed)
         hbox.addWidget(w)
-        w = self.hist_high_input = ReturnSpinBox()
+        w = self.hist_high_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
         w.returnPressed.connect(self.gain_changed)
