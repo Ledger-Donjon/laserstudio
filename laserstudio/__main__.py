@@ -1,17 +1,23 @@
 #!/usr/bin/python3
-from .laserstudio import LaserStudio
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QLocale
+import argparse
+import logging
+import os.path
+import pathlib
 import sys
 import yaml
-import os.path
-import logging
-import argparse
+
+from PyQt6.QtCore import QLocale
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication
+
+from .config_generator import ConfigGenerator, ConfigGeneratorWizard
+from .laserstudio import LaserStudio
 from .utils.util import resource_path
 from .utils.colors import LedgerPalette, LedgerStyle
-from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger("laserstudio")
 
 def main():
     app = QApplication(sys.argv)
@@ -20,17 +26,19 @@ def main():
     parser.add_argument(
         "--log", choices=list(logging._nameToLevel.keys()), required=False
     )
-    parser.add_argument("--conf_file", type=argparse.FileType("r"), required=False)
+    parser.add_argument(
+        "--config",
+        type=pathlib.Path,
+        required=False,
+        default=os.path.join(os.getcwd(), "config.yaml"),
+    )
     args = parser.parse_args()
 
     if args.log is not None:
         try:
-            logging.basicConfig(level=logging.NOTSET)
-            logger = logging.getLogger("laserstudio")
             logger.setLevel(args.log)
         except ValueError as e:
-            print("Warning, error during setting log level:", e)
-            pass
+            logger.error("Warning, error during setting log level:", e)
 
     app.setApplicationName("Laser Studio")
     app.setApplicationDisplayName("Laser Studio")
@@ -50,30 +58,27 @@ def main():
 
     # Loading configuration file
     stream = None
-    if args.conf_file is not None:
-        stream = args.conf_file
-    else:
-        # Search existing configuration file, from current folder to root
-        current_dir = os.path.realpath((os.curdir))
-        while not os.path.exists(os.path.join(current_dir, "config.yaml")):
-            # Search for the config file in the parent directory
-            parent_dir = os.path.dirname(current_dir)
-            if current_dir == parent_dir:
-                break
-            current_dir = parent_dir
-
-        if os.path.exists(path := os.path.join(current_dir, "config.yaml")):
-            stream = open(path, "r")
+    try:
+        stream = open(args.config, "r")
+    except FileNotFoundError:
+        logger.error(f"Configuration file {args.config} not found")
+    except Exception as e:
+        logger.error(f"Encountered error while opening configuration file {args.config}: {e}")
 
     yaml_config = None
     if stream is not None:
         # Load the found or given configuration file
-        yaml_config = yaml.load(stream, yaml.FullLoader)
+        try:
+            yaml_config = yaml.safe_load(stream)
+        except Exception as e:
+            logger.error(f"Encountered error while loading configuration file {args.config}: {e}")
 
         # Check if the configuration file is valid
         if type(yaml_config) is not dict:
-            print("Error: Invalid configuration file: it is not a dictionary")
+            logger.error("Invalid configuration file: it is not a dictionary")
             yaml_config = None
+        else:
+            logger.info(f"Configuration file {args.config} loaded successfully")
 
     if yaml_config is None:
         # No configuration file found, generate one
@@ -85,6 +90,7 @@ def main():
         wizard = ConfigGeneratorWizard(config_generator.schema)
         wizard.exec()
         yaml_config = wizard.config_result_page.config
+        logger.info(f"Configuration generated successfully")
 
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())
