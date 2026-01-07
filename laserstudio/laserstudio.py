@@ -122,10 +122,16 @@ class LaserStudio(QMainWindow):
                 self.instruments.focus_helper,
             )
             self.addToolBar(toolbar)
+
             self.addDockWidget(
                 Qt.DockWidgetArea.RightDockWidgetArea,
                 toolbar.magic_focus_dockwidget,
             )
+            self.tabifyDockWidget(
+                toolbar.magic_focus_dockwidget,
+                toolbar.magic_focus_settings_dockwidget,
+            )
+            
 
         # ToolBar: Scanning zone definition and usage
         toolbar = ScanToolBar(self)

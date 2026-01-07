@@ -27,7 +27,7 @@ class FocusSearchSettings:
             1000 µm, for safety purpose. Search will occur in the range
             [z - span / 2, z + span / 2].
         :param steps: Number of search steps. Must be greater or equal to 2.
-        :param avg: Image averaging setting. Must be greater or equal to 1.
+        :param averaging: Image averaging setting. Must be greater or equal to 1.
         :multi_peaks: If True, peak detection is performed, and the peak with
             the higher Z value is considered as the correct focus. This is used
             to distinguish the silicon transistors from the silicon surface. If
@@ -41,7 +41,7 @@ class FocusSearchSettings:
         assert averaging >= 1, "Image averaging must be greater or equal to 1"
         self.span = span
         self.steps = steps
-        self.avg = averaging
+        self.averaging = averaging
         self.multi_peaks = multi_peaks
         self.best_is_highest_z = best_is_highest_z
 
@@ -115,7 +115,7 @@ class FocusThread(QThread):
         z_mid = (pos := stage.position).z
         z_min, z_max = self.z_range(z_mid, settings)
         z_step = (z_max - z_min) / (settings.steps - 1)
-        self.__camera.image_averaging = settings.avg
+        self.__camera.image_averaging = settings.averaging
         best_z = None
         best_std_dev = None
         tab = []
@@ -126,7 +126,7 @@ class FocusThread(QThread):
         print(
             f"Focus search at {pos.xy}: "
             f"{z_min:.2f} to {z_max:.2f} with {settings.steps} steps, "
-            f"averaging {settings.avg} images"
+            f"averaging {settings.averaging} images"
         )
         for i in range(settings.steps):
             z = (z_step * i) + z_min
@@ -179,7 +179,7 @@ class FocusThread(QThread):
         Perform focus research, with first coarse settings, and then eventually with fine
         settings.
         """
-        avg_prev = self.__camera.image_averaging
+        averaging_prev = self.__camera.image_averaging
         if self.__positions is None:
             self.best_z, self.tab_coarse, self.peaks_coarse = self.run_search(
                 self.__coarse
@@ -199,7 +199,7 @@ class FocusThread(QThread):
                     best_z, _, _ = self.run_search(self.__fine)
                 self.best_positions.append(Vector(position.x, position.y, best_z))
 
-        self.__camera.image_averaging = avg_prev  # Restore setting
+        self.__camera.image_averaging = averaging_prev  # Restore setting
 
 
 class FocusInstrument(Instrument):
@@ -226,7 +226,7 @@ class FocusInstrument(Instrument):
         self.fine_focus_settings: Optional[FocusSearchSettings] = None
         self.coarse_focus_settings: Optional[FocusSearchSettings] = None
 
-        # Magic focus settings
+        # Magic focus parameters configuration
         if "fine" in config:
             self.fine_focus_settings = FocusSearchSettings(**config["fine"])
         if "coarse" in config:
@@ -294,7 +294,7 @@ class FocusInstrument(Instrument):
             res["tab_fine"] = str(t.tab_fine)
         return res
 
-    def parse_parameters(self, parameters: dict):
+    def parse_magicfocus_parameters(self, parameters: dict):
         if "coarse" in parameters:
             coarse_focus_settings = FocusSearchSettings(**parameters["coarse"])
         else:
@@ -321,7 +321,7 @@ class FocusInstrument(Instrument):
             return self.focus_thread
 
         if parameters is not None:
-            coarse, fine = self.parse_parameters(parameters)
+            coarse, fine = self.parse_magicfocus_parameters(parameters)
 
         if coarse is None:
             coarse = self.coarse_focus_settings or FocusSearchSettings(
