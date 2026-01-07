@@ -7,7 +7,7 @@ class Instrument(QObject):
 
     def __init__(self, config: dict):
         super().__init__()
-        self.label = config.get("label")
+        self.label: str | None = config.get("label")
 
     @property
     def settings(self) -> dict:
