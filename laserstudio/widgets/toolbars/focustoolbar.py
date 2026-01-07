@@ -1,19 +1,112 @@
-from time import sleep
-from PyQt6.QtCore import Qt, QSize, QThread
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton
-import numpy as np
-import scipy.signal
-from pystages import Autofocus, Vector
-from laserstudio.instruments.camera_nit import CameraNITInstrument
-from laserstudio.utils.util import colored_image
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIcon, QPainter
+from PyQt6.QtWidgets import (
+    QToolBar,
+    QPushButton,
+    QLabel,
+    QMessageBox,
+    QWidget,
+    QVBoxLayout,
+    QMenu,
+)
+from ...utils.util import colored_image, ChartViewWithVMarker
+from ..coloredbutton import ColoredPushButton
+from ...instruments.camera import CameraInstrument
+from ...instruments.stage import StageInstrument
+from ...instruments.focus import FocusInstrument
+from PyQt6.QtCharts import QLineSeries, QChart
 from typing import Optional
 
 
-class FocusToolbar(QToolBar):
-    """Toolbar for focus registration and autofocus."""
+class FocusChartWindow(QWidget):
+    """
+    Window for displaying the focus chart.
+    """
 
-    def __init__(self, stage, camera: CameraNITInstrument, autofocus_helper: Autofocus):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("focus-chart-window")  # For settings save and restore
+        self.setWindowTitle("Focus Chart")
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+        )
+        self.setGeometry(100, 100, 800, 600)
+        self.setVisible(False)
+        # Chart for focus results
+        self.chart = QChart()
+        self.chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
+        self.cv = w = ChartViewWithVMarker()
+        w.setChart(self.chart)
+        w.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w.setMinimumSize(600, 400)
+
+        self.coarse_serie = QLineSeries()
+        self.coarse_serie.setName("Coarse")
+        self.fine_serie = QLineSeries()
+        self.fine_serie.setName("Fine")
+        self.chart.addSeries(self.coarse_serie)
+        self.chart.addSeries(self.fine_serie)
+        self.chart.createDefaultAxes()
+
+        self.setLayout(vbox := QVBoxLayout())
+        vbox.addWidget(w)
+
+    def new_point(self, z: float, std_dev: float, serie: QLineSeries):
+        """
+        Called when a new point is added to the chart.
+
+        :param z: The z position of the point.
+        :param std_dev: The standard deviation of the point.
+        """
+        serie.append(z, std_dev)
+        p = self.coarse_serie.points() + self.fine_serie.points()
+        minY = min(p, key=lambda p: p.y()).y()
+        maxY = max(p, key=lambda p: p.y()).y()
+        self.chart.axes()[1].setRange(minY, maxY)
+
+    def clear(self):
+        """
+        Clears the chart.
+        """
+        self.coarse_serie.clear()
+        self.fine_serie.clear()
+        self.cv.vmarker = None
+
+    @property
+    def vmarker(self):
+        """
+        Returns the vertical marker position.
+        :return: The z position of the marker.
+        """
+        return self.cv.vmarker
+
+    @vmarker.setter
+    def vmarker(self, z: Optional[float]):
+        """
+        Sets the vertical marker position.
+        :param z: The z position of the marker.
+        """
+        self.cv.vmarker = z
+
+    def setRange(self, z_range: tuple[float, float]):
+        """
+        Sets the range of the chart.
+        :param z_range: The z range of the chart.
+        """
+        self.chart.axes()[0].setRange(z_range[0], z_range[1])
+
+
+class FocusToolBar(QToolBar):
+    """ToolBar for focus registration and autofocus."""
+
+    def __init__(
+        self,
+        stage: StageInstrument,
+        camera: CameraInstrument,
+        focus_helper: FocusInstrument,
+    ):
         """
         :param autofocus_helper: Stores the registered points and calculates focus on demand.
         """
@@ -22,21 +115,15 @@ class FocusToolbar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
-        # Set when a focus search is running, then cleared.
-        # This is used to prevent launching two search threads at the same time.
-        self.focus_thread: Optional[FocusThread] = None
-
-        self.autofocus_helper = autofocus_helper
+        self.focus_helper: FocusInstrument = focus_helper
         self.stage = stage
         self.camera = camera
 
         # Try to find focus automatically
-        self.button_magic_focus = w = QPushButton(self)
-        w.setIcon(
-            QIcon(
-                colored_image(":/icons/fontawesome-free/wand-magic-sparkles-solid.svg")
-            )
+        self.button_magic_focus = w = ColoredPushButton(
+            ":/icons/fontawesome-free/wand-magic-sparkles-solid.svg", parent=self
         )
+        w.setCheckable(True)
         w.setIconSize(QSize(24, 24))
         w.setToolTip(
             "Automatically find best focus position using camera image analysis."
@@ -44,203 +131,121 @@ class FocusToolbar(QToolBar):
         w.clicked.connect(self.magic_focus)
         self.addWidget(w)
 
-        # Set focus point at current position
-        w = QPushButton(self)
-        w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/wrench-solid.svg")))
-        w.setIconSize(QSize(24, 24))
-        w.setToolTip("Register current position for focusing.")
-        w.clicked.connect(self.register)
-        self.addWidget(w)
+        # Register focus point at current position
+        self.buttons_autofocus_menu = menu = QMenu("Autofocus Points", self)
+        action = menu.addAction("Perform autofocus", lambda: self.autofocus())
+        assert action is not None, "Autofocus action could not be created"
+        self.autofocus_action = action
+        menu.addAction("Register current position", lambda: self.register())
+        menu.addAction("Clear all registered points", lambda: self.clear_all())
 
         # Autofocus
-        w = QPushButton(self)
+        self.autofocus_button = w = QPushButton(self)
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/glasses-solid.svg")))
         w.setIconSize(QSize(24, 24))
         w.setToolTip("Automatically focus based on 3 registered positions.")
-        w.clicked.connect(self.autofocus)
+        w.setMenu(menu)
         self.addWidget(w)
+
+        self.update_autofocus_buttons()
+
+        # Show current sharpness value
+        self.sharpness = QLabel("")
+        self.sharpness.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.sharpness.setStyleSheet("padding-left: 10px;padding-right: 10px")
+        self.camera.new_image.connect(
+            lambda: self.sharpness.setText(f"{self.camera.laplacian_std_dev:.2f}")
+        )
+        self.sharpness.setToolTip("The sharpness value of the current image.")
+        self.addWidget(self.sharpness)
+
+        self.chart_window = FocusChartWindow()
+
+        self.focus_helper.parameter_changed.connect(
+            lambda _: self.update_autofocus_buttons()
+        )
 
     def magic_focus(self):
         """
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
         """
-        assert self.focus_thread is None
+        assert (
+            self.focus_helper.focus_thread is None
+            or not self.focus_helper.focus_thread.isRunning()
+        ), "Magic Focus thread is already running"
         self.button_magic_focus.setEnabled(False)
-        # Adapt range depending on currently selected microscope objective.
-        objective = self.camera.objective
-        t = FocusThread(
-            self.camera,
-            self.stage,
-            FocusSearchSettings(4000 / objective, 50, 4, False),
-            FocusSearchSettings(200 / objective, 20, 16, False),
-            None,
+
+        self.chart_window.clear()
+        self.chart_window.show()
+
+        t = self.focus_helper.magic_focus()
+        t.new_point.connect(
+            lambda z, dev: self.chart_window.new_point(
+                z,
+                dev,
+                self.chart_window.coarse_serie
+                if t.tab_coarse is None
+                else self.chart_window.fine_serie,
+            )
         )
-        self.focus_thread = t
         t.finished.connect(self.magic_focus_finished)
+        self.chart_window.setRange(t.z_range())
         t.start()
 
     def magic_focus_finished(self):
         """Called when focus search thread has finished."""
-        assert self.focus_thread is not None
-        self.focus_thread = None
+        # Reenable the button
+        self.button_magic_focus.setChecked(False)
         self.button_magic_focus.setEnabled(True)
 
-    def register(self):
+        # Show the graphs
+        assert (t := self.focus_helper.focus_thread) is not None
+        self.chart_window.vmarker = t.best_z
+        self.chart_window.show()
+
+    def update_autofocus_buttons(self) -> None:
         """
-        Registers a new focus point. If three focus points are already defined, the
-        farther point is replaced.
+        Update the autofocus buttons to show the current focus points.
         """
-        pos = self.stage.position
-        if len(self.autofocus_helper) == 3:
-            dists = [
-                np.linalg.norm((Vector(*p).xy - pos.xy).data)
-                for p in self.autofocus_helper.registered_points
-            ]
-            del self.autofocus_helper.registered_points[dists.index(min(dists))]
-        self.autofocus_helper.register(pos.x, pos.y, pos.z)
+        points = self.focus_helper.autofocus_helper.registered_points
+        num_points = len(points)
+        self.autofocus_action.setEnabled(num_points >= 3)
+        self.autofocus_button.setText(str(num_points))
+
+    def clear_all(self):
+        self.focus_helper.clear()
+
+    def register(self, index: int = 1, checked: bool = True):
+        """
+        Registers a new focus point.
+        """
+        if checked:
+            pos = self.stage.position
+            self.focus_helper.register((pos.x, pos.y, pos.z))
+        else:
+            self.focus_helper.autofocus_helper.registered_points.pop(index - 1)
+        self.update_autofocus_buttons()
 
     def autofocus(self):
         """
         Calculate focus for the given position and apply it, if possible.
         """
-        pos = self.stage.position
-        z = self.autofocus_helper.focus(pos.x, pos.y)
-        if abs(z - pos.z < 250):
-            print("DIFF", z, pos.z)
-            self.stage.position = Vector(pos.x, pos.y, z)
-        else:
-            print("Warning: too big Z difference")
-
-
-class FocusSearchSettings:
-    """Parameters for the focus search procedure."""
-
-    def __init__(self, span: float, steps: int, avg: int, multi_peaks: bool):
-        """
-        :param span: Z search span, in micrometers. Maximum allowed value is
-            1000 µm, for safety purpose. Search will occur in the range
-            [z - span / 2, z + span / 2].
-        :param steps: Number of search steps. Must be greater or equal to 2.
-        :param avg: Image averaging setting. Must be greater or equal to 1.
-        :multi_peaks: If True, peak detection is performed, and the peak with
-            the higher Z value is considered as the correct focus. This is used
-            to distinguish the silicon transistors from the silicon surface. If
-            False, the position with the highest image standard deviation is
-            kept.
-        """
-        assert span > 0
-        assert span < 1000  # In case of bug, prevent large span
-        assert steps >= 2
-        assert avg >= 1
-        self.span = span
-        self.steps = steps
-        self.avg = avg
-        self.multi_peaks = multi_peaks
-
-
-class FocusThread(QThread):
-    """
-    Thread to perform best focus position research by moving a stage and analysing the
-    images of a camera.
-    """
-
-    def __init__(
-        self,
-        camera: CameraNITInstrument,
-        stage,
-        coarse: FocusSearchSettings,
-        fine: Optional[FocusSearchSettings] = None,
-        positions: Optional[list[Vector]] = None,
-    ):
-        """
-        Tries to find optimal stage Z position to get best focus.
-
-        :param camera: Camera instrument for capturing images.
-        :param stage: Stage instrument used to modify Z position. At the end of the
-            procedure, stage is moved to the best found position.
-        :param positions: A list of positions to be scanned. If None, current
-            position is used.
-        """
-        super().__init__()
-        self.__camera = camera
-        self.__stage = stage
-        self.__coarse = coarse
-        self.__fine = fine
-        self.__positions = positions
-        self.best_z = None
-        self.best_positions = None
-
-    def run_search(self, settings: FocusSearchSettings):
-        """
-        Start a research given some search settings.
-
-        :param settings: Focus research settings.
-        """
-        stage = self.__stage
-        z_mid = stage.position.z
-        z_max = z_mid + settings.span / 2.0
-        z_min = z_mid - settings.span / 2.0
-        z_step = (z_max - z_min) / (settings.steps - 1)
-        self.__camera.averaging = settings.avg
-        best_z = None
-        best_std_dev = None
-        tab = []
-        pos: Vector = Vector()
-        for i in range(settings.steps):
-            z = (z_step * i) + z_min
-            pos = stage.position
-            stage.move_to(Vector(pos.x, pos.y, z), wait=True)
-            self.__camera.averaging_restart()
-            self.__camera.reset_counter()
-            # +3: pynit does some pipelining in the image processing, there can
-            # be latency in the images. This is a bit hacky.
-            while self.__camera.counter < settings.avg + 3:
-                sleep(0.05)
-            std_dev = self.__camera.laplacian_std_dev
-            tab.append((z, std_dev))
-            if (best_std_dev is None) or (std_dev > best_std_dev):
-                best_std_dev = std_dev
-                best_z = z
-
-        tab = np.array(tab)
-        peaks = None
-
-        if settings.multi_peaks:
-            amplitude = max(tab[:, 1]) - min(tab[:, 1])
-            peak_indexes = scipy.signal.find_peaks(
-                tab[:, 1], prominence=amplitude * 0.1
-            )[0]
-            peaks = list(tab[i] for i in peak_indexes)
-            # We can get two peaks, one for the silicon surface, and another one
-            # for the transistors. This latest has a higher Z value, so we chose
-            # the peak with the highest Z.
-            best_z = peaks[-1][0]
-
-        stage.move_to(Vector(pos.x, pos.y, best_z), wait=True)
-        return (best_z, tab, peaks)
-
-    def run(self):
-        """
-        Perform focus research, with first coarse settings, and then eventually with fine
-        settings.
-        """
-        avg_prev = self.__camera.averaging
-        if self.__positions is None:
-            self.best_z, self.tab_coarse, self.peaks_coarse = self.run_search(
-                self.__coarse
+        if len(self.focus_helper.autofocus_helper) < 3:
+            # Prompt a dialog
+            QMessageBox.critical(
+                self,
+                "Focus",
+                f"Not enough points registered for autofocus ({len(self.focus_helper.autofocus_helper)} over 3 required).",
             )
-            if self.__fine is not None:
-                self.best_z, self.tab_fine, self.peaks_fine = self.run_search(
-                    self.__fine
-                )
-        else:
-            self.best_positions = []
-            for position in self.__positions:
-                self.__stage.move_to(position, wait=True)
-                best_z, _, _ = self.run_search(self.__coarse)
-                if self.__fine is not None:
-                    best_z, _, _ = self.run_search(self.__fine)
-                self.best_positions.append(Vector(position.x, position.y, best_z))
+            return
 
-        self.__camera.averaging = avg_prev  # Restore setting
+        try:
+            self.focus_helper.autofocus()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Focus",
+                str(e),
+            )
+            return

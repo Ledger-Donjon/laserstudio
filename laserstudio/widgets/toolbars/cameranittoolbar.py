@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+import pickle
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -14,7 +15,6 @@ from PyQt6.QtWidgets import (
 from ..return_line_edit import ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
 from ...utils import util
-import pickle
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -23,6 +23,11 @@ from PyQt6.QtCore import QTimer
 
 class CameraNITToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
+        """
+        Initialize the camera NIT toolbar.
+
+        :param laser_studio: The laser studio instance.
+        """
         assert isinstance(laser_studio.instruments.camera, CameraNITInstrument)
         self.camera = laser_studio.instruments.camera
         self.laser_studio = laser_studio
@@ -61,7 +66,7 @@ class CameraNITToolBar(QToolBar):
         self.button_agc = w = QPushButton("AGC")
         w.setToolTip("Auto gain control (every 1 second)")
         w.setCheckable(True)
-        w.setChecked(True)
+        # w.setChecked(True)
         w.clicked.connect(self.agc_changed)
         hbox.addWidget(w)
         # Timer to trigger gain autoset every 1 seconds

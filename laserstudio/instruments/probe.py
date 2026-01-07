@@ -16,16 +16,18 @@ class ProbeInstrument(Instrument):
     offset_pos_changed = pyqtSignal()
 
     @property
-    def yaml(self) -> dict[str, Any]:
-        yaml = {}
+    def settings(self) -> dict[str, Any]:
+        data = super().settings
         if self.offset_pos is not None:
-            yaml["offset_pos"] = list(self.offset_pos)
-        return yaml
+            data["offset_pos"] = list(self.offset_pos)
+        return data
 
-    @yaml.setter
-    def yaml(self, yaml: dict):
+    @settings.setter
+    def settings(self, data: dict):
         """Import settings from a dict."""
-        offset_pos = yaml.get("offset_pos", None)
+        assert Instrument.settings.fset is not None
+        Instrument.settings.fset(self, data)
+        offset_pos = data.get("offset_pos", None)
         self.offset_pos = tuple(offset_pos) if offset_pos is not None else None
 
     @property

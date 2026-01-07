@@ -1,16 +1,20 @@
-from pystages import Autofocus, Vector
 from .stage import StageInstrument
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument
 from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
+from .camera_raptor import CameraRaptorInstrument
+from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
+from .focus import FocusInstrument
+from .instrument import Instrument
+from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
 from .laserdriver import LaserDriverInstrument, LaserDriver  # type: ignore
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
-from typing import Optional, cast, Any
+from typing import Optional, cast, Any, Sequence
 import sys
 import logging
 
@@ -23,7 +27,7 @@ class Instruments:
         :param config: Configuration YAML object
         """
         # Main stage
-        self.stage = None
+        self.stage: Optional[StageInstrument] = None
         stage_config = config.get("stage", None)
         if stage_config is not None and stage_config.get("enable", True):
             try:
@@ -39,17 +43,17 @@ class Instruments:
                 self.stage = None
 
         # Main camera
-        self.camera = None
+        self.camera: Optional[CameraInstrument] = None
         camera_config = config.get("camera", None)
         if camera_config is not None and camera_config.get("enable", True):
             device_type = camera_config.get("type")
             try:
                 if device_type == "USB":
-                    self.camera: Optional[CameraInstrument] = CameraUSBInstrument(
+                    self.camera = CameraUSBInstrument(
                         camera_config
                     )
                 elif device_type == "REST":
-                    self.camera: Optional[CameraInstrument] = CameraRESTInstrument(
+                    self.camera = CameraRESTInstrument(
                         camera_config
                     )
                 elif device_type == "NIT":
@@ -57,7 +61,11 @@ class Instruments:
                         raise Exception(
                             "The NIT camera is not supported on other platforms than Linux or Windows."
                         )
-                    self.camera: Optional[CameraInstrument] = CameraNITInstrument(
+                    self.camera = CameraNITInstrument(
+                        camera_config
+                    )
+                elif device_type == "Raptor":
+                    self.camera = CameraRaptorInstrument(
                         camera_config
                     )
             except Exception as e:
@@ -100,17 +108,32 @@ class Instruments:
 
         # Autofocus helper: stores registered position in order to do automatic camera
         # focusing. This can be considered as an abstract instrument.
-        self.autofocus_helper = Autofocus()
+        if self.camera is not None and self.stage is not None:
+            self.focus_helper = FocusInstrument(
+                config.get("focus", {}), self.camera, self.stage
+            )
+        else:
+            self.focus_helper = None
 
-        # Hayashi Light Remote
-        self.hayashi_light: Optional[HayashiLRInstrument] = None
-        hayashi_config = config.get("hayashi", None)
-        if hayashi_config is not None and hayashi_config.get("enable", True):
+        # Lighting system
+        self.light: Optional[LightInstrument] = None
+        light_config = config.get("lighting", None)
+        if light_config is not None and light_config.get("enable", True):
+            device_type = light_config.get("type")
             try:
-                self.hayashi_light = HayashiLRInstrument(hayashi_config)
+                if device_type == "Hayashi":
+                    self.light = HayashiLRInstrument(light_config)
+                elif device_type == "LMSController":
+                    self.light = LMSControllerInstrument(light_config)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unknown Lighting system type {device_type}. Skipping device."
+                    )
+                    raise
+
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
-                    f"Hayashi Light Remote is enabled but device could not be created: {str(e)}... Skipping."
+                    f"Lighting system is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
     def go_next(self) -> dict[str, Any]:
@@ -119,12 +142,11 @@ class Instruments:
             results.append(laser.go_next())
         return {"lasers": results}
 
-    def autofocus(self):
-        if self.stage is None:
-            return
-        if len(self.autofocus_helper.registered_points) < 3:
-            return
-        pos = self.stage.position
-        z = self.autofocus_helper.focus(pos.x, pos.y)
-        assert abs(z - pos.z) < 500
-        self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
+    @property
+    def all_instruments(self) -> Sequence[Optional[Instrument]]:
+        return [self.stage] + self.lasers + [self.camera] + [self.light] + self.probes
+
+    def get_instrument_with_label(self, label: str) -> Optional[Instrument]:
+        for instrument in self.all_instruments:
+            if instrument is not None and instrument.label == label:
+                return instrument

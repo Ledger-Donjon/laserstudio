@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING, Optional, Union
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -10,18 +11,19 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
+from PyQt6.QtGui import QGuiApplication
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter
+from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
-import os
+
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class StageToolbar(QToolBar):
+class StageToolBar(QToolBar):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
@@ -73,7 +75,14 @@ class StageToolbar(QToolBar):
 
         w = QPushButton(self)
         w.setText("Get Position")
-        w.clicked.connect(lambda: print(self.stage.stage.position))
+        w.setToolTip("Get current stage position and copy in clipboard")
+
+        w.clicked.connect(
+            lambda: (
+                print(pos := self.stage.position.data, "(copied in clipboard)"),
+                QGuiApplication.clipboard().setText(str(pos)), # type: ignore
+            )
+        )
         hbox.addWidget(w)
 
         if isinstance(self.stage.stage, CNCRouter):
@@ -85,6 +94,27 @@ class StageToolbar(QToolBar):
             w = QPushButton(self)
             w.setText("Reset GRBL")
             w.clicked.connect(self.stage.stage.reset_grbl)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
+        if isinstance(stage := self.stage.stage, SMC100):
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Reset")
+            w.clicked.connect(stage.reset)
+            hbox.addWidget(w)
+
+            w = QPushButton(self)
+            w.setText("Stop")
+            w.clicked.connect(stage.stop)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
+        if isinstance(stage := self.stage.stage, Corvus):
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Enable Joystick")
+            w.clicked.connect(stage.enable_joystick)
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
@@ -129,6 +159,9 @@ class StageToolbar(QToolBar):
             vbox.addLayout(hbox)
 
     def home(self):
+        """
+        Called when the home button is clicked.
+        """
         # Request a confirmation from the user
         if QMessageBox.StandardButton.Apply == QMessageBox.warning(
             None,
@@ -141,6 +174,11 @@ class StageToolbar(QToolBar):
             self.stage.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
+        """
+        Called when the move for selection is changed.
+
+        :param index: The index of the selected item.
+        """
         move_for = self.move_for_selector.itemData(index, Qt.ItemDataRole.UserRole)
         if not isinstance(move_for, MoveFor):
             return
@@ -180,10 +218,19 @@ class StageToolbar(QToolBar):
         if not pressed:
             return
         axe = button // 2
-        if axe != 2:
-            return
-        coefficient = (button % 2) * 2.0 - 1.0
-        self.joystick_axis(axe, coefficient)
+        if axe == 2:
+            coefficient = (button % 2) * 2.0 - 1.0
+            self.joystick_axis(axe, coefficient)
+        elif axe == 0 and self.keyboardbox.displacement_z_spinbox is not None:
+            # First pair of number of buttons (0 and 1) is for changing the step of Z
+            self.keyboardbox.displacement_z_spinbox.setValue(
+                self.keyboardbox.displacement_z * (2.0 if button % 2 else 0.5)
+            )
+        elif axe == 1 and self.keyboardbox.displacement_xy_spinbox is not None:
+            # Second pair of number of buttons (7 and 8) is for changing the step of XY
+            self.keyboardbox.displacement_xy_spinbox.setValue(
+                self.keyboardbox.displacement_xy * (2.0 if button % 2 else 0.5)
+            )
 
     def joystick_axis(self, axe: int, coefficient: float):
         """

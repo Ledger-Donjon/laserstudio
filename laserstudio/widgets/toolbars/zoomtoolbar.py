@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from ...widgets.viewer import Viewer
 
 
-class ZoomToolbar(QToolBar):
+class ZoomToolBar(QToolBar):
     def __init__(self, viewer: "Viewer"):
         super().__init__("Zoom control")
         self.setObjectName("toolbar-zoom")  # For settings save and restore
@@ -69,7 +69,7 @@ class ZoomToolbar(QToolBar):
         w.setIconSize(QSize(24, 24))
         w.toggled.connect(lambda x: viewer.__setattr__("follow_stage_sight", x))
         viewer.follow_stage_sight_changed.connect(w.setChecked)
-        w.setChecked(True)
+        w.setChecked(False)
         self.addWidget(w)
 
         # Position tracking label

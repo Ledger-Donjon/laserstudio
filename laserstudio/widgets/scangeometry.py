@@ -200,10 +200,10 @@ class ScanGeometry(QGraphicsItemGroup):
             assert False
 
     @property
-    def yaml(self) -> dict:
+    def settings(self) -> dict:
         return __class__.shapely_to_yaml(self.__scan_geometry)
 
-    @yaml.setter
-    def yaml(self, dict: dict):
-        self.__scan_geometry = __class__.yaml_to_shapely(dict)
+    @settings.setter
+    def settings(self, data: dict):
+        self.__scan_geometry = __class__.yaml_to_shapely(data)
         self.__update()

@@ -28,4 +28,4 @@ You can get more information on this page: {doc}`conf_file`.
 The main interface of Laser Studio is composed of 3 main parts:
 
 - The **{doc}`viewer`**, in the main window, where you have a view of the camera and many elements overlaying, such as markers, scan zones, probes and laser positions...
-- The **Toolbars** that can be detached and moved around, and that contain the main actions and settings of the software and the {doc}`instruments`.
+- The **ToolBars** that can be detached and moved around, and that contain the main actions and settings of the software and the {doc}`instruments`.

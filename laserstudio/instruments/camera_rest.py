@@ -16,7 +16,7 @@ class CameraRESTInstrument(RestInstrument, CameraInstrument):
         CameraInstrument.__init__(self, config)
         self.api_command = cast(str, config.get("api_command", "images/camera"))
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
+    def get_last_image(self) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
         try:
             response = self.get()
         except Exception:

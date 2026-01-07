@@ -1,6 +1,23 @@
 #!/usr/bin/python3
 from typing import Union, cast
 import serial.tools.list_ports
+import serial
+
+
+class ChecksumError(Exception):
+    """Thrown if a communication checksum error is detected."""
+
+    pass
+
+
+class ProtocolError(Exception):
+    """Thrown if an unexpected response from the device is received."""
+
+    pass
+
+
+class ConnectionFailure(Exception):
+    pass
 
 
 class DeviceSearchError(Exception):

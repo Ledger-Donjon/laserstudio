@@ -1,6 +1,6 @@
 from .camera import CameraInstrument
-from typing import Optional, Literal, cast
-
+from typing import Optional, cast
+import numpy
 
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
@@ -27,19 +27,14 @@ class CameraNITInstrument(CameraInstrument):
         objective = cast(float, config.get("objective", 5.0))
         self.select_objective(objective)
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "RGB"], Optional[bytes]]:
-        """
-        Retrieves the last image captured by the camera.
-
-        :return: A tuple containing the width and height of the image, the format of the image as a string,
-                and the image data as bytes. If the acquisition failed, the data will be None.
-        :rtype: tuple[int, int, Literal["L", "RGB"], Optional[bytes]]
-        """
-        # pynit.get_last_image returns Tuple [width, height, fmt, data], with data being None if
-        # acquisition failed.
-        width, height, _, data = self.pynit.get_last_image()
-
-        return width, height, "L", data
+    def capture_image(self) -> Optional[numpy.ndarray]:
+        width, height, _ , data = self.pynit.get_last_image()
+        if data is None:
+            return None
+        # get_last_image returns Tuple always 'L' for the 'mode'
+        frame = numpy.frombuffer(data, dtype=numpy.uint8)
+        frame = numpy.resize(frame, width * height)
+        return frame
 
     @property
     def gain(self) -> tuple[float, float]:
@@ -137,7 +132,7 @@ class CameraNITInstrument(CameraInstrument):
         :return: The standard deviation of the Laplacian operator on the last image.
         :rtype: float
         """
-        return self.pynit.get_laplacian_std_dev()
+        return super().laplacian_std_dev
 
     @property
     def averaged_count(self):
@@ -154,3 +149,33 @@ class CameraNITInstrument(CameraInstrument):
     def reset_counter(self):
         """Resets frame counter."""
         self.pynit.reset_counter()
+
+    @property
+    def settings(self) -> dict:
+        settings = CameraInstrument.settings.__get__(self)
+        settings["averaging"] = self.averaging
+        settings["gain"] = list(self.gain)
+        return settings
+
+
+    @settings.setter
+    def settings(self, data: dict):
+        """Import and apply settings."""
+        # Call the parent class settings setter
+        CameraInstrument.settings.__set__(self, data)
+
+        if "gain_autoset" in data:
+            self.gain_autoset()
+        if "reset_counter" in data:
+            self.reset_counter()
+            self.parameter_changed.emit("counter", self.counter)
+        if "averaging_restart" in data:
+            self.averaging_restart()
+        if "averaging" in data:
+            self.averaging = data["averaging"]
+            self.parameter_changed.emit("averaging",  data["averaging"])
+        if "gain" in data and isinstance(gain := data["gain"], list) and len(gain) == 2:
+            self.gain = tuple(gain)
+            self.parameter_changed.emit("gain", gain)
+
+

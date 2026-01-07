@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
 from typing import Optional, Any
 
@@ -10,26 +10,31 @@ from .instruments.instruments import (
     PDMInstrument,
     LaserDriverInstrument,
     CameraNITInstrument,
-    HayashiLRInstrument,
+    CameraRaptorInstrument,
+    LightInstrument,
 )
 from .instruments.stage import Vector
 from .widgets.toolbars import (
-    PictureToolbar,
-    ZoomToolbar,
-    ScanToolbar,
-    StageToolbar,
-    CameraToolbar,
-    MainToolbar,
-    MarkersToolbar,
-    PDMToolbar,
-    LaserDriverToolbar,
+    PictureToolBar,
+    ZoomToolBar,
+    ScanToolBar,
+    StageToolBar,
+    CameraToolBar,
+    CameraImageAdjustmentToolBar,
+    MainToolBar,
+    MarkersToolBar,
+    PDMToolBar,
+    LaserDriverToolBar,
     CameraNITToolBar,
-    HayashiLightToolbar,
-    FocusToolbar,
+    CameraRaptorToolBar,
+    PhotoEmissionToolBar,
+    LightToolBar,
+    FocusToolBar,
 )
 import yaml
 from .restserver.server import RestProxy
 from PIL import Image, ImageQt
+import numpy
 
 
 class LaserStudio(QMainWindow):
@@ -74,49 +79,63 @@ class LaserStudio(QMainWindow):
         group.idClicked.connect(lambda mode: self.viewer.select_mode(mode, True))
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
-        # Toolbar: Main
-        toolbar = MainToolbar(self)
+        # ToolBar: Main
+        toolbar = MainToolBar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
-        # Toolbar: Background picture
-        toolbar = PictureToolbar(self)
+        # ToolBar: Background picture
+        toolbar = PictureToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Zoom
-        toolbar = ZoomToolbar(self.viewer)
+        # ToolBar: Zoom
+        toolbar = ZoomToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Markers
-        toolbar = MarkersToolbar(self.viewer)
+        # ToolBar: Markers
+        toolbar = MarkersToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
         self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar.markers_list_toolbar)
 
-        # Toolbar: Stage positioning
+        # ToolBar: Stage positioning
         if self.instruments.stage is not None:
-            toolbar = StageToolbar(self)
+            toolbar = StageToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
-        # Toolbar: Focusing
-        if (self.instruments.stage is not None) and (
-            type(self.instruments.camera) is CameraNITInstrument
+        # ToolBar: Focusing
+        if (
+            self.instruments.stage is not None
+            and self.instruments.stage.num_axis > 2
+            and self.instruments.camera is not None
+            and self.instruments.focus_helper is not None
         ):
-            toolbar = FocusToolbar(
+            toolbar = FocusToolBar(
                 self.instruments.stage,
                 self.instruments.camera,
-                self.instruments.autofocus_helper,
+                self.instruments.focus_helper,
             )
             self.addToolBar(toolbar)
 
-        # Toolbar: Scanning zone definition and usage
-        toolbar = ScanToolbar(self)
+        # ToolBar: Scanning zone definition and usage
+        toolbar = ScanToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Toolbar: Camera Image control
+        # ToolBar: Camera Image control
         if self.instruments.camera is not None:
-            toolbar = CameraToolbar(self)
+            if isinstance(self.instruments.camera, CameraRaptorInstrument):
+                toolbar = CameraRaptorToolBar(self)
+            else:
+                toolbar = CameraToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            self.addToolBar(
+                Qt.ToolBarArea.BottomToolBarArea, CameraImageAdjustmentToolBar(self)
+            )
 
-        # Toolbar: NIT Camera Image control
+            self.photoemission_toolbar = PhotoEmissionToolBar(self)
+            self.addToolBar(
+                Qt.ToolBarArea.BottomToolBarArea, self.photoemission_toolbar
+            )
+
+        # ToolBar: NIT Camera Image control
         if isinstance(self.instruments.camera, CameraNITInstrument):
             toolbar = CameraNITToolBar(self)
             self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
@@ -124,16 +143,16 @@ class LaserStudio(QMainWindow):
         # Laser toolbars
         for i, laser in enumerate(self.instruments.lasers):
             if isinstance(laser, PDMInstrument):
-                toolbar = PDMToolbar(laser, i)
+                toolbar = PDMToolBar(laser, i)
             elif isinstance(laser, LaserDriverInstrument):
-                toolbar = LaserDriverToolbar(laser, i)
+                toolbar = LaserDriverToolBar(laser, i)
             else:
                 continue
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
-        # Hayashi Light toolbar
-        if isinstance(self.instruments.hayashi_light, HayashiLRInstrument):
-            toolbar = HayashiLightToolbar(self.instruments.hayashi_light)
+        # Light toolbar
+        if isinstance(self.instruments.light, LightInstrument):
+            toolbar = LightToolBar(self.instruments.light)
             self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
 
         # Instantiate proxy for REST command reception
@@ -150,7 +169,7 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.PIN))
-        if (stage := self.instruments.stage) is not None:
+        if (stage := self.instruments.stage) is not None and stage.num_axis > 2:
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(
                 lambda: stage.move_relative(Vector(0, 0, 1), wait=True)
@@ -202,6 +221,10 @@ class LaserStudio(QMainWindow):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
+        # Close all other windows of the application
+        for w in QGuiApplication.allWindows():
+            if w != self:
+                w.close()
         super().closeEvent(a0)
 
     def handle_go_next(self) -> dict:
@@ -251,6 +274,103 @@ class LaserStudio(QMainWindow):
             # Image has been saved at a given path, we return a 1x1 black pixel.
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(im)
+
+    def handle_camera_average(self, reset: bool):
+        """
+        Handle a Camera API request to get the average count of the camera associated to the main Stage.
+
+        :param reset: If True, reset the camera's accumulator.
+        :return: The current number of accumulated images.
+            None if no camera exists
+        """
+        # Takes the Image of the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return None
+
+        if reset:
+            camera.clear_averaged_images()
+
+        # Return the number of averaged images
+        return camera.number_of_averaged_images
+
+    def handle_camera_accumulator(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+        """
+        Handle a Camera API request to get the accumulated image of the camera.
+        Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
+
+        :param path: The path where to store the accumulator's data.
+            If None, the data is returned.
+        :return: The camera's accumulator's data if it has not been stored in a file.
+            Otherwise, an empty array.
+        """
+        # Takes the Image of the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return None
+
+        frame = camera.last_frame_accumulator
+        if frame is None:
+            return None
+
+        if path is not None:
+            numpy.save(path, frame)
+            # Image has been saved at a given path, we return an empty array.
+            return numpy.array([])
+        return frame
+
+    def handle_camera_reference(self, dotake: Optional[bool], refname: Optional[str]):
+        """
+        Handles camera reference image operations.
+
+        This method manages the camera's reference image by allowing the user to set
+        the current reference image or take a new one.
+
+        :param dotake: If True, a new reference image will be taken. If False, no new
+                       image will be taken. If None, no action is performed.
+        :param refname: The name of reference image to set as the current reference
+                       image for the camera. If None, no action is performed.
+        :returns: None if the stage sight or its associated camera is unavailable,
+                  otherwise returns the current reference image name.
+        """
+        # Takes the camera associated to the stage.
+        if (
+            self.viewer.stage_sight is None
+            or (camera := self.viewer.stage_sight.camera) is None
+        ):
+            return
+        if refname is not None:
+            camera.current_reference_image = refname
+        if dotake is not None:
+            camera.take_reference_image(dotake)
+        self.photoemission_toolbar.update_ref_image_controls()
+        return camera.current_reference_image
+
+    def handle_instrument_settings(
+        self, label: str, settings: Optional[dict]
+    ) -> Optional[dict]:
+        """
+        Handles the settings for a specific instrument identified by its label.
+        This method retrieves an instrument by its label, updates its settings if
+        provided, and returns the updated settings.
+
+        :param label: The label identifying the instrument.
+        :param settings: A dictionary containing the settings to be
+            applied to the instrument. If None, the instrument's settings
+            remain unchanged.
+        :return: A dictionary containing the updated settings of the
+            instrument if the instrument is found, otherwise None.
+        """
+        inst = self.instruments.get_instrument_with_label(label)
+        if inst is not None:
+            if settings is not None:
+                inst.settings = settings
+            return {"settings": inst.settings}
+        return None
 
     def handle_position(self, pos: Optional[list[float]]) -> dict:
         if self.instruments.stage is None:
@@ -323,12 +443,11 @@ class LaserStudio(QMainWindow):
             Memory points are defined in the configuration file, on the
             stage -> mem_points.
 
-        :param name: The name of the memory point to go to.
+        :param index: The index of the memory point to go to.
         """
-        if self.instruments.stage is None:
-            return {"pos": []}
-
-        if index < 0 or index >= len(self.instruments.stage.mem_points):
+        if self.instruments.stage is None or index not in range(
+            len(self.instruments.stage.mem_points)
+        ):
             return {"pos": []}
 
         point = self.instruments.stage.mem_points[index]
@@ -352,19 +471,27 @@ class LaserStudio(QMainWindow):
 
         # Camera settings
         if self.instruments.camera is not None:
-            data["camera"] = self.instruments.camera.yaml
+            data["camera"] = self.instruments.camera.settings
 
         # Scanning geometry
-        data["scangeometry"] = self.viewer.scan_geometry.yaml
+        data["scangeometry"] = self.viewer.scan_geometry.settings
+
+        # Lighting
+        if self.instruments.light is not None:
+            data["light"] = self.instruments.light.settings
 
         # Probes
-        data["probes"] = [probe.yaml for probe in self.instruments.probes]
+        data["probes"] = [probe.settings for probe in self.instruments.probes]
 
         # Lasers
-        data["lasers"] = [laser.yaml for laser in self.instruments.lasers]
+        data["lasers"] = [laser.settings for laser in self.instruments.lasers]
 
-        # Viewver
-        data["viewer"] = self.viewer.yaml
+        # Focus
+        if self.instruments.focus_helper is not None:
+            data["focus"] = self.instruments.focus_helper.settings
+
+        # Viewer
+        data["viewer"] = self.viewer.settings
 
         yaml.dump(data, open("settings.yaml", "w"))
 
@@ -376,28 +503,38 @@ class LaserStudio(QMainWindow):
         # Camera settings (maybe missing from settings)
         camera = data.get("camera")
         if (self.instruments.camera is not None) and (camera is not None):
-            self.instruments.camera.yaml = camera
+            self.instruments.camera.settings = camera
             if self.viewer.stage_sight is not None:
                 self.viewer.stage_sight.distortion = (
                     self.instruments.camera.correction_matrix
                 )
 
-        # Scanning geometry
+        # Lighting system settings
+        lighting = data.get("lighting")
+        if (self.instruments.light is not None) and (lighting is not None):
+            self.instruments.light.settings = lighting
+
+        # Scanning geometr
         geometry = data.get("scangeometry")
         if geometry is not None:
-            self.viewer.scan_geometry.yaml = geometry
+            self.viewer.scan_geometry.settings = geometry
 
         # Probes
         probes = data.get("probes", [])
         for pdata, probe in zip(probes, self.instruments.probes):
-            probe.yaml = pdata
+            probe.settings = pdata
 
         # Lasers
         lasers = data.get("lasers", [])
         for pdata, laser in zip(lasers, self.instruments.lasers):
-            laser.yaml = pdata
+            laser.settings = pdata
 
-        # Viewver's configuration
+        # Focus
+        focus = data.get("focus")
+        if self.instruments.focus_helper is not None and focus is not None:
+            self.instruments.focus_helper.settings = focus
+
+        # Viewer's configuration
         viewer = data.get("viewer")
         if viewer is not None:
-            self.viewer.yaml = viewer
+            self.viewer.settings = viewer

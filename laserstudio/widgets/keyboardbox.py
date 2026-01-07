@@ -43,6 +43,7 @@ class KeyboardBox(QGroupBox):
         vbox.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vbox)
 
+        self.displacement_xy_spinbox = self.displacement_z_spinbox = None
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
         if num_axis > 0:
@@ -57,11 +58,11 @@ class KeyboardBox(QGroupBox):
             grid.setColumnStretch(1, 1)
             grid.setColumnStretch(3, 1)
 
-            w = QDoubleSpinBox()
+            self.displacement_xy_spinbox = w = QDoubleSpinBox()
             w.setMinimum(0)
             w.setMaximum(1_000_000)
             w.setDecimals(1)
-            w.setValue(self.displacement_z)
+            w.setValue(self.displacement_xy)
             w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
             w.setSuffix("\xa0µm")
             w.setSingleStep(5)
@@ -87,7 +88,7 @@ class KeyboardBox(QGroupBox):
             grid.addWidget(w, 2, 4, alignment=Qt.AlignmentFlag.AlignCenter)
             grid.setColumnStretch(4, 1)
 
-            w = QDoubleSpinBox()
+            self.displacement_z_spinbox = w = QDoubleSpinBox()
             w.setMinimum(0)
             w.setMaximum(1000000)
             w.setDecimals(1)
