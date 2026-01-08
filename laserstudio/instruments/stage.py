@@ -300,6 +300,8 @@ class StageInstrument(Instrument):
                 backlash[i] = backlash[i] / factors[i]
             self.stage.move_to(result - backlash, wait=True)
         self.stage.move_to(result, wait=wait)
+        if isinstance(self.stage, Corvus):
+            self.stage.enable_joystick()
         self.mutex.unlock()
         _ = self.position
 
