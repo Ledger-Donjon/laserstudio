@@ -1,5 +1,6 @@
 import os
 from typing import TYPE_CHECKING, Optional, Union
+import logging
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
     QPushButton,
@@ -12,10 +13,9 @@ from PyQt6.QtWidgets import (
     QDockWidget,
 )
 from PyQt6.QtGui import QGuiApplication, QFont
-from pystages import Vector
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus
+from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus, Vector
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 
@@ -60,14 +60,25 @@ class StageDockWidget(QDockWidget):
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
-        self.mem_point_selector = box = QComboBox()
-        for i in range(len(self.stage.mem_points)):
-            box.addItem(f"Go to M{i}")
-        box.activated.connect(
-            lambda i: self.stage.move_to(self.stage.mem_points[i], wait=True)
-        )
-        hbox.addWidget(box)
-        box.setHidden(len(self.stage.mem_points) == 0)
+        if len(self.stage.mem_points) > 0:
+            hbox2 = QHBoxLayout()
+            hbox.addLayout(hbox2)
+            self.mem_point_selector = box = QComboBox()
+            for i in range(len(self.stage.mem_points)):
+                box.addItem(f"M{i}")
+                # Tooltip of the memory point's position
+                box.setItemData(
+                    i,
+                    f"M{i}:"
+                    + ", ".join(
+                        [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data]  # type: ignore
+                    ),
+                    Qt.ItemDataRole.ToolTipRole,
+                )
+            hbox2.addWidget(box)
+            hbox2.addWidget(w := QPushButton(self))
+            w.setText("Go")
+            w.clicked.connect(self.go_to_mem_point_clicked)
 
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
@@ -170,6 +181,18 @@ class StageDockWidget(QDockWidget):
         vbox.addWidget(self.position)
 
         vbox.addStretch(1000)
+
+    def go_to_mem_point_clicked(self):
+        """
+        Called when the go to memory point button is clicked.
+        """
+        index = self.mem_point_selector.currentIndex()
+        if index < 0 or index >= len(self.stage.mem_points):
+            logging.getLogger("laserstudio").error(
+                f"Invalid memory point index: {index}"
+            )
+            return
+        self.stage.move_to(self.stage.mem_points[index], wait=True)
 
     def update_position(self, position: Vector):
         self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in position.data]))
