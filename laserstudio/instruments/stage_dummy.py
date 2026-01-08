@@ -1,4 +1,4 @@
-from pystages import Stage, Vector
+from .stage import Stage, Vector
 from typing import cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
