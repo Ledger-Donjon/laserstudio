@@ -3,7 +3,17 @@ from typing import Optional, cast
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from pystages.exceptions import ProtocolError
-from pystages import Corvus, CNCRouter, Stage, Vector, Autofocus, Tic, TicDirection
+from pystages import (
+    Corvus,
+    CNCRouter,
+    Stage,
+    Vector,
+    Autofocus,
+    Tic,
+    TicDirection,
+    SMC100,
+    PI,
+)
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
@@ -19,6 +29,8 @@ __all__ = [
     "ProtocolError",
     "Corvus",
     "CNCRouter",
+    "SMC100",
+    "PI",
     "Stage",
     "Vector",
     "Autofocus",
