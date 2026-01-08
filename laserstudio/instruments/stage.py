@@ -2,15 +2,12 @@ import logging
 from typing import Optional, cast
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
-import logging
 from pystages.exceptions import ProtocolError
 from pystages import Corvus, CNCRouter, Stage, Vector, Autofocus, Tic, TicDirection
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
 from .instrument import Instrument
-from typing import Optional, cast
-from enum import Enum, auto
 
 __all__ = [
     "StageInstrument",
