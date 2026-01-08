@@ -2,12 +2,35 @@ import logging
 from typing import Optional, cast
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
-from pystages import Corvus, CNCRouter, PI, SMC100, Vector
 from pystages.exceptions import ProtocolError
-from .list_serials import get_serial_device, DeviceSearchError
+from pystages import Corvus, CNCRouter, Stage, Vector, Autofocus, Tic, TicDirection
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
+from .list_serials import get_serial_device, DeviceSearchError
 from .instrument import Instrument
+
+__all__ = [
+    "StageInstrument",
+    "MoveFor",
+    "Autofocus",
+    "Tic",
+    "TicDirection",
+    "Vector",
+    "ProtocolError",
+    "Corvus",
+    "CNCRouter",
+    "Stage",
+    "Vector",
+    "Autofocus",
+    "Tic",
+    "TicDirection",
+    "StageRest",
+    "StageDummy",
+    "get_serial_device",
+    "DeviceSearchError",
+    "Instrument",
+    "MoveFor",
+]
 
 
 class MoveFor(object):
@@ -274,6 +297,8 @@ class StageInstrument(Instrument):
                 backlash[i] = backlash[i] / factors[i]
             self.stage.move_to(result - backlash, wait=True)
         self.stage.move_to(result, wait=wait)
+        if isinstance(self.stage, Corvus):
+            self.stage.enable_joystick()
         self.mutex.unlock()
         _ = self.position
 

@@ -1,28 +1,13 @@
-from PyQt6.QtCore import Qt, QSize, QMargins
-from PyQt6.QtGui import QIcon, QPainter
-from PyQt6.QtWidgets import (
-    QToolBar,
-    QPushButton,
-    QLabel,
-    QGroupBox,
-    QMessageBox,
-    QWidget,
-    QVBoxLayout,
-    QMenu,
-    QDockWidget,
-    QFormLayout,
-    QSpinBox,
-    QDoubleSpinBox,
-    QCheckBox,
-)
-from ...utils.colors import LedgerColors
-from ...utils.util import colored_image, ChartViewWithVMarker
-from ..coloredbutton import ColoredPushButton
-from ...instruments.camera import CameraInstrument
-from ...instruments.stage import StageInstrument
-from ...instruments.focus import FocusInstrument, FocusSearchSettings
-from PyQt6.QtCharts import QLineSeries, QChart
+from time import sleep
+from PyQt6.QtCore import Qt, QSize, QThread
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QToolBar, QPushButton
+import numpy as np
+import scipy.signal
+from laserstudio.instruments.camera_nit import CameraNITInstrument
+from laserstudio.utils.util import colored_image
 from typing import Optional
+from ...instruments.stage import Autofocus, Vector
 
 
 class FocusSettingsWidget(QGroupBox):

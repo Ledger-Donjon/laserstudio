@@ -1,4 +1,4 @@
-from .stage import StageInstrument
+from .stage import StageInstrument, Autofocus, Vector
 from .list_serials import DeviceSearchError
 from .camera import CameraInstrument
 from .camera_rest import CameraRESTInstrument

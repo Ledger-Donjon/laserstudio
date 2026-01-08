@@ -1,4 +1,4 @@
-from pystages import Tic, TicDirection, Vector
+from .stage import Tic, TicDirection, Vector
 from .instrument import Instrument
 
 

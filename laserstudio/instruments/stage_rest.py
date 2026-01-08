@@ -1,4 +1,4 @@
-from pystages import Stage, Vector
+from .stage import Stage, Vector
 from .rest_instrument import RestInstrument
 from typing import cast
 
