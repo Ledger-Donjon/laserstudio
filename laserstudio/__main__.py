@@ -14,10 +14,12 @@ from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 from .laserstudio import LaserStudio
 from .utils.util import resource_path
 from .utils.colors import LedgerPalette, LedgerStyle
+from .instruments.list_serials import list_devices
 
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("laserstudio")
+
 
 def main():
     app = QApplication(sys.argv)
@@ -32,7 +34,17 @@ def main():
         required=False,
         default=os.path.join(os.getcwd(), "config.yaml"),
     )
+    parser.add_argument(
+        "--list-devices",
+        action="store_true",
+        required=False,
+        default=False,
+    )
     args = parser.parse_args()
+
+    if args.list_devices:
+        list_devices()
+        return 0
 
     if args.log is not None:
         try:
@@ -63,7 +75,9 @@ def main():
     except FileNotFoundError:
         logger.error(f"Configuration file {args.config} not found")
     except Exception as e:
-        logger.error(f"Encountered error while opening configuration file {args.config}: {e}")
+        logger.error(
+            f"Encountered error while opening configuration file {args.config}: {e}"
+        )
 
     yaml_config = None
     if stream is not None:
@@ -71,7 +85,9 @@ def main():
         try:
             yaml_config = yaml.safe_load(stream)
         except Exception as e:
-            logger.error(f"Encountered error while loading configuration file {args.config}: {e}")
+            logger.error(
+                f"Encountered error while loading configuration file {args.config}: {e}"
+            )
 
         # Check if the configuration file is valid
         if type(yaml_config) is not dict:
