@@ -238,7 +238,7 @@ class PDMDockWidget(QDockWidget):
         advanced_groupbox.setToolTip("Advanced features of the PDM laser")
         advanced_groupbox.setCheckable(True)
         advanced_groupbox.setChecked(False)
-        advanced_groupbox.setVisible(False)
+        # advanced_groupbox.setVisible(False)
         grid.addWidget(advanced_groupbox, row, 0, 1, 2)
         adv_row = 0
         row += 1
@@ -278,7 +278,7 @@ class PDMDockWidget(QDockWidget):
         advanced_layout.addWidget(w, adv_row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
         adv_row += 1
 
-        self.reload_parameters()
+        self.reload_parameters(all_parameters=True)
         self.laser.parameter_changed.connect(self.reload_parameters)
 
     def open_shutter(self, b):
@@ -352,9 +352,9 @@ class PDMDockWidget(QDockWidget):
             self.refresh_interface("offset_current", self.laser.offset_current)
             self.refresh_interface("interlock_status", self.laser.interlock_status)
             self.refresh_interface("on_off", self.laser.on_off)
+            self.refresh_interface("temperature", self.laser.temperature)
             if all_parameters:
                 self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
-                self.refresh_interface("temperature", self.laser.temperature)
                 self.refresh_interface("sync_source", self.laser.sync_source)
                 self.refresh_interface("delay_line_type", self.laser.delay_line_type)
                 self.refresh_interface("pulse_width", self.laser.pulse_width)
