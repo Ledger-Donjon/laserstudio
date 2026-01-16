@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QTimer, QVariant, Qt
-from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource
+from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource, InterlockStatus
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
@@ -79,13 +79,62 @@ class PDMInstrument(LaserInstrument):
             QTimer.singleShot(value, Qt.TimerType.CoarseTimer, self.refresh_pdm)
 
     @property
-    def interlock_status(self) -> bool:
+    def interlock_status(self) -> InterlockStatus:
         """Get the laser interlock status, emits a signal when it changes"""
         state = self.pdm.interlock_status
         if state != self._interlock_status:
             self._interlock_status = state
             self.parameter_changed.emit("interlock_status", QVariant(state))
         return state
+
+    @property
+    def temperature(self) -> float:
+        return self.pdm.temperature
+
+    @property
+    def frequency(self) -> float:
+        return self.pdm.frequency
+
+    @frequency.setter
+    def frequency(self, value: float):
+        self.pdm.frequency = value
+        self.pdm.apply()
+
+    @property
+    def delay(self) -> float:
+        return self.pdm.delay
+
+    @delay.setter
+    def delay(self, value: float):
+        self.pdm.delay = value
+        self.pdm.apply()
+
+    @property
+    def pulse_width(self) -> float:
+        return self.pdm.pulse_width
+
+    @pulse_width.setter
+    def pulse_width(self, value: float):
+        self.pdm.pulse_width = value
+        self.pdm.apply()
+    
+    @property
+    def sync_source(self) -> SyncSource:
+        return self.pdm.sync_source
+
+    @sync_source.setter
+    def sync_source(self, value: SyncSource):
+        self.pdm.sync_source = value
+        self.pdm.apply()
+
+    @property
+    def delay_line_type(self) -> DelayLineType:
+        return self.pdm.delay_line_type
+
+    @delay_line_type.setter
+    def delay_line_type(self, value: DelayLineType):
+        self.pdm.delay_line_type = value
+        self.pdm.apply()
 
     @property
     def on_off(self) -> bool:
@@ -149,7 +198,7 @@ class PDMInstrument(LaserInstrument):
         super_settings = super().settings
         super_settings.update(
             {
-                "interlock_status": self.interlock_status,
+                "interlock_status": "Open" if self.interlock_status == InterlockStatus.OPEN else "Closed",
                 "refresh_interval_ms": self.refresh_interval,
             }
         )

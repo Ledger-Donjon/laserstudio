@@ -7,10 +7,12 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QDoubleSpinBox,
     QDockWidget,
+    QComboBox,
+    QGroupBox,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
-from ...instruments.pdm import PDMInstrument
+from ...instruments.pdm import PDMInstrument, SyncSource, DelayLineType, InterlockStatus
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..coloredbutton import ColoredPushButton
@@ -163,6 +165,20 @@ class PDMDockWidget(QDockWidget):
         grid.addWidget(w, row, 1)
         row += 1
 
+
+        # Laser's temperature
+        grid.addWidget(
+            QLabel("Temperature:"),
+            row,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading,
+        )
+        self.temperature_label = w = QLabel("Unknown")
+        grid.addWidget(
+            w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
+        )
+        row += 1
+
         # Laser interlock status
         grid.addWidget(
             QLabel("Interlock status:"),
@@ -175,6 +191,92 @@ class PDMDockWidget(QDockWidget):
             w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
         )
         row += 1
+
+        # Pulse width and delay line type
+        grid.addWidget(
+            QLabel("Pulse width and delay:"),
+            row,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading,
+        )
+        self.delay_line_type_combobox = w = QComboBox()
+        w.addItem("From external (SMA connector)", DelayLineType.NONE)
+        w.addItem("From internal parameters", DelayLineType.INTERNAL)
+        w.currentIndexChanged.connect(
+            lambda: self.laser.__setattr__("delay_line_type", self.delay_line_type_combobox.currentData())
+        )
+        grid.addWidget(w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        row += 1
+
+        # Pulse width
+        grid.addWidget(QLabel("Pulse width:"), row, 0)
+        w = self.pulse_width_input = ReturnSpinBox()
+        w.setMinimum(0)
+        w.setMaximum(1275000)
+        w.setSuffix("\xa0ps")
+        w.returnPressed.connect(
+            lambda: self.laser.__setattr__("pulse_width", self.pulse_width_input.value())
+        )
+        grid.addWidget(w, row, 1)
+        row += 1
+
+        # Delay
+        grid.addWidget(QLabel("Delay:"), row, 0)
+        w = self.delay_input = ReturnSpinBox()
+        w.setMinimum(0)
+        w.setMaximum(15000)
+        w.setSuffix("\xa0ps")
+        w.returnPressed.connect(
+            lambda: self.laser.__setattr__("delay", self.delay_input.value())
+        )
+        grid.addWidget(w, row, 1)
+        row += 1
+
+        advanced_groupbox = QGroupBox("Advanced features")
+        self.advanced_layout = advanced_layout = QGridLayout()
+        advanced_groupbox.setLayout(advanced_layout)
+        advanced_groupbox.setToolTip("Advanced features of the PDM laser")
+        advanced_groupbox.setCheckable(True)
+        advanced_groupbox.setChecked(False)
+        advanced_groupbox.setVisible(False)
+        grid.addWidget(advanced_groupbox, row, 0, 1, 2)
+        adv_row = 0
+        row += 1
+        # After this, all "advanced" widgets use advanced_layout and adv_row
+        # Synchronization source
+        advanced_layout.addWidget(
+            QLabel("Synchronization source:"),
+            adv_row,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading,
+        )
+        self.sync_source_combobox = w = QComboBox()
+        w.addItem("External TTL/LVTTL", SyncSource.EXTERNAL_TTL_LVTTL)
+        w.addItem("External LVDS", SyncSource.EXTERNAL_LVDS)
+        w.addItem("Internal", SyncSource.INTERNAL)
+        w.currentIndexChanged.connect(
+            lambda: self.laser.pdm.__setattr__("sync_source", self.sync_source_combobox.currentData())
+        )
+        advanced_layout.addWidget(w, adv_row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        adv_row += 1
+
+        # Frequency
+        advanced_layout.addWidget(QLabel("Frequency (if internal synchronization):"), adv_row, 0)
+        w = self.frequency_input = ReturnSpinBox()
+        w.setMinimum(1)
+        w.setMaximum(250 * 10**6)  # 250 MHz
+        w.setSuffix("\xa0Hz")
+        w.returnPressed.connect(
+            lambda: self.laser.__setattr__("frequency", self.frequency_input.value())
+        )
+        advanced_layout.addWidget(w, adv_row, 1)
+        adv_row += 1
+
+        # Apply button
+        w = QPushButton("Apply")
+        w.clicked.connect(lambda: self.laser.pdm.apply())
+        advanced_layout.addWidget(w, adv_row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        adv_row += 1
 
         self.reload_parameters()
         self.laser.parameter_changed.connect(self.reload_parameters)
@@ -198,14 +300,48 @@ class PDMDockWidget(QDockWidget):
             self.offset_current_input.setValue(value)
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
-            self.interlock_label.setText("Opened" if value else "Closed")
+            self.interlock_label.setText("Open" if value == InterlockStatus.OPEN else "Closed")
         elif name == "refresh_interval_ms" and value is not None:
             self.refresh_interval_input.blockSignals(True)
             self.refresh_interval_input.setValue(value)
             self.refresh_interval_input.reset()
             self.refresh_interval_input.blockSignals(False)
+        elif name == "temperature":
+            self.temperature_label.setText(f"{value:.2f}°C")
+        elif name == "sync_source":
+            self.sync_source_combobox.blockSignals(True)
+            assert isinstance(value, SyncSource)
+            match value:
+                case SyncSource.EXTERNAL_TTL_LVTTL:
+                    self.sync_source_combobox.setCurrentIndex(0)
+                case SyncSource.EXTERNAL_LVDS:
+                    self.sync_source_combobox.setCurrentIndex(1)
+                case SyncSource.INTERNAL:
+                    self.sync_source_combobox.setCurrentIndex(2)
+            self.sync_source_combobox.blockSignals(False)
+        elif name == "delay_line_type":
+            self.delay_line_type_combobox.blockSignals(True)
+            assert isinstance(value, DelayLineType)
+            match value:
+                case DelayLineType.NONE:
+                    self.delay_line_type_combobox.setCurrentIndex(0)
+                case DelayLineType.INTERNAL:
+                    self.delay_line_type_combobox.setCurrentIndex(1)
+            self.delay_line_type_combobox.blockSignals(False)
+        elif name == "pulse_width":
+            self.pulse_width_input.blockSignals(True)
+            self.pulse_width_input.setValue(value)
+            self.pulse_width_input.blockSignals(False)
+        elif name == "delay":
+            self.delay_input.blockSignals(True)
+            self.delay_input.setValue(value)
+            self.delay_input.blockSignals(False)
+        elif name == "frequency":
+            self.frequency_input.blockSignals(True)
+            self.frequency_input.setValue(value)
+            self.frequency_input.blockSignals(False)
 
-    def reload_parameters(self, param_name: str = "", value: Any = None):
+    def reload_parameters(self, param_name: str = "", value: Any = None, all_parameters: bool = False):
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
         self.sweep_freq_input.setValue(self.laser.sweep_freq)
@@ -215,5 +351,12 @@ class PDMDockWidget(QDockWidget):
             self.refresh_interface("current_percentage", self.laser.current_percentage)
             self.refresh_interface("offset_current", self.laser.offset_current)
             self.refresh_interface("interlock_status", self.laser.interlock_status)
-            self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
             self.refresh_interface("on_off", self.laser.on_off)
+            if all_parameters:
+                self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
+                self.refresh_interface("temperature", self.laser.temperature)
+                self.refresh_interface("sync_source", self.laser.sync_source)
+                self.refresh_interface("delay_line_type", self.laser.delay_line_type)
+                self.refresh_interface("pulse_width", self.laser.pulse_width)
+                self.refresh_interface("delay", self.laser.delay)
+                self.refresh_interface("frequency", self.laser.frequency)
