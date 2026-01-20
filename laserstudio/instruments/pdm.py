@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QTimer, QVariant, Qt
-from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource
+from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource, InterlockStatus
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
@@ -79,9 +79,9 @@ class PDMInstrument(LaserInstrument):
             QTimer.singleShot(value, Qt.TimerType.CoarseTimer, self.refresh_pdm)
 
     @property
-    def interlock_status(self) -> bool:
+    def interlock_status(self) -> str:
         """Get the laser interlock status, emits a signal when it changes"""
-        state = self.pdm.interlock_status
+        state = "Open" if (self.pdm.interlock_status == InterlockStatus.OPEN) else "Closed"
         if state != self._interlock_status:
             self._interlock_status = state
             self.parameter_changed.emit("interlock_status", QVariant(state))

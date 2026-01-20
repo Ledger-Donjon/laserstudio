@@ -58,10 +58,10 @@ class LaserInstrument(ProbeInstrument):
 
     def go_next(self) -> dict[str, float]:
         self._sweep_iteration += 1
-        if self._sweep_iteration % self.sweep_freq == 0:
-            self.current_percentage = uniform(self.sweep_min, self.sweep_max)
-            return {"current_percentage": self.current_percentage}
-        return {}
+        # if self._sweep_iteration % self.sweep_freq == 0:
+        self.current_percentage = uniform(self.sweep_min, self.sweep_max)
+        return {"current_percentage": self.current_percentage}
+        # return {}
 
     @property
     def settings(self):

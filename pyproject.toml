@@ -45,6 +45,7 @@ version = "0.0.0"
 Documentation = "https://laserstudio.readthedocs.io/"
 
 [project.scripts]
+chipscan = 'laserstudio.utils.chipscan.__main__:main'
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 laserstudio_generate_config_cli = 'laserstudio.config_generator:main_cli'

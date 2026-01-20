@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QGuiApplication, QFont
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus, Vector
+from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus, PI, Vector
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 
@@ -99,15 +99,23 @@ class StageDockWidget(QDockWidget):
         )
         hbox.addWidget(w)
 
-        if isinstance(self.stage.stage, CNCRouter):
+        if isinstance(stage := self.stage.stage, PI):
             hbox = QHBoxLayout()
             w = QPushButton(self)
             w.setText("Set Origin")
-            w.clicked.connect(self.stage.stage.set_origin)
+            w.clicked.connect(stage.set_origin)
+            hbox.addWidget(w)
+            vbox.addLayout(hbox)
+
+        if isinstance(stage := self.stage.stage, CNCRouter):
+            hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Set Origin")
+            w.clicked.connect(stage.set_origin)
             hbox.addWidget(w)
             w = QPushButton(self)
             w.setText("Reset GRBL")
-            w.clicked.connect(self.stage.stage.reset_grbl)
+            w.clicked.connect(stage.reset_grbl)
             hbox.addWidget(w)
             vbox.addLayout(hbox)
 
@@ -126,6 +134,10 @@ class StageDockWidget(QDockWidget):
 
         if isinstance(stage := self.stage.stage, Corvus):
             hbox = QHBoxLayout()
+            w = QPushButton(self)
+            w.setText("Set Origin")
+            w.clicked.connect(stage.set_origin)
+            hbox.addWidget(w)
             w = QPushButton(self)
             w.setText("Enable Joystick")
             w.clicked.connect(stage.enable_joystick)

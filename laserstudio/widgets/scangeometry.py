@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Union
+from typing import Optional, Any
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
@@ -52,7 +52,7 @@ class ScanGeometry(QGraphicsItemGroup):
             del child
         children = []
 
-    def __update_scan_geometry(self):
+    def __update_scan_geometry(self) -> list[BaseGeometry]:
         """Update the scan geometry."""
         overall_geometry = MultiPolygon()
         for polygon, add in self.scan_geometries:
@@ -67,29 +67,33 @@ class ScanGeometry(QGraphicsItemGroup):
                 overall_geometry -= polygon
         self.__scan_geometry = overall_geometry
         return (
-            overall_geometry.geoms
+            list(overall_geometry.geoms)
             if isinstance(overall_geometry, MultiPolygon)
             else [overall_geometry]
         )
 
-    def __update(self):
+    def __update(self, geoms: None | Polygon | MultiPolygon | GeometryCollection = None):
         """
         Rebuild the scene item which displays the scanning geometry.
         """
-        geoms = self.__update_scan_geometry()
-
+        _geoms: list[Polygon] | list[BaseGeometry] = []
+        if geoms is not None:
+            if isinstance(geoms, Polygon):
+                _geoms = [geoms]
+            elif isinstance(geoms, MultiPolygon):
+                _geoms = list(geoms.geoms)
+        else:
+            _geoms = self.__update_scan_geometry()
+        
         self.__clear_scan_geometry_items()
-
-        for geom in geoms:
-            # print("TREATING geom", geom)
+        for geom in _geoms:
             if not isinstance(geom, Polygon):
-                # print("geom is not a Polygon")
+                logging.getLogger("laserstudio").warning(f"geom is not a Polygon: {geom=}, {type(geom)=}...")
                 continue
             if not geom.is_valid:
-                # print("geom is not valid")
+                logging.getLogger("laserstudio").warning(f"geom is not valid: {geom=}, {geom.is_valid=}")
                 continue
             item = ScanGeometry.__poly_to_path_item(geom)
-            # print("GEOM is now an item", item)
             self.__scan_geometry_items.addToGroup(item)
 
         self.scan_path_generator.geometry = self.__scan_geometry
@@ -170,50 +174,54 @@ class ScanGeometry(QGraphicsItemGroup):
 
     @staticmethod
     def shapely_to_yaml(
-        geometry: Union[BaseGeometry, Polygon, MultiPolygon, GeometryCollection],
-    ) -> dict:
+        geometry: BaseGeometry | Polygon | MultiPolygon | GeometryCollection,
+    ) -> dict[str, Any]:
         """
         :return: A dict for YAML serialization.
         :g: Any shapely geometry object.
         """
         if isinstance(geometry, Polygon):
-            res = dict()
+            res: dict[str, list[dict[str, float]] | list[list[dict[str, float]]]] = {}
             res["exterior"] = list(
                 {"x": p[0], "y": p[1]} for p in geometry.exterior.coords
             )
-            interiors = []
-            res["interiors"] = interiors
+            interiors: list[list[dict[str, float]]] = []
             for interior in geometry.interiors:
                 interiors.append(list({"x": p[0], "y": p[1]} for p in interior.coords))
+            res["interiors"] = interiors
             return {"polygon": res}
         elif isinstance(geometry, MultiPolygon):
-            res = []
+            res_multi: list[dict[str, Any]] = []
             for poly in geometry.geoms:
-                res.append(__class__.shapely_to_yaml(poly))
-            return {"multipolygon": res}
+                res_multi.append(__class__.shapely_to_yaml(poly))
+            return {"multipolygon": res_multi}
         elif isinstance(geometry, GeometryCollection):
             # We have this type when the zone is empty.
             return {"geometrycollection": None}
-        elif isinstance(geometry, BaseGeometry):
-            # this should not happen.
-            logging.getLogger("laserstudio").error(
-                "Shapely geometry is not a Polygon, MultiPolygon, or GeometryCollection."
+        else:
+            # This should not happen.
+            logging.getLogger("laserstudio").warning(
+                f"Shapely geometry is not a Polygon, MultiPolygon, or GeometryCollection: {geometry=}, {type(geometry)=}..."
             )
             pass
         # If this line is reached, some shapely type handling may be missing.
         assert False
 
     @staticmethod
-    def yaml_to_shapely(yaml: dict) -> Union[Polygon, MultiPolygon, GeometryCollection]:
+    def yaml_to_shapely(yaml: dict[str, Any]) -> Polygon | MultiPolygon | GeometryCollection:
         assert len(yaml) == 1
         type_, value = next(iter(yaml.items()))
+        logging.getLogger("laserstudio").debug(f"Scan Geometry YAML to Shapely: {type_=}, {value=}...")
         if type_ == "polygon":
             exterior = list((float(p["x"]), float(p["y"])) for p in value["exterior"])
-            interiors = []
+            interiors: list[list[tuple[float, float]]] = []
             for value_sub in value["interiors"]:
                 interior = list((float(p["x"]), float(p["y"])) for p in value_sub)
                 interiors.append(interior)
-            return Polygon(shell=exterior, holes=interiors)
+            logging.getLogger("laserstudio").debug(f"Scan Geometry YAML to Shapely: Polygon: {exterior=}, {interiors=}...")
+            polygon = Polygon(shell=exterior, holes=interiors)
+            logging.getLogger("laserstudio").debug(f"Scan Geometry YAML to Shapely: Polygon: {polygon}...")
+            return polygon
         elif type_ == "multipolygon":
             polys = []
             for value_sub in value:
@@ -222,13 +230,16 @@ class ScanGeometry(QGraphicsItemGroup):
         elif type_ == "geometrycollection":
             return GeometryCollection()
         else:
+            # If this line is reached, some shapely type handling may be missing.
             assert False
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         return __class__.shapely_to_yaml(self.__scan_geometry)
 
     @settings.setter
-    def settings(self, data: dict):
-        self.__scan_geometry = __class__.yaml_to_shapely(data)
-        self.__update()
+    def settings(self, data: dict[str, Any]):
+        logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {data}...")
+        geoms = __class__.yaml_to_shapely(data)
+        logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {self.__scan_geometry}...")
+        self.__update(geoms)
