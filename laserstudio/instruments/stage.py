@@ -95,6 +95,7 @@ class StageInstrument(Instrument):
 
         self.shear = cast(list[float], config.get("shear", [0.0, 0.0]))
 
+
         dev = config.get("dev")
         if dev == "":
             dev = None
@@ -192,6 +193,13 @@ class StageInstrument(Instrument):
             f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
         )
 
+        # Offset origin
+        self.offset_origin: list[float] = cast(list[float], config.get("offset_origin", [0.0] * self.num_axis))
+        assert type(self.offset_origin) is list and len(self.offset_origin) == self.num_axis, (
+            f"Offset origin {self.offset_origin} is not a list of {self.num_axis} numbers. "
+            "Please check your configuration file"
+        )
+
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
         # Indicate
@@ -217,7 +225,8 @@ class StageInstrument(Instrument):
         factors = self.unit_factors
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
-            position[i] = position[i] * factors[i]
+            position[i] = position[i] * factors[i] - self.offset_origin[i]
+
         self.position_changed.emit(position)
         return position
 
@@ -275,6 +284,7 @@ class StageInstrument(Instrument):
             If there is a configuration of z-offsetting for each move, it will be done and
             intermediates moves are blocking (eg, waiting to be done).
         """
+        logging.getLogger("laserstudio").debug(f"Moving to {position}...")
         if self.guardrail_enabled:
             displacement = self.position - position
             for i, displacement in enumerate(displacement.data):
@@ -283,12 +293,18 @@ class StageInstrument(Instrument):
                         f"Do not move!! One axis ({i}) moves further than {self.guardrail}\xa0µm: {displacement}\xa0µm"
                     )
                     return
+
+        result = Vector(dim=len(position))
+
         # Move to actual destination
         factors = self.unit_factors
-        result = Vector(dim=len(position))
         assert type(factors) is list and len(factors) == len(position)
+        logging.getLogger("laserstudio").debug(f"Offset origin: {self.offset_origin}...")
+        logging.getLogger("laserstudio").debug(f"Unit factors: {factors}...")
+
         for i in range(len(position)):
-            result[i] = position[i] / factors[i]
+            result[i] = (position[i] + self.offset_origin[i]) / factors[i]
+        logging.getLogger("laserstudio").debug(f"Position after unit factors and offset origin: {result}...")
 
         # Apply shearing transformation
         x = result[0]
@@ -296,6 +312,7 @@ class StageInstrument(Instrument):
 
         result[0] = x + self.shear[0] * y
         result[1] = y + self.shear[1] * x
+        logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
 
         self.mutex.lock()
         if (
@@ -321,3 +338,35 @@ class StageInstrument(Instrument):
         :return: Get the number of axis of the stage
         """
         return self.stage.num_axis
+
+    def set_origin(self, desired_current_position: Vector):
+        """Set an offset to the origin of the stage,
+        in order that current position corresponds to the desired position
+        given in parameters."""
+        self.offset_origin = [0.0] * self.num_axis
+        self.offset_origin = (self.position - desired_current_position).data
+        logging.getLogger("laserstudio").debug(f"Offset origin set to {self.offset_origin}")
+        # self.stage.set_origin()
+
+    @property
+    def settings(self):
+        """
+        Return a dict of settings for the stage.
+        """
+        super_settings = super().settings
+        super_settings["offset_origin"] = self.offset_origin
+        logging.getLogger("laserstudio").debug(f"Stage settings: {super_settings}")
+        return super_settings
+
+    @settings.setter
+    def settings(self, data: dict):
+        """
+        Set the settings of the stage.
+        """
+        Instrument.settings.__set__(self, data)
+        if "offset_origin" in data:
+            assert type(data["offset_origin"]) is list and len(data["offset_origin"]) == self.num_axis, (
+                f"Offset origin {data['offset_origin']} is not a list of {self.num_axis} numbers. "
+                "Please check your settings file"
+            )
+            self.offset_origin = cast(list[float], data["offset_origin"])

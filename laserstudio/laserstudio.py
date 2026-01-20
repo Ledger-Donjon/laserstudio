@@ -13,6 +13,7 @@ from .instruments.instruments import (
     CameraRaptorInstrument,
     LightInstrument,
 )
+import logging
 import yaml
 from PIL import Image, ImageQt
 import numpy
@@ -512,6 +513,10 @@ class LaserStudio(QMainWindow):
         # Viewer
         data["viewer"] = self.viewer.settings
 
+        # Stage
+        if self.instruments.stage is not None:
+            data["stage"] = self.instruments.stage.settings
+
         yaml.dump(data, open("settings.yaml", "w"))
 
     def reload_settings(self):
@@ -533,8 +538,9 @@ class LaserStudio(QMainWindow):
         if (self.instruments.light is not None) and (lighting is not None):
             self.instruments.light.settings = lighting
 
-        # Scanning geometr
+        # Scanning geometry
         geometry = data.get("scangeometry")
+        logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {geometry}...")
         if geometry is not None:
             self.viewer.scan_geometry.settings = geometry
 
@@ -557,3 +563,8 @@ class LaserStudio(QMainWindow):
         viewer = data.get("viewer")
         if viewer is not None:
             self.viewer.settings = viewer
+
+        # Stage
+        stage = data.get("stage")
+        if self.instruments.stage is not None and stage is not None:
+            self.instruments.stage.settings = stage

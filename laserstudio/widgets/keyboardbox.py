@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 from PyQt6.QtWidgets import (
     QGroupBox,
     QVBoxLayout,
@@ -100,7 +101,6 @@ class KeyboardBox(QGroupBox):
 
         vbox.addLayout(grid)
 
-
         # Set size policy to prefer minimum size
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
@@ -124,7 +124,7 @@ class KeyboardBox(QGroupBox):
         elif direction in [Direction.zup, Direction.zdown]:
             axe = 2
         else:
-            print("Unexpected direction")
+            logging.getLogger("laserstudio").error("Unexpected direction")
             return
 
         displacement = self.displacement_z if axe == 2 else self.displacement_xy
