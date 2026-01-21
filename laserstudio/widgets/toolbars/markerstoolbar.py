@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy, QMenu, QFileDialog
-from ..return_line_edit import ReturnSpinBox
+from ..return_line_edit import ReturnDoubleSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
 from .markerslistdockwidget import MarkersListDockWidget
@@ -51,20 +51,19 @@ class MarkersToolBar(QToolBar):
         self.addWidget(w)
 
         # Markers' size
-        self.marker_size_sp = w = ReturnSpinBox()
+        self.marker_size_sp = w = ReturnDoubleSpinBox()
         self.marker_size_sp.setSuffix("\xa0µm")
         self.marker_size_sp.setToolTip("Markers' size")
-        self.marker_size_sp.setMinimum(1)
-        self.marker_size_sp.setSingleStep(10)
-        self.marker_size_sp.setMaximum(2000)
-        self.marker_size_sp.setValue(int(viewer.default_marker_size))
+        self.marker_size_sp.setMinimum(0.1)
+        self.marker_size_sp.setDecimals(1)
+        self.marker_size_sp.setSingleStep(10.0)
+        self.marker_size_sp.setMaximum(2000.0)
+        self.marker_size_sp.setValue(viewer.default_marker_size)
         self.marker_size_sp.reset()
         self.marker_size_sp.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
         )
-        w.returnPressed.connect(
-            lambda: viewer.marker_size(float(self.marker_size_sp.value()))
-        )
+        w.returnPressed.connect(lambda: viewer.marker_size(self.marker_size_sp.value()))
         self.addWidget(self.marker_size_sp)
 
         # Dock widget: Markers' List
