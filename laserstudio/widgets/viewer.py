@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QGraphicsPixmapItem,
     QGraphicsLineItem,
+    QWidget,
 )
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
@@ -22,8 +23,7 @@ from PyQt6.QtGui import (
     QColor,
 )
 from enum import Enum, auto
-from typing import Optional, Union
-
+from typing import Any
 from shapely import Polygon
 
 from laserstudio.utils.colors import LedgerColors
@@ -35,10 +35,11 @@ from .stagesight import (
     LaserInstrument,
 )
 import logging
-from .scangeometry import ScanGeometry
+import json
 import numpy as np
-from ..instruments.stage import MoveFor
 from .marker import IdMarker, Marker
+from .scangeometry import ScanGeometry
+from ..instruments.stage import MoveFor
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -66,7 +67,7 @@ class Viewer(QGraphicsView):
     # Signal emitted when the follow stage sight option changed
     follow_stage_sight_changed = pyqtSignal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
 
         # # Align objects to the center
@@ -98,7 +99,7 @@ class Viewer(QGraphicsView):
         self.scale(1, -1)
 
         # By default, there is no StageSight
-        self.stage_sight: Optional[StageSight] = None
+        self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
         # Scanning geometry object and its representative item in the view.
@@ -176,10 +177,10 @@ class Viewer(QGraphicsView):
 
         # We force to disconnect, in all cases (if already connected).
         if self._follow_stage_sight:
-            self.stage_sight.position_changed.disconnect()
+            self.stage_sight.position_changed.disconnect()  # type: ignore
 
         if value:
-            self.stage_sight.position_changed.connect(
+            self.stage_sight.position_changed.connect(  # type: ignore
                 lambda _: self.__setattr__(
                     "cam_pos_zoom",
                     (self.focused_element_position(), self.zoom),
@@ -192,7 +193,7 @@ class Viewer(QGraphicsView):
             self._follow_stage_sight = value
             self.follow_stage_sight_changed.emit(value)
 
-    def reset_camera(self, item: Optional[QGraphicsPixmapItem] = None):
+    def reset_camera(self, item: QGraphicsPixmapItem | None = None):
         """Resets the camera to show all elements of the scene"""
         if item is not None:
             all_elements_rect = item.sceneTransform().mapRect(item.boundingRect())
@@ -262,9 +263,9 @@ class Viewer(QGraphicsView):
             self.__picture_item = None
             self.background_picture_path = None
 
-    def load_picture(self, picture_path: Optional[str] = None):
+    def load_picture(self, picture_path: str | None = None):
         """Requests loading a backgound picture from the user"""
-        filename = (
+        filename: str | None = (
             # Make the file dialog visible and on top
             QFileDialog.getOpenFileName(
                 self,
@@ -288,8 +289,8 @@ class Viewer(QGraphicsView):
 
     def add_stage_sight(
         self,
-        stage: Optional[StageInstrument],
-        camera: Optional[CameraInstrument],
+        stage: StageInstrument | None,
+        camera: CameraInstrument | None,
         probes: list[ProbeInstrument] = [],
     ):
         """Instantiate a stage sight associated with given stage.
@@ -316,7 +317,7 @@ class Viewer(QGraphicsView):
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
-    def select_mode(self, mode: Union[Mode, int], toggle: bool = False):
+    def select_mode(self, mode: Mode | int, toggle: bool = False):
         """Selects the Viewer's mode. If toogle is set to true,
         the function behaves as 'toggling',
         meaning that the mode is reset to NONE if it is reselected."""
@@ -347,7 +348,7 @@ class Viewer(QGraphicsView):
         return result
 
     def __update_selection_color(
-        self, has_shift: Optional[bool] = None, is_valid: bool = True
+        self, has_shift: bool | None = None, is_valid: bool = True
     ):
         """Convenience function to change the current Application Palette to modify
         the highlight color. It permits to the Zone creation tool to have green / red
@@ -415,7 +416,7 @@ class Viewer(QGraphicsView):
         self.zoom = 1.0
 
     # User interactions
-    def wheelEvent(self, event: Optional[QWheelEvent]):
+    def wheelEvent(self, event: QWheelEvent | None):
         """
         Handle mouse wheel events to manage zoom.
         """
@@ -448,7 +449,7 @@ class Viewer(QGraphicsView):
         self.cam_pos_zoom = pos, zoom
         event.accept()
 
-    def mousePressEvent(self, event: Optional[QMouseEvent]):
+    def mousePressEvent(self, event: QMouseEvent | None):
         """
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
@@ -491,9 +492,11 @@ class Viewer(QGraphicsView):
             elif self.mode == Viewer.Mode.ZONE_POLY:
                 self.zone_poly.append(scene_pos)
                 self.zone_poly_item.setPolygon(self.zone_poly)
-            
+
             elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
-                self.offset_origin_line.setLine(scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y())
+                self.offset_origin_line.setLine(
+                    scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y()
+                )
                 self.offset_origin_line.show()
 
         # The event is a press of the right button
@@ -527,7 +530,7 @@ class Viewer(QGraphicsView):
         shapely_poly = Polygon(points)
         return shapely_poly.is_valid
 
-    def mouseMoveEvent(self, event: Optional[QMouseEvent]):
+    def mouseMoveEvent(self, event: QMouseEvent | None):
         """
         Called when mouse moves.
         """
@@ -559,7 +562,9 @@ class Viewer(QGraphicsView):
 
             elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
                 p1 = self.offset_origin_line.line().p1()
-                self.offset_origin_line.setLine(p1.x(), p1.y(), scene_pos.x(), scene_pos.y())
+                self.offset_origin_line.setLine(
+                    p1.x(), p1.y(), scene_pos.x(), scene_pos.y()
+                )
 
         if self.mode in [
             Viewer.Mode.ZONE,
@@ -572,7 +577,7 @@ class Viewer(QGraphicsView):
 
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: Optional[QMouseEvent]):
+    def mouseReleaseEvent(self, event: QMouseEvent | None):
         """
         Called when mouse button is released.
         Used to get out the panning, when Right button is released.
@@ -611,7 +616,7 @@ class Viewer(QGraphicsView):
 
         super().mouseReleaseEvent(event)
 
-    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
         if event is None:
             return
         if event.button() == Qt.MouseButton.LeftButton:
@@ -627,7 +632,7 @@ class Viewer(QGraphicsView):
 
         return super().mouseDoubleClickEvent(event)
 
-    def keyPressEvent(self, event: Optional[QKeyEvent]):
+    def keyPressEvent(self, event: QKeyEvent | None):
         """
         Called when a keyboard button is pressed.
         """
@@ -635,7 +640,7 @@ class Viewer(QGraphicsView):
             self.__update_selection_color(is_valid=True)
         super().keyPressEvent(event)
 
-    def keyReleaseEvent(self, event: Optional[QKeyEvent]):
+    def keyReleaseEvent(self, event: QKeyEvent | None):
         """
         Called when a keyboard button is released.
         """
@@ -786,7 +791,7 @@ class Viewer(QGraphicsView):
         return probe_position
 
     def point_for_desired_move(
-        self, point: Union[QPointF, tuple[float, float]]
+        self, point: QPointF | tuple[float, float]
     ) -> tuple[float, float]:
         """
         Gives the actual stage's destination according to desired element
@@ -825,12 +830,26 @@ class Viewer(QGraphicsView):
         )
 
     def add_marker(
-        self, position: Optional[tuple[float, float]] = None, color=QColorConstants.Red
+        self,
+        position: None | tuple[float, float] = None,
+        color: QColor | Qt.GlobalColor | int | list[float] = QColorConstants.Red,
+        label: str | None = None,
     ) -> IdMarker:
         """
         Add a marker at a specific position, or at current observed position
         """
-        marker = IdMarker(color=color)
+        if isinstance(color, list):
+            color = QColor(
+                int(color[0] * 255),
+                int(color[1] * 255),
+                int(color[2] * 255),
+                int(color[3] * 255),
+            )
+        elif isinstance(color, Qt.GlobalColor):
+            color = QColor(color)
+        elif isinstance(color, int):
+            color = QColor(color)
+        marker = IdMarker(color=color, label=label)
         self.__markers.append(marker)
         self.__scene.addItem(marker)
         if position is None:
@@ -849,9 +868,9 @@ class Viewer(QGraphicsView):
         self.__markers.clear()
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
-        data = {}
+        data: dict[str, Any] = {}
         data["marker_size"] = self.default_marker_size
 
         if self.background_picture_path is not None:
@@ -864,7 +883,7 @@ class Viewer(QGraphicsView):
         return data
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         if (marker_size := data.get("marker_size")) is not None:
             self.marker_size(marker_size)
@@ -878,3 +897,23 @@ class Viewer(QGraphicsView):
                 for i, pin in enumerate(pins):
                     self.pin_markers[i].setPos(pin[0], pin[1])
                     self.pin_markers[i].show()
+
+    def load_markers(self, file_path: str):
+        """Load markers from a file."""
+        with open(file_path, "r") as f:
+            markers = json.load(f)
+        for marker in markers:
+            color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
+            color = QColor(
+                int(color[0] * 255),
+                int(color[1] * 255),
+                int(color[2] * 255),
+                int(color[3] * 255),
+            )
+            label = marker.get("label", None)
+            self.add_marker(marker["pos"], color, label=label)
+
+    def save_markers(self, file_path: str):
+        """Save markers to a file."""
+        with open(file_path, "w") as f:
+            json.dump([marker.to_dict() for marker in self.__markers], f)

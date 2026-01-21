@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication
+from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QCloseEvent
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
-from typing import Optional, Any
+from typing import Any
 
 from .widgets.viewer import Viewer, IdMarker
 from .instruments.instruments import (
@@ -43,7 +43,7 @@ class LaserStudio(QMainWindow):
     Laser Studio main class and main window.
     """
 
-    def __init__(self, config: Optional[dict]):
+    def __init__(self, config: dict[str, Any] | None):
         """
         Initialize the Laser Studio main window.
 
@@ -53,7 +53,7 @@ class LaserStudio(QMainWindow):
         super().__init__()
 
         if config is None:
-            config = {}
+            config: dict[str, Any] = {}
 
         # Configuration file
         self.config = config
@@ -132,7 +132,6 @@ class LaserStudio(QMainWindow):
                 toolbar.magic_focus_dockwidget,
                 toolbar.magic_focus_settings_dockwidget,
             )
-            
 
         # ToolBar: Scanning zone definition and usage
         toolbar = ScanToolBar(self)
@@ -237,7 +236,7 @@ class LaserStudio(QMainWindow):
         if window_state is not None:
             self.restoreState(window_state)
 
-    def closeEvent(self, a0):
+    def closeEvent(self, a0: QCloseEvent | None):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
@@ -257,7 +256,7 @@ class LaserStudio(QMainWindow):
         v.update(self.viewer.go_next())
         return v
 
-    def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:
+    def handle_screenshot(self, path: str | None = None) -> Image.Image:
         """
         Handle a Screenshot API to get the image of the viewer as currently displayed in laser studio.
         Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
@@ -274,7 +273,7 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(pixmap)
 
-    def handle_camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def handle_camera(self, path: str | None = None) -> Image.Image | None:
         """
         Handle a Camera API request to get the image of the camera associated to the main Stage.
         Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
@@ -316,7 +315,7 @@ class LaserStudio(QMainWindow):
         # Return the number of averaged images
         return camera.number_of_averaged_images
 
-    def handle_camera_accumulator(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+    def handle_camera_accumulator(self, path: str | None) -> numpy.ndarray | None:
         """
         Handle a Camera API request to get the accumulated image of the camera.
         Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
@@ -343,7 +342,7 @@ class LaserStudio(QMainWindow):
             return numpy.array([])
         return frame
 
-    def handle_camera_reference(self, dotake: Optional[bool], refname: Optional[str]):
+    def handle_camera_reference(self, dotake: bool | None, refname: str | None):
         """
         Handles camera reference image operations.
 
@@ -371,8 +370,8 @@ class LaserStudio(QMainWindow):
         return camera.current_reference_image
 
     def handle_instrument_settings(
-        self, label: str, settings: Optional[dict]
-    ) -> Optional[dict]:
+        self, label: str, settings: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -392,33 +391,21 @@ class LaserStudio(QMainWindow):
             return {"settings": inst.settings}
         return None
 
-    def handle_position(self, pos: Optional[list[float]]) -> dict:
+    def handle_position(self, pos: list[float] | None) -> dict[str, Any]:
         if self.instruments.stage is None:
             return {"pos": []}
         if pos is not None:
             self.instruments.stage.move_to(Vector(*pos), wait=True)
         return {"pos": self.instruments.stage.position.data}
 
-    def handle_markers(self) -> list[dict]:
+    def handle_markers(self) -> list[dict[str, Any]]:
         """Handle a Markers API request to get the list of markers."""
 
-        return [
-            {
-                "id": marker.id if isinstance(marker, IdMarker) else -1,
-                "pos": [marker.pos().x(), marker.pos().y()],
-                "color": [
-                    marker.qfillcolor.redF(),
-                    marker.qfillcolor.greenF(),
-                    marker.qfillcolor.blueF(),
-                    marker.qfillcolor.alphaF(),
-                ],
-            }
-            for marker in self.viewer.markers
-        ]
+        return [marker.to_dict() for marker in self.viewer.markers]
 
     def handle_add_markers(
-        self, positions: Optional[list[list[float]]], color: Optional[list[float]]
-    ) -> dict:
+        self, positions: list[list[float]] | None, color: list[float] | None
+    ) -> dict[str, Any]:
         """Add a marker.
 
         :param pos: The requested position(s) of the marker(s)
@@ -450,10 +437,7 @@ class LaserStudio(QMainWindow):
                 for pos in positions
             ]
 
-        description = [
-            {"id": marker.id, "pos": [marker.pos().x(), marker.pos().y()]}
-            for marker in markers
-        ]
+        description = [marker.to_dict() for marker in markers]
         if len(description) == 1:
             return description[0]
         return {"markers": description}

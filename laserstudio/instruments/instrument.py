@@ -1,3 +1,4 @@
+from typing import Any
 from PyQt6.QtCore import QObject, pyqtSignal, QVariant
 
 
@@ -5,12 +6,12 @@ class Instrument(QObject):
     # Signal emitted when the instrument has a parameter which changed in another way than UI interface
     parameter_changed = pyqtSignal(str, QVariant)
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         super().__init__()
         self.label: str | None = config.get("label")
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         # Label is not actually a setting but more an identifier
         if self.label is not None:
@@ -19,7 +20,7 @@ class Instrument(QObject):
             return {}
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         if data.get("label") != self.label:
             print(

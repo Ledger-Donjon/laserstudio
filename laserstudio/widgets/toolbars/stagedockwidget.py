@@ -20,7 +20,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QGuiApplication, QFont
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, StageInstrument, CNCRouter, SMC100, Corvus, Vector
+from ...instruments.stage import (
+    MoveFor,
+    StageInstrument,
+    CNCRouter,
+    SMC100,
+    Corvus,
+    Vector,
+)
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 
@@ -30,87 +37,99 @@ if TYPE_CHECKING:
 
 
 class PositioningOffsetDialog(QDialog):
-        def __init__(self, stage: StageInstrument):
-            super().__init__()
-            self.stage = stage
+    def __init__(self, stage: StageInstrument):
+        super().__init__()
+        self.stage = stage
 
-            self.original_offset_origin = self.stage.offset_origin
-            self.stage.offset_origin = [0.0] * self.stage.num_axis
-            self.current_position = cast(list[float], self.stage.position.data)
+        self.original_offset_origin = self.stage.offset_origin
+        self.stage.offset_origin = [0.0] * self.stage.num_axis
+        self.current_position = cast(list[float], self.stage.position.data)
 
-            self.setWindowTitle("Set Positioning Offset")
+        self.setWindowTitle("Set Positioning Offset")
 
-            vbox = QVBoxLayout()
-            self.setLayout(vbox)
-            # Explanations of what to do in the dialog
-            vbox.addWidget(QLabel("Enter the coordinates of current position as you would like them to be, determining an offset to be applied to all positions."))
+        vbox = QVBoxLayout()
+        self.setLayout(vbox)
+        # Explanations of what to do in the dialog
+        vbox.addWidget(
+            QLabel(
+                "Enter the coordinates of current position as you would like them to be, determining an offset to be applied to all positions."
+            )
+        )
 
-            hbox = QHBoxLayout()
-            hbox.addWidget(QLabel("Actual Current Position:"))
-            for p in self.current_position:
-                label = QLabel(f"{p:+.02f}\xa0µm")
-                hbox.addWidget(label)
-            vbox.addLayout(hbox)
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("Actual Current Position:"))
+        for p in self.current_position:
+            label = QLabel(f"{p:+.02f}\xa0µm")
+            hbox.addWidget(label)
+        vbox.addLayout(hbox)
 
-            hbox = QHBoxLayout()
-            hbox.addWidget(QLabel("After Positioning Offset:"))
-            self.pos_entries : list[QDoubleSpinBox] = []
-            for i in range(self.stage.num_axis):
-                sb = QDoubleSpinBox()
-                sb.setMinimum(-1000000.0)
-                sb.setMaximum(1000000.0)
-                sb.setDecimals(1)
-                sb.setSuffix("\xa0µm")
-                sb.valueChanged.connect(lambda: self._pos_entries_value_changed()) # type: ignore
-                self.pos_entries.append(sb)
-                hbox.addWidget(sb)
-            vbox.addLayout(hbox)
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("After Positioning Offset:"))
+        self.pos_entries: list[QDoubleSpinBox] = []
+        for i in range(self.stage.num_axis):
+            sb = QDoubleSpinBox()
+            sb.setMinimum(-1000000.0)
+            sb.setMaximum(1000000.0)
+            sb.setDecimals(1)
+            sb.setSuffix("\xa0µm")
+            sb.valueChanged.connect(lambda: self._pos_entries_value_changed())  # type: ignore
+            self.pos_entries.append(sb)
+            hbox.addWidget(sb)
+        vbox.addLayout(hbox)
 
-            hbox = QHBoxLayout()
-            hbox.addWidget(QLabel("Positioning Offset:"))
-            self.offset_entries : list[QDoubleSpinBox] = []
-            for i in range(self.stage.num_axis):
-                sb = QDoubleSpinBox()
-                sb.setMinimum(-1000000.0)
-                sb.setMaximum(1000000.0)
-                sb.setDecimals(1)
-                sb.setSuffix("\xa0µm")
-                sb.setValue(self.original_offset_origin[i])
-                sb.valueChanged.connect(lambda: self._offset_entries_value_changed()) # type: ignore
-                self.offset_entries.append(sb)
-                hbox.addWidget(sb)
-            vbox.addLayout(hbox)
-            self._offset_entries_value_changed()
-            
-            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-            buttons.accepted.connect(lambda: self.accept()) # type: ignore
-            buttons.rejected.connect(lambda: self.reject()) # type: ignore
-            vbox.addWidget(buttons)
-            self.apply_offsets()
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("Positioning Offset:"))
+        self.offset_entries: list[QDoubleSpinBox] = []
+        for i in range(self.stage.num_axis):
+            sb = QDoubleSpinBox()
+            sb.setMinimum(-1000000.0)
+            sb.setMaximum(1000000.0)
+            sb.setDecimals(1)
+            sb.setSuffix("\xa0µm")
+            sb.setValue(self.original_offset_origin[i])
+            sb.valueChanged.connect(lambda: self._offset_entries_value_changed())  # type: ignore
+            self.offset_entries.append(sb)
+            hbox.addWidget(sb)
+        vbox.addLayout(hbox)
+        self._offset_entries_value_changed()
 
-        def _pos_entries_value_changed(self):
-            offsets = [self.pos_entries[i].value() - self.current_position[i] for i in range(len(self.current_position))]
-            for i in range(len(offsets)):
-                sb = self.offset_entries[i]
-                sb.blockSignals(True)
-                sb.setValue(offsets[i])
-                sb.blockSignals(False)
-            self.apply_offsets()
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(lambda: self.accept())  # type: ignore
+        buttons.rejected.connect(lambda: self.reject())  # type: ignore
+        vbox.addWidget(buttons)
+        self.apply_offsets()
 
-        def _offset_entries_value_changed(self):
-            for i in range(len(self.stage.offset_origin)):
-                sb = self.pos_entries[i]
-                sb.blockSignals(True)
-                sb.setValue(self.current_position[i] + self.offset_entries[i].value())
-                sb.blockSignals(False)
-            self.apply_offsets()
+    def _pos_entries_value_changed(self):
+        offsets = [
+            self.pos_entries[i].value() - self.current_position[i]
+            for i in range(len(self.current_position))
+        ]
+        for i in range(len(offsets)):
+            sb = self.offset_entries[i]
+            sb.blockSignals(True)
+            sb.setValue(offsets[i])
+            sb.blockSignals(False)
+        self.apply_offsets()
 
-        @property
-        def new_offset_origin(self) -> list[float]:
-            return [self.offset_entries[i].value() for i in range(len(self.stage.offset_origin))]
+    def _offset_entries_value_changed(self):
+        for i in range(len(self.stage.offset_origin)):
+            sb = self.pos_entries[i]
+            sb.blockSignals(True)
+            sb.setValue(self.current_position[i] + self.offset_entries[i].value())
+            sb.blockSignals(False)
+        self.apply_offsets()
 
-        def apply_offsets(self):
-            self.stage.offset_origin = self.new_offset_origin
+    @property
+    def new_offset_origin(self) -> list[float]:
+        return [
+            self.offset_entries[i].value() for i in range(len(self.stage.offset_origin))
+        ]
+
+    def apply_offsets(self):
+        self.stage.offset_origin = self.new_offset_origin
+
 
 class StageDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
@@ -143,20 +162,20 @@ class StageDockWidget(QDockWidget):
             ":/icons/fontawesome-free/directions-solid.svg", parent=self
         )
         w.setText("Move")
-        w.setToolTip("Move the stage to a new position, by clicking on the camera view.")
+        w.setToolTip(
+            "Move the stage to a new position, by clicking on the camera view."
+        )
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         grid.addWidget(w, 0, 0)
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
-
         hbox2 = QHBoxLayout()
         grid.addLayout(hbox2, 0, 1)
         self.mem_point_selector = box = QComboBox()
         origin = [0.0] * self.stage.num_axis
-        box.addItem("Origin",
-                origin)
+        box.addItem("Origin", Vector(*origin))
         box.setItemData(
             0,
             "Origin: ["
@@ -165,14 +184,14 @@ class StageDockWidget(QDockWidget):
             Qt.ItemDataRole.ToolTipRole,
         )
         for i in range(len(self.stage.mem_points)):
-            box.addItem(f"M{i}",
-                self.stage.mem_points[i])
+            box.addItem(f"M{i}", self.stage.mem_points[i])
             # Tooltip of the memory point's position
             box.setItemData(
                 box.count() - 1,
                 f"M{i}: ["
                 + ", ".join(
-                    [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data])  # type: ignore
+                    [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data]
+                )  # type: ignore
                 + "]",
                 Qt.ItemDataRole.ToolTipRole,
             )
@@ -180,12 +199,12 @@ class StageDockWidget(QDockWidget):
         box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         hbox2.addWidget(w := QPushButton(self))
         w.setText("Go")
-        w.clicked.connect(self.go_to_mem_point_clicked) # type: ignore
+        w.clicked.connect(self.go_to_mem_point_clicked)  # type: ignore
         w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         w = QPushButton(self)
         w.setText("Home")
-        w.clicked.connect(self.home) # type: ignore
+        w.clicked.connect(self.home)  # type: ignore
         grid.addWidget(w, 1, 0)
 
         w = QPushButton(self)
@@ -198,20 +217,21 @@ class StageDockWidget(QDockWidget):
             clipboard = QGuiApplication.clipboard()
             if clipboard is not None:
                 clipboard.setText(str(pos))
-        w.clicked.connect(copy_position_to_clipboard) # type: ignore
+
+        w.clicked.connect(copy_position_to_clipboard)  # type: ignore
         grid.addWidget(w, 1, 1)
 
         hbox2 = QHBoxLayout()
         w = QPushButton(self)
         w.setText("Set Positioning Offset...")
         w.setToolTip("Set the positioning offset by entering coordinates values.")
-        w.clicked.connect(self.set_positioning_offset) # type: ignore
+        w.clicked.connect(self.set_positioning_offset)  # type: ignore
         w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         hbox2.addWidget(w)
-        w = ColoredPushButton(
-            ":/icons/origin-offset-drag.svg", parent=self
+        w = ColoredPushButton(":/icons/origin-offset-drag.svg", parent=self)
+        w.setToolTip(
+            "Modify the positioning offset by drag and replace on the camera view an element where it should be positioned to, according to other elements (zones, markers...)."
         )
-        w.setToolTip("Modify the positioning offset by drag and replace on the camera view an element where it should be positioned to, according to other elements (zones, markers...).")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         # make the button to stretch horizontally with the minimum size.
@@ -224,34 +244,38 @@ class StageDockWidget(QDockWidget):
         if isinstance(stage := self.stage.stage, CNCRouter):
             w = QPushButton(self)
             w.setText("Set Device Origin")
-            w.setToolTip("Set the current position as the origin of the device. This is permanent so will impact other projects.")
-            w.clicked.connect(self.stage.set_origin) # type: ignore
+            w.setToolTip(
+                "Set the current position as the origin of the device. This is permanent so will impact other projects."
+            )
+            w.clicked.connect(self.stage.set_origin)  # type: ignore
             grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Reset GRBL")
-            w.clicked.connect(stage.reset_grbl) # type: ignore
+            w.clicked.connect(stage.reset_grbl)  # type: ignore
             grid.addWidget(w, 3, 1)
 
         elif isinstance(stage := self.stage.stage, SMC100):
             w = QPushButton(self)
             w.setText("Reset")
-            w.clicked.connect(stage.reset) # type: ignore
+            w.clicked.connect(stage.reset)  # type: ignore
             grid.addWidget(w, 3, 0)
 
             w = QPushButton(self)
             w.setText("Stop")
-            w.clicked.connect(stage.stop) # type: ignore
+            w.clicked.connect(stage.stop)  # type: ignore
             grid.addWidget(w, 3, 1)
 
         elif isinstance(stage := self.stage.stage, Corvus):
             w = QPushButton(self)
             w.setText("Set Device Origin")
-            w.setToolTip("Set the current position as the origin of the device. This is permanent so will impact other projects.")
-            w.clicked.connect(self.stage.set_origin) # type: ignore
+            w.setToolTip(
+                "Set the current position as the origin of the device. This is permanent so will impact other projects."
+            )
+            w.clicked.connect(self.stage.set_origin)  # type: ignore
             grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Enable Joystick")
-            w.clicked.connect(stage.enable_joystick) # type: ignore
+            w.clicked.connect(stage.enable_joystick)  # type: ignore
             grid.addWidget(w, 3, 1)
 
         hbox = QHBoxLayout()
@@ -264,7 +288,7 @@ class StageDockWidget(QDockWidget):
             box.addItem(f"Laser {i + 1}", userData=MoveFor(MoveFor.Type.LASER, i))
         for i in range(len(laser_studio.instruments.probes)):
             box.addItem(f"Probe {i + 1}", userData=MoveFor(MoveFor.Type.PROBE, i))
-        box.activated.connect(self.move_for_selection) # type: ignore
+        box.activated.connect(self.move_for_selection)  # type: ignore
         hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)
         box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -291,7 +315,7 @@ class StageDockWidget(QDockWidget):
             w.addItem("Disabled")
             for joystick in joysticks:
                 w.addItem(joystick)
-            w.currentTextChanged.connect(self.activate_joystick) # type: ignore
+            w.currentTextChanged.connect(self.activate_joystick)  # type: ignore
             hbox.addWidget(QLabel("Joystick:"))
             hbox.addWidget(w)
             vbox.addLayout(hbox)
@@ -300,7 +324,7 @@ class StageDockWidget(QDockWidget):
         self.position = QLabel("")
         self.position.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.position.setStyleSheet("padding-left: 10px;padding-right: 10px")
-        self.stage.position_changed.connect(self.update_position) # type: ignore
+        self.stage.position_changed.connect(self.update_position)  # type: ignore
         self.position.setToolTip("The stage position")
         vbox.addWidget(self.position)
 
@@ -312,9 +336,7 @@ class StageDockWidget(QDockWidget):
         """
         data = self.mem_point_selector.currentData()
         if not isinstance(data, Vector):
-            logging.getLogger("laserstudio").error(
-                f"Invalid memory point: {data}"
-            )
+            logging.getLogger("laserstudio").error(f"Invalid memory point: {data}")
             return
         if len(data.data) != self.stage.num_axis:
             logging.getLogger("laserstudio").error(
@@ -324,7 +346,9 @@ class StageDockWidget(QDockWidget):
         self.stage.move_to(data, wait=True)
 
     def update_position(self, position: Vector):
-        self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in cast(list[float], position.data)]))
+        self.position.setText(
+            ", ".join([f"{c:+.02f}\xa0µm" for c in cast(list[float], position.data)])
+        )
         f = QFont("monospace", 10)
         f.setStyleHint(QFont.StyleHint.Monospace)
         self.position.setFont(f)
@@ -377,8 +401,8 @@ class StageDockWidget(QDockWidget):
         if name == "PS4":
             self.joystick = JoystickHIDInstrument(HIDGAMEPAD.PS4)
         if self.joystick is not None:
-            self.joystick.axis_changed.connect(self.joystick_axis) # type: ignore
-            self.joystick.button_pressed.connect(self.joystick_button) # type: ignore
+            self.joystick.axis_changed.connect(self.joystick_axis)  # type: ignore
+            self.joystick.button_pressed.connect(self.joystick_button)  # type: ignore
 
     def joystick_button(self, button: int, pressed: bool):
         """

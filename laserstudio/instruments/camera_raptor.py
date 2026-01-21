@@ -7,7 +7,7 @@ from .list_serials import (
 )
 from serial.serialutil import SerialException
 import logging
-from typing import NamedTuple, cast
+from typing import NamedTuple, cast, Any
 from enum import Enum, IntFlag
 import numpy
 import math
@@ -516,7 +516,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         )
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         settings["gain_db"] = self.get_digital_gain_db()
@@ -529,7 +529,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import and apply settings."""
         # Call the parent class settings setter
         CameraUSBInstrument.settings.__set__(self, data)

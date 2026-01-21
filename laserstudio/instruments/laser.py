@@ -2,7 +2,7 @@ from .probe import ProbeInstrument
 from random import uniform
 from PyQt6.QtCore import QVariant
 from .shutter import ShutterInstrument
-from typing import Optional
+from typing import Optional, Any
 from .lmscontroller import LMSControllerInstrument
 import logging
 
@@ -64,7 +64,7 @@ class LaserInstrument(ProbeInstrument):
         # return {}
 
     @property
-    def settings(self):
+    def settings(self) -> dict[str, Any]:
         """
         Return a dict of settings for the PDM.
         """
@@ -82,7 +82,7 @@ class LaserInstrument(ProbeInstrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """
         Set the settings of the PDM.
         """

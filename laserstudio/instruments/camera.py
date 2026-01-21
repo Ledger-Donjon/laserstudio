@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, Literal, cast
+from typing import Optional, Literal, cast, Any
 import numpy
 import cv2
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt
@@ -17,7 +17,7 @@ class CameraInstrument(Instrument):
     # Signal emitted when a new image is created
     new_image = pyqtSignal(QImage)
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         """
         :param config: YAML configuration object
         """
@@ -395,7 +395,9 @@ class CameraInstrument(Instrument):
         else:
             self.reference_image_accumulator = None
 
-    def substract_reference_image(self) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
+    def substract_reference_image(
+        self,
+    ) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
         """
         Substract the reference_image_accumulator from the current accumulator
 
@@ -487,7 +489,7 @@ class CameraInstrument(Instrument):
         return stacked.reshape(self.width, self.height, 3)
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         if self.correction_matrix is not None:
@@ -502,7 +504,7 @@ class CameraInstrument(Instrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         if "transform" in data:

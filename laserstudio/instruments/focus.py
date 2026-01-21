@@ -359,7 +359,7 @@ class FocusInstrument(Instrument):
         print(f"{self.focus_thread.tab_fine=}")
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         points = self.autofocus_helper.registered_points
@@ -370,7 +370,7 @@ class FocusInstrument(Instrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         points = data.get("autofocus_points", [])

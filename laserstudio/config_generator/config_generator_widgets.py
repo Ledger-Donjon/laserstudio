@@ -39,7 +39,13 @@ class FileSelector(QWidget):
         self.pb.clicked.connect(self.select_file)
 
     def select_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*)")
+        file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select file",
+            "",
+            "All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
         if file:
             self.le.setText(file)
 
