@@ -66,7 +66,7 @@ class PDMDockWidget(QDockWidget):
         )
         w.setIcon(icon)
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))
+        w.toggled.connect(lambda b: self.laser.__setattr__("on_off", b))  # type: ignore
         grid.addWidget(w, row, 0, 1, 2)
         row += 1
 
@@ -77,8 +77,8 @@ class PDMDockWidget(QDockWidget):
         w.setMaximum(100.0)
         w.setSuffix("%")
         w.setValue(0)
-        w.returnPressed.connect(
-            lambda: self.laser.__setattr__(
+        w.returnPressed.connect(  # type: ignore
+            lambda: self.laser.__setattr__(  # type: ignore
                 "current_percentage", self.pulse_power_input.value()
             )
         )
@@ -92,7 +92,7 @@ class PDMDockWidget(QDockWidget):
         w.setMaximum(100.0)
         w.setSuffix("%")
         w.setValue(0)
-        w.valueChanged.connect(
+        w.valueChanged.connect(  # type: ignore
             lambda: self.laser.__setattr__("sweep_min", self.sweep_min_input.value())
         )
         grid.addWidget(w, row, 1)
@@ -104,7 +104,7 @@ class PDMDockWidget(QDockWidget):
         w.setMaximum(100.0)
         w.setSuffix("%")
         w.setValue(0)
-        w.valueChanged.connect(
+        w.valueChanged.connect(  # type: ignore
             lambda: self.laser.__setattr__("sweep_max", self.sweep_max_input.value())
         )
         grid.addWidget(w, row, 1)
@@ -114,7 +114,7 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(1)
         w.setMaximum(1000000)
         w.setValue(10)
-        w.valueChanged.connect(
+        w.valueChanged.connect(  # type: ignore
             lambda: self.laser.__setattr__("sweep_freq", self.sweep_freq_input.value())
         )
 
@@ -129,7 +129,7 @@ class PDMDockWidget(QDockWidget):
         w.setDecimals(3)
         w.setSuffix("\xa0mA")
         w.setValue(0)
-        w.returnPressed.connect(
+        w.returnPressed.connect(  # type: ignore
             lambda: self.laser.__setattr__(
                 "offset_current", self.offset_current_input.value()
             )
@@ -147,7 +147,7 @@ class PDMDockWidget(QDockWidget):
             w.setCheckable(True)
             w.setChecked(False)
             w.setIconSize(QSize(24, 24))
-            w.toggled.connect(self.open_shutter)
+            w.toggled.connect(self.open_shutter)  # type: ignore
             grid.addWidget(w, row, 1)
             row += 1
 
@@ -157,14 +157,13 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(1000)
         w.setMaximum(1000000)
         w.setValue(2000)
-        w.valueChanged.connect(
+        w.valueChanged.connect(  # type: ignore
             lambda: self.laser.__setattr__(
                 "refresh_interval", self.refresh_interval_input.value()
             )
         )
         grid.addWidget(w, row, 1)
         row += 1
-
 
         # Laser's temperature
         grid.addWidget(
@@ -202,10 +201,14 @@ class PDMDockWidget(QDockWidget):
         self.delay_line_type_combobox = w = QComboBox()
         w.addItem("From external (SMA connector)", DelayLineType.NONE)
         w.addItem("From internal parameters", DelayLineType.INTERNAL)
-        w.currentIndexChanged.connect(
-            lambda: self.laser.__setattr__("delay_line_type", self.delay_line_type_combobox.currentData())
+        w.currentIndexChanged.connect(  # type: ignore
+            lambda: self.laser.__setattr__(
+                "delay_line_type", self.delay_line_type_combobox.currentData()
+            )
         )
-        grid.addWidget(w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        grid.addWidget(
+            w, row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
+        )
         row += 1
 
         # Pulse width
@@ -214,8 +217,10 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(0)
         w.setMaximum(1275000)
         w.setSuffix("\xa0ps")
-        w.returnPressed.connect(
-            lambda: self.laser.__setattr__("pulse_width", self.pulse_width_input.value())
+        w.returnPressed.connect(  # type: ignore
+            lambda: self.laser.__setattr__(
+                "pulse_width", self.pulse_width_input.value()
+            )
         )
         grid.addWidget(w, row, 1)
         row += 1
@@ -226,19 +231,18 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(0)
         w.setMaximum(15000)
         w.setSuffix("\xa0ps")
-        w.returnPressed.connect(
+        w.returnPressed.connect(  # type: ignore
             lambda: self.laser.__setattr__("delay", self.delay_input.value())
         )
         grid.addWidget(w, row, 1)
         row += 1
-
         advanced_groupbox = QGroupBox("Advanced features")
         self.advanced_layout = advanced_layout = QGridLayout()
         advanced_groupbox.setLayout(advanced_layout)
         advanced_groupbox.setToolTip("Advanced features of the PDM laser")
         advanced_groupbox.setCheckable(True)
         advanced_groupbox.setChecked(False)
-        # advanced_groupbox.setVisible(False)
+        advanced_groupbox.setVisible(False)
         grid.addWidget(advanced_groupbox, row, 0, 1, 2)
         adv_row = 0
         row += 1
@@ -254,19 +258,25 @@ class PDMDockWidget(QDockWidget):
         w.addItem("External TTL/LVTTL", SyncSource.EXTERNAL_TTL_LVTTL)
         w.addItem("External LVDS", SyncSource.EXTERNAL_LVDS)
         w.addItem("Internal", SyncSource.INTERNAL)
-        w.currentIndexChanged.connect(
-            lambda: self.laser.pdm.__setattr__("sync_source", self.sync_source_combobox.currentData())
+        w.currentIndexChanged.connect(  # type: ignore
+            lambda: self.laser.pdm.__setattr__(
+                "sync_source", self.sync_source_combobox.currentData()
+            )
         )
-        advanced_layout.addWidget(w, adv_row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        advanced_layout.addWidget(
+            w, adv_row, 1, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
+        )
         adv_row += 1
 
         # Frequency
-        advanced_layout.addWidget(QLabel("Frequency (if internal synchronization):"), adv_row, 0)
+        advanced_layout.addWidget(
+            QLabel("Frequency (if internal synchronization):"), adv_row, 0
+        )
         w = self.frequency_input = ReturnSpinBox()
         w.setMinimum(1)
         w.setMaximum(250 * 10**6)  # 250 MHz
         w.setSuffix("\xa0Hz")
-        w.returnPressed.connect(
+        w.returnPressed.connect(  # type: ignore
             lambda: self.laser.__setattr__("frequency", self.frequency_input.value())
         )
         advanced_layout.addWidget(w, adv_row, 1)
@@ -274,14 +284,16 @@ class PDMDockWidget(QDockWidget):
 
         # Apply button
         w = QPushButton("Apply")
-        w.clicked.connect(lambda: self.laser.pdm.apply())
-        advanced_layout.addWidget(w, adv_row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading)
+        w.clicked.connect(lambda: self.laser.pdm.apply())  # type: ignore
+        advanced_layout.addWidget(
+            w, adv_row, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeading
+        )
         adv_row += 1
 
         self.reload_parameters(all_parameters=True)
-        self.laser.parameter_changed.connect(self.reload_parameters)
+        self.laser.parameter_changed.connect(self.reload_parameters)  # type: ignore
 
-    def open_shutter(self, b):
+    def open_shutter(self, b: bool):
         if self.laser.shutter is not None:
             self.laser.shutter.open = b
 
@@ -300,7 +312,9 @@ class PDMDockWidget(QDockWidget):
             self.offset_current_input.setValue(value)
             self.offset_current_input.blockSignals(False)
         elif name == "interlock_status":
-            self.interlock_label.setText("Open" if value == InterlockStatus.OPEN else "Closed")
+            self.interlock_label.setText(
+                "Open" if value == InterlockStatus.OPEN else "Closed"
+            )
         elif name == "refresh_interval_ms" and value is not None:
             self.refresh_interval_input.blockSignals(True)
             self.refresh_interval_input.setValue(value)
@@ -341,7 +355,9 @@ class PDMDockWidget(QDockWidget):
             self.frequency_input.setValue(value)
             self.frequency_input.blockSignals(False)
 
-    def reload_parameters(self, param_name: str = "", value: Any = None, all_parameters: bool = False):
+    def reload_parameters(
+        self, param_name: str = "", value: Any = None, all_parameters: bool = False
+    ):
         self.sweep_min_input.setValue(self.laser.sweep_min)
         self.sweep_max_input.setValue(self.laser.sweep_max)
         self.sweep_freq_input.setValue(self.laser.sweep_freq)
@@ -354,7 +370,9 @@ class PDMDockWidget(QDockWidget):
             self.refresh_interface("on_off", self.laser.on_off)
             self.refresh_interface("temperature", self.laser.temperature)
             if all_parameters:
-                self.refresh_interface("refresh_interval_ms", self.laser.refresh_interval)
+                self.refresh_interface(
+                    "refresh_interval_ms", self.laser.refresh_interval
+                )
                 self.refresh_interface("sync_source", self.laser.sync_source)
                 self.refresh_interface("delay_line_type", self.laser.delay_line_type)
                 self.refresh_interface("pulse_width", self.laser.pulse_width)

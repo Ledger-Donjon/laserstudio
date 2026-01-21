@@ -36,7 +36,7 @@ dependencies = [
     "PyQt6-Charts",
     "pylmscontroller",
 ]
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.13"
 
 [tool.poetry]
 version = "0.0.0"

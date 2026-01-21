@@ -8,7 +8,7 @@ import logging
 
 
 class LaserInstrument(ProbeInstrument):
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config=config)
         # Sweep parameters, in order to change the current_percentage
         # regularly, within a random value from sweep_min to sweep_max,
@@ -21,7 +21,7 @@ class LaserInstrument(ProbeInstrument):
         # Shutter
         self.shutter: Optional[ShutterInstrument] = None
         shutter = config.get("shutter")
-        if type(shutter) is dict and shutter.get("enable", True):
+        if type(shutter) is dict[str, Any] and shutter.get("enable", True):
             try:
                 device_type = shutter.get("type")
                 if device_type == "LMSController":
@@ -58,10 +58,9 @@ class LaserInstrument(ProbeInstrument):
 
     def go_next(self) -> dict[str, float]:
         self._sweep_iteration += 1
-        # if self._sweep_iteration % self.sweep_freq == 0:
-        self.current_percentage = uniform(self.sweep_min, self.sweep_max)
+        if self.sweep_freq and (self._sweep_iteration % self.sweep_freq) == 0:
+            self.current_percentage = uniform(self.sweep_min, self.sweep_max)
         return {"current_percentage": self.current_percentage}
-        # return {}
 
     @property
     def settings(self) -> dict[str, Any]:

@@ -12,7 +12,7 @@ class JoystickThread(QThread):
     def run(self):
         while not self.isInterruptionRequested():
             if evbuf := self.joystick.device.read(8):
-                time, value, type, number = struct.unpack("IhBB", evbuf)
+                _, value, type, number = struct.unpack("IhBB", evbuf)
                 if type & 0x01:
                     # Filter out buttons different from 4 and 5
                     if number not in [4, 5, 0, 1, 2, 3]:

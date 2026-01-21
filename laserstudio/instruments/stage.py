@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, cast
+from typing import cast, Any
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from pystages.exceptions import ProtocolError
@@ -77,7 +77,7 @@ class StageInstrument(Instrument):
     # Signal emitted when a new position is fetched
     position_changed = pyqtSignal(Vector)
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         """
         :param config: YAML configuration object
         """
@@ -86,7 +86,7 @@ class StageInstrument(Instrument):
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time
-        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
+        self.refresh_interval = cast(int | None, config.get("refresh_interval_ms"))
 
         self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
         self.guardrail_enabled = True
@@ -94,7 +94,6 @@ class StageInstrument(Instrument):
         self.backlashes = cast(list[float], config.get("backlashes_um"))
 
         self.shear = cast(list[float], config.get("shear", [0.0, 0.0]))
-
 
         dev = config.get("dev")
         if dev == "":
@@ -170,7 +169,9 @@ class StageInstrument(Instrument):
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
-        factors = config.get("unit_factor", config.get("unit_factors", [1.0]))
+        factors = cast(
+            list[float], config.get("unit_factor", config.get("unit_factors", [1.0]))
+        )
         position = self.stage.position
         if type(factors) is not list:
             factors = [factors] * len(position)
@@ -194,8 +195,13 @@ class StageInstrument(Instrument):
         )
 
         # Offset origin
-        self.offset_origin: list[float] = cast(list[float], config.get("offset_origin", [0.0] * self.num_axis))
-        assert type(self.offset_origin) is list and len(self.offset_origin) == self.num_axis, (
+        self.offset_origin: list[float] = cast(
+            list[float], config.get("offset_origin", [0.0] * self.num_axis)
+        )
+        assert (
+            type(self.offset_origin) is list
+            and len(self.offset_origin) == self.num_axis
+        ), (
             f"Offset origin {self.offset_origin} is not a list of {self.num_axis} numbers. "
             "Please check your configuration file"
         )
@@ -216,8 +222,8 @@ class StageInstrument(Instrument):
         self.mutex.unlock()
 
         # Apply shearing transformation
-        x = position[0]
-        y = position[1]
+        x = float(position[0])
+        y = float(position[1])
 
         position[0] = x - self.shear[0] * y
         position[1] = y - self.shear[1] * x
@@ -257,7 +263,7 @@ class StageInstrument(Instrument):
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
             )
 
-    def move_relative(self, displacement: Vector, wait: bool, backlash=False):
+    def move_relative(self, displacement: Vector, wait: bool, backlash: bool = False):
         """
         Moves the stage for a specific displacement.
 
@@ -273,7 +279,7 @@ class StageInstrument(Instrument):
             pos[i] += v
         self.move_to(pos, wait=wait, backlash=backlash)
 
-    def move_to(self, position: Vector, wait: bool, backlash=False):
+    def move_to(self, position: Vector, wait: bool, backlash: bool = False):
         """
         Moves associated stage to a specific position, optionally waits for stage to stop moving.
 
@@ -299,12 +305,16 @@ class StageInstrument(Instrument):
         # Move to actual destination
         factors = self.unit_factors
         assert type(factors) is list and len(factors) == len(position)
-        logging.getLogger("laserstudio").debug(f"Offset origin: {self.offset_origin}...")
+        logging.getLogger("laserstudio").debug(
+            f"Offset origin: {self.offset_origin}..."
+        )
         logging.getLogger("laserstudio").debug(f"Unit factors: {factors}...")
 
         for i in range(len(position)):
             result[i] = (position[i] - self.offset_origin[i]) / factors[i]
-        logging.getLogger("laserstudio").debug(f"Position after unit factors and offset origin: {result}...")
+        logging.getLogger("laserstudio").debug(
+            f"Position after unit factors and offset origin: {result}..."
+        )
 
         # Apply shearing transformation
         x = result[0]
@@ -315,11 +325,7 @@ class StageInstrument(Instrument):
         logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
 
         self.mutex.lock()
-        if (
-            backlash
-            and self.backlashes is not None
-            and len(self.backlashes) == len(position)
-        ):
+        if backlash and len(self.backlashes) == len(position):
             backlash = Vector(*self.backlashes)
             # Apply unit factors
             for i in range(len(backlash)):
@@ -350,13 +356,16 @@ class StageInstrument(Instrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """
         Set the settings of the stage.
         """
         Instrument.settings.__set__(self, data)
         if "offset_origin" in data:
-            assert type(data["offset_origin"]) is list and len(data["offset_origin"]) == self.num_axis, (
+            assert (
+                type(data["offset_origin"]) is list
+                and len(data["offset_origin"]) == self.num_axis
+            ), (
                 f"Offset origin {data['offset_origin']} is not a list of {self.num_axis} numbers. "
                 "Please check your settings file"
             )

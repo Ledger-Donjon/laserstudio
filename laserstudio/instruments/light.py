@@ -1,4 +1,5 @@
 from .instrument import Instrument
+from typing import Any
 
 
 class LightInstrument(Instrument):
@@ -20,7 +21,7 @@ class LightInstrument(Instrument):
         """
 
     @property
-    def intensity(self):
+    def intensity(self) -> float:
         """
         The intensity of the light.
         """
@@ -33,7 +34,7 @@ class LightInstrument(Instrument):
         """
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """
         The settings of the light instrument include the intensity and the light state.
         """
@@ -43,7 +44,7 @@ class LightInstrument(Instrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """
         Set the settings of the light instrument.
         """
