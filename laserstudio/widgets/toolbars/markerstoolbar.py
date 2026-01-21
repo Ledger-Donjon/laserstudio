@@ -1,6 +1,6 @@
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton
+from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy
 from ..return_line_edit import ReturnSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
@@ -34,6 +34,7 @@ class MarkersToolBar(QToolBar):
         # Show list of all markers
         w = ColoredPushButton(parent=self)
         w.setText("Show list")
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         w.setToolTip("Show a list of all markers")
         w.setCheckable(True)
         w.clicked.connect(self.show_markers_list)
@@ -48,6 +49,7 @@ class MarkersToolBar(QToolBar):
         self.marker_size_sp.setMaximum(2000)
         self.marker_size_sp.setValue(int(viewer.default_marker_size))
         self.marker_size_sp.reset()
+        self.marker_size_sp.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         w.returnPressed.connect(
             lambda: viewer.marker_size(float(self.marker_size_sp.value()))
         )

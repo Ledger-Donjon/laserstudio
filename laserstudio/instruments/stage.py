@@ -225,7 +225,7 @@ class StageInstrument(Instrument):
         factors = self.unit_factors
         assert type(factors) is list and len(factors) == len(position)
         for i in range(len(position)):
-            position[i] = position[i] * factors[i] - self.offset_origin[i]
+            position[i] = position[i] * factors[i] + self.offset_origin[i]
 
         self.position_changed.emit(position)
         return position
@@ -303,7 +303,7 @@ class StageInstrument(Instrument):
         logging.getLogger("laserstudio").debug(f"Unit factors: {factors}...")
 
         for i in range(len(position)):
-            result[i] = (position[i] + self.offset_origin[i]) / factors[i]
+            result[i] = (position[i] - self.offset_origin[i]) / factors[i]
         logging.getLogger("laserstudio").debug(f"Position after unit factors and offset origin: {result}...")
 
         # Apply shearing transformation
@@ -338,15 +338,6 @@ class StageInstrument(Instrument):
         :return: Get the number of axis of the stage
         """
         return self.stage.num_axis
-
-    def set_origin(self, desired_current_position: Vector):
-        """Set an offset to the origin of the stage,
-        in order that current position corresponds to the desired position
-        given in parameters."""
-        self.offset_origin = [0.0] * self.num_axis
-        self.offset_origin = (self.position - desired_current_position).data
-        logging.getLogger("laserstudio").debug(f"Offset origin set to {self.offset_origin}")
-        # self.stage.set_origin()
 
     @property
     def settings(self):

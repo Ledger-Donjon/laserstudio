@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QGraphicsScene,
     QFileDialog,
     QGraphicsPixmapItem,
+    QGraphicsLineItem,
 )
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
@@ -56,6 +57,7 @@ class Viewer(QGraphicsView):
         ZONE_TILTED = auto()
         ZONE_POLY = auto()
         PIN = auto()
+        OFFSET_ORIGIN = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -141,6 +143,15 @@ class Viewer(QGraphicsView):
         self.zone_poly_item = QGraphicsPolygonItem(self.zone_poly)
         self.zone_poly_item.setZValue(2)
         self.__scene.addItem(self.zone_poly_item)
+
+        # Offset origin line
+        self.offset_origin_line = QGraphicsLineItem()
+        self.offset_origin_line.setZValue(10)
+        pen = QPen(QColorConstants.White)
+        pen.setCosmetic(True)
+        self.offset_origin_line.setPen(pen)
+        self.__scene.addItem(self.offset_origin_line)
+        self.offset_origin_line.hide()
 
         self.setMouseTracking(True)
 
@@ -444,6 +455,7 @@ class Viewer(QGraphicsView):
         In case of Mode being PIN, triggers a pin of the background picture.
         In case of Mode being ZONE_POLY, triggers a polygon shaped zone creation.
         In case of Mode being ZONE_TILTED, triggers a tilted rectangle shaped zone creation.
+        In case of Mode being OFFSET_ORIGIN, triggers a line to be drawn from the current position to the mouse position.
         """
         if event is None:
             return
@@ -479,6 +491,10 @@ class Viewer(QGraphicsView):
             elif self.mode == Viewer.Mode.ZONE_POLY:
                 self.zone_poly.append(scene_pos)
                 self.zone_poly_item.setPolygon(self.zone_poly)
+            
+            elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+                self.offset_origin_line.setLine(scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y())
+                self.offset_origin_line.show()
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
@@ -541,6 +557,10 @@ class Viewer(QGraphicsView):
                     full_poly.append(fourth_point)
                     self.zone_poly_item.setPolygon(full_poly)
 
+            elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+                p1 = self.offset_origin_line.line().p1()
+                self.offset_origin_line.setLine(p1.x(), p1.y(), scene_pos.x(), scene_pos.y())
+
         if self.mode in [
             Viewer.Mode.ZONE,
             Viewer.Mode.ZONE_POLY,
@@ -578,6 +598,16 @@ class Viewer(QGraphicsView):
                 self.scan_geometry.remove(zone)
             else:
                 self.scan_geometry.add(zone)
+
+        elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+            line = self.offset_origin_line.line()
+            offset_p = line.p2() - line.p1()
+            offset = [offset_p.x(), offset_p.y()]
+            logging.getLogger("laserstudio").debug(f"Offset origin line: {offset}")
+            if self.stage_sight is not None and self.stage_sight.stage is not None:
+                for i in range(len(offset)):
+                    self.stage_sight.stage.offset_origin[i] += offset[i]
+            self.offset_origin_line.hide()
 
         super().mouseReleaseEvent(event)
 

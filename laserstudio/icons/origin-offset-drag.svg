@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<svg
+   width="708.96222"
+   height="647.88965"
+   viewBox="0 0 21.268867 19.436689"
+   fill="none"
+   aria-labelledby="originIconTitle"
+   stroke="#000000"
+   stroke-width="1"
+   stroke-linecap="square"
+   stroke-linejoin="miter"
+   color="#000000"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="origin-offset-drag.svg"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs5" />
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showguides="false"
+     inkscape:zoom="0.71099595"
+     inkscape:cx="292.54738"
+     inkscape:cy="135.7251"
+     inkscape:window-width="1563"
+     inkscape:window-height="1056"
+     inkscape:window-x="0"
+     inkscape:window-y="30"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg5" />
+  <title
+     id="originIconTitle">Origin</title>
+  <g
+     id="g5"
+     transform="matrix(1.4242424,0,0,1.4242424,-2.1096056,2.3866067)"
+     style="stroke-width:0.631915;stroke-dasharray:none">
+    <path
+       fill-rule="evenodd"
+       clip-rule="evenodd"
+       d="m 6.7471699,10.16217 c 1.91367,0 3.4650001,-1.5513301 3.4650001,-3.4650001 0,-1.9136651 -1.5513301,-3.465 -3.4650001,-3.465 -1.9136651,0 -3.465,1.5513349 -3.465,3.465 0,1.91367 1.5513349,3.4650001 3.465,3.4650001 z"
+       id="path1"
+       style="stroke-width:0.631915;stroke-dasharray:none" />
+    <path
+       d="m 6.7471699,1.7471698 v 2.97"
+       id="path2"
+       style="stroke-width:0.631915;stroke-linecap:round;stroke-dasharray:none" />
+    <path
+       d="m 6.7471699,8.67717 v 2.97"
+       id="path3"
+       style="stroke-width:0.631915;stroke-linecap:round;stroke-dasharray:none" />
+    <path
+       d="M 1.7971698,6.6971699 H 4.7671699"
+       id="path4"
+       style="stroke-width:0.631915;stroke-linecap:round;stroke-dasharray:none" />
+    <path
+       d="m 8.72717,6.6971699 h 2.97"
+       id="path5"
+       style="stroke-width:0.631915;stroke-linecap:round;stroke-dasharray:none" />
+    <circle
+       cx="6.74717"
+       cy="6.6971698"
+       r="0.495"
+       id="circle5"
+       style="stroke-width:0.631915;stroke-dasharray:none" />
+  </g>
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Origin</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <path
+     d="m 15.02459,0.72182275 5.641391,5.27565535 c 0.283023,0.2645005 0.11917,0.7403598 -0.266339,0.7737948 l -2.455446,0.2119588 1.672515,3.7077663 c 0.162862,0.35943 0.0035,0.78275 -0.355119,0.946345 v 0 c -0.363462,0.165388 -0.792465,0 -0.950957,-0.367195 L 16.692936,7.5205876 15.004927,9.129673 C 14.720118,9.4007423 14.25,9.1989285 14.25,8.8048713 V 1.0591635 c 0,-0.40361492 0.480247,-0.6125872 0.77459,-0.33734075 z"
+     id="path1-9"
+     style="stroke-width:0.9;stroke-dasharray:none;fill:#000000;fill-opacity:1;stroke:none;stroke-opacity:1" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:0.9;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2.2;stroke-dasharray:0.89999998, 1.79999995;stroke-dashoffset:0;marker-end:"
+     d="M 7.5,12 12.9,3"
+     id="path6"
+     sodipodi:nodetypes="cc" />
+  <path
+     style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.6;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2.2;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+     d="M 11.579065,3.4431482 13.404799,1.7997553 13.110794,4.2385265 Z"
+     id="path7"
+     sodipodi:nodetypes="cccc"
+     inkscape:transform-center-x="0.33412222"
+     inkscape:transform-center-y="0.13383718" />
+</svg>

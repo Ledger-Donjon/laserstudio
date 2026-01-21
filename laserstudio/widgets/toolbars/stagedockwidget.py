@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QVBoxLayout,
+    QGridLayout,
     QLabel,
     QWidget,
     QMessageBox,
@@ -14,11 +15,12 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QDialog,
     QDialogButtonBox,
+    QSizePolicy,
 )
 from PyQt6.QtGui import QGuiApplication, QFont
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import MoveFor, CNCRouter, SMC100, Corvus, PI, Vector
+from ...instruments.stage import MoveFor, StageInstrument, CNCRouter, SMC100, Corvus, Vector
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 
@@ -26,6 +28,89 @@ from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
+
+class PositioningOffsetDialog(QDialog):
+        def __init__(self, stage: StageInstrument):
+            super().__init__()
+            self.stage = stage
+
+            self.original_offset_origin = self.stage.offset_origin
+            self.stage.offset_origin = [0.0] * self.stage.num_axis
+            self.current_position = cast(list[float], self.stage.position.data)
+
+            self.setWindowTitle("Set Positioning Offset")
+
+            vbox = QVBoxLayout()
+            self.setLayout(vbox)
+            # Explanations of what to do in the dialog
+            vbox.addWidget(QLabel("Enter the coordinates of current position as you would like them to be, determining an offset to be applied to all positions."))
+
+            hbox = QHBoxLayout()
+            hbox.addWidget(QLabel("Actual Current Position:"))
+            for p in self.current_position:
+                label = QLabel(f"{p:+.02f}\xa0µm")
+                hbox.addWidget(label)
+            vbox.addLayout(hbox)
+
+            hbox = QHBoxLayout()
+            hbox.addWidget(QLabel("After Positioning Offset:"))
+            self.pos_entries : list[QDoubleSpinBox] = []
+            for i in range(self.stage.num_axis):
+                sb = QDoubleSpinBox()
+                sb.setMinimum(-1000000.0)
+                sb.setMaximum(1000000.0)
+                sb.setDecimals(1)
+                sb.setSuffix("\xa0µm")
+                sb.valueChanged.connect(lambda: self._pos_entries_value_changed()) # type: ignore
+                self.pos_entries.append(sb)
+                hbox.addWidget(sb)
+            vbox.addLayout(hbox)
+
+            hbox = QHBoxLayout()
+            hbox.addWidget(QLabel("Positioning Offset:"))
+            self.offset_entries : list[QDoubleSpinBox] = []
+            for i in range(self.stage.num_axis):
+                sb = QDoubleSpinBox()
+                sb.setMinimum(-1000000.0)
+                sb.setMaximum(1000000.0)
+                sb.setDecimals(1)
+                sb.setSuffix("\xa0µm")
+                sb.setValue(self.original_offset_origin[i])
+                sb.valueChanged.connect(lambda: self._offset_entries_value_changed()) # type: ignore
+                self.offset_entries.append(sb)
+                hbox.addWidget(sb)
+            vbox.addLayout(hbox)
+            self._offset_entries_value_changed()
+            
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+            buttons.accepted.connect(lambda: self.accept()) # type: ignore
+            buttons.rejected.connect(lambda: self.reject()) # type: ignore
+            vbox.addWidget(buttons)
+            self.apply_offsets()
+
+        def _pos_entries_value_changed(self):
+            offsets = [self.pos_entries[i].value() - self.current_position[i] for i in range(len(self.current_position))]
+            for i in range(len(offsets)):
+                sb = self.offset_entries[i]
+                sb.blockSignals(True)
+                sb.setValue(offsets[i])
+                sb.blockSignals(False)
+            self.apply_offsets()
+
+        def _offset_entries_value_changed(self):
+            for i in range(len(self.stage.offset_origin)):
+                sb = self.pos_entries[i]
+                sb.blockSignals(True)
+                sb.setValue(self.current_position[i] + self.offset_entries[i].value())
+                sb.blockSignals(False)
+            self.apply_offsets()
+
+        @property
+        def new_offset_origin(self) -> list[float]:
+            return [self.offset_entries[i].value() for i in range(len(self.stage.offset_origin))]
+
+        def apply_offsets(self):
+            self.stage.offset_origin = self.new_offset_origin
 
 class StageDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
@@ -49,46 +134,59 @@ class StageDockWidget(QDockWidget):
         w.setLayout(vbox)
         self.setWidget(w)
 
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        vbox.addLayout(grid)
 
         # Activate stage-move mode
         w = ColoredPushButton(
             ":/icons/fontawesome-free/directions-solid.svg", parent=self
         )
-        w.setToolTip("Move stage mode")
+        w.setText("Move")
+        w.setToolTip("Move the stage to a new position, by clicking on the camera view.")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
-        hbox.addWidget(w)
+        grid.addWidget(w, 0, 0)
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
-        if len(self.stage.mem_points) > 0:
-            hbox2 = QHBoxLayout()
-            hbox.addLayout(hbox2)
-            self.mem_point_selector = box = QComboBox()
-            for i in range(len(self.stage.mem_points)):
-                box.addItem(f"M{i}")
-                # Tooltip of the memory point's position
-                box.setItemData(
-                    i,
-                    f"M{i}:"
-                    + ", ".join(
-                        [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data]  # type: ignore
-                    ),
-                    Qt.ItemDataRole.ToolTipRole,
-                )
-            hbox2.addWidget(box)
-            hbox2.addWidget(w := QPushButton(self))
-            w.setText("Go")
-            w.clicked.connect(self.go_to_mem_point_clicked) # type: ignore
 
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
+        hbox2 = QHBoxLayout()
+        grid.addLayout(hbox2, 0, 1)
+        self.mem_point_selector = box = QComboBox()
+        origin = [0.0] * self.stage.num_axis
+        box.addItem("Origin",
+                origin)
+        box.setItemData(
+            0,
+            "Origin: ["
+            + ", ".join([f"{c:+.02f}" + "\xa0µm" for c in origin])  # type: ignore
+            + "]",
+            Qt.ItemDataRole.ToolTipRole,
+        )
+        for i in range(len(self.stage.mem_points)):
+            box.addItem(f"M{i}",
+                self.stage.mem_points[i])
+            # Tooltip of the memory point's position
+            box.setItemData(
+                box.count() - 1,
+                f"M{i}: ["
+                + ", ".join(
+                    [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data])  # type: ignore
+                + "]",
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        hbox2.addWidget(box)
+        box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        hbox2.addWidget(w := QPushButton(self))
+        w.setText("Go")
+        w.clicked.connect(self.go_to_mem_point_clicked) # type: ignore
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
         w = QPushButton(self)
         w.setText("Home")
         w.clicked.connect(self.home) # type: ignore
-        hbox.addWidget(w)
+        grid.addWidget(w, 1, 0)
 
         w = QPushButton(self)
         w.setText("Get Position")
@@ -101,55 +199,60 @@ class StageDockWidget(QDockWidget):
             if clipboard is not None:
                 clipboard.setText(str(pos))
         w.clicked.connect(copy_position_to_clipboard) # type: ignore
-        hbox.addWidget(w)
+        grid.addWidget(w, 1, 1)
 
-        if isinstance(self.stage.stage, PI):
-            hbox = QHBoxLayout()
-            w = QPushButton(self)
-            w.setText("Set Positioning Offset")
-            w.setToolTip("Set the coordinates corresponding to current position, determining an offset to be applied to all positions.")
-            w.clicked.connect(self.set_positioning_offset) # type: ignore
-            hbox.addWidget(w)
-            vbox.addLayout(hbox)
+        hbox2 = QHBoxLayout()
+        w = QPushButton(self)
+        w.setText("Set Positioning Offset...")
+        w.setToolTip("Set the positioning offset by entering coordinates values.")
+        w.clicked.connect(self.set_positioning_offset) # type: ignore
+        w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        hbox2.addWidget(w)
+        w = ColoredPushButton(
+            ":/icons/origin-offset-drag.svg", parent=self
+        )
+        w.setToolTip("Modify the positioning offset by drag and replace on the camera view an element where it should be positioned to, according to other elements (zones, markers...).")
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        # make the button to stretch horizontally with the minimum size.
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        hbox2.addWidget(w)
+        group.addButton(w)
+        group.setId(w, laser_studio.viewer.Mode.OFFSET_ORIGIN)
+        grid.addLayout(hbox2, 2, 0)
 
         if isinstance(stage := self.stage.stage, CNCRouter):
-            hbox = QHBoxLayout()
             w = QPushButton(self)
-            w.setText("Set Positioning Offset")
-            w.setToolTip("Set the coordinates corresponding to current position, determining an offset to be applied to all positions.")
-            w.clicked.connect(self.set_positioning_offset) # type: ignore
-            hbox.addWidget(w)
+            w.setText("Set Device Origin")
+            w.setToolTip("Set the current position as the origin of the device. This is permanent so will impact other projects.")
+            w.clicked.connect(self.stage.set_origin) # type: ignore
+            grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Reset GRBL")
             w.clicked.connect(stage.reset_grbl) # type: ignore
-            hbox.addWidget(w)
-            vbox.addLayout(hbox)
+            grid.addWidget(w, 3, 1)
 
-        if isinstance(stage := self.stage.stage, SMC100):
-            hbox = QHBoxLayout()
+        elif isinstance(stage := self.stage.stage, SMC100):
             w = QPushButton(self)
             w.setText("Reset")
             w.clicked.connect(stage.reset) # type: ignore
-            hbox.addWidget(w)
+            grid.addWidget(w, 3, 0)
 
             w = QPushButton(self)
             w.setText("Stop")
             w.clicked.connect(stage.stop) # type: ignore
-            hbox.addWidget(w)
-            vbox.addLayout(hbox)
+            grid.addWidget(w, 3, 1)
 
-        if isinstance(stage := self.stage.stage, Corvus):
-            hbox = QHBoxLayout()
+        elif isinstance(stage := self.stage.stage, Corvus):
             w = QPushButton(self)
-            w.setText("Set Positioning Offset")
-            w.setToolTip("Set the coordinates corresponding to current position, determining an offset to be applied to all positions.")
-            w.clicked.connect(self.set_positioning_offset) # type: ignore
-            hbox.addWidget(w)
+            w.setText("Set Device Origin")
+            w.setToolTip("Set the current position as the origin of the device. This is permanent so will impact other projects.")
+            w.clicked.connect(self.stage.set_origin) # type: ignore
+            grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Enable Joystick")
             w.clicked.connect(stage.enable_joystick) # type: ignore
-            hbox.addWidget(w)
-            vbox.addLayout(hbox)
+            grid.addWidget(w, 3, 1)
 
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
@@ -164,6 +267,7 @@ class StageDockWidget(QDockWidget):
         box.activated.connect(self.move_for_selection) # type: ignore
         hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)
+        box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Keyboard box
         self.keyboardbox = w = KeyboardBox(self.stage)
@@ -206,13 +310,18 @@ class StageDockWidget(QDockWidget):
         """
         Called when the go to memory point button is clicked.
         """
-        index = self.mem_point_selector.currentIndex()
-        if index < 0 or index >= len(self.stage.mem_points):
+        data = self.mem_point_selector.currentData()
+        if not isinstance(data, Vector):
             logging.getLogger("laserstudio").error(
-                f"Invalid memory point index: {index}"
+                f"Invalid memory point: {data}"
             )
             return
-        self.stage.move_to(self.stage.mem_points[index], wait=True)
+        if len(data.data) != self.stage.num_axis:
+            logging.getLogger("laserstudio").error(
+                f"Invalid memory point: {data}. Dimension of point {len(data.data)} is different from stage's number of axes {self.stage.num_axis}). Please correct your configuration file."
+            )
+            return
+        self.stage.move_to(data, wait=True)
 
     def update_position(self, position: Vector):
         self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in cast(list[float], position.data)]))
@@ -324,31 +433,11 @@ class StageDockWidget(QDockWidget):
         """
         Called when the set positioning offset button is clicked.
         """
-        dialog = QDialog()
+        dialog = PositioningOffsetDialog(self.stage)
 
-        dialog.setWindowTitle("Set Positioning Offset")
-        # dialog.setText("Set the coordinates corresponding to current position, determining an offset to be applied to all positions.")
-        vbox = QVBoxLayout()
-        dialog.setLayout(vbox)
-        vbox.addWidget(QLabel("Current position's coordinates:"))
-        hbox = QHBoxLayout()
-        entries : list[QDoubleSpinBox] = []
-        current_position = cast(list[float], self.stage.position.data)
-        for i in range(self.stage.num_axis):
-            sb = QDoubleSpinBox()
-            sb.setMinimum(-1000000.0)
-            sb.setMaximum(1000000.0)
-            sb.setDecimals(1)
-            sb.setSuffix("\xa0µm")
-            sb.setValue(current_position[i])
-            entries.append(sb)
-            hbox.addWidget(sb)
-        vbox.addLayout(hbox)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(lambda: dialog.accept()) # type: ignore
-        buttons.rejected.connect(lambda: dialog.reject()) # type: ignore
-        vbox.addWidget(buttons)
         result = dialog.exec()
         logging.getLogger("laserstudio").debug(f"Dialog returned {result}...")
         if result == QDialog.DialogCode.Accepted:
-            self.stage.set_origin(Vector(*[sb.value() for sb in entries]))
+            self.stage.offset_origin = dialog.new_offset_origin
+        else:
+            self.stage.offset_origin = dialog.original_offset_origin

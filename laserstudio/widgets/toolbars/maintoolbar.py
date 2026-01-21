@@ -32,7 +32,7 @@ class MainToolBar(QToolBar):
 
         # Button to unselect any viewer mode.
         w = ColoredPushButton(
-            ":/icons/fontawesome-free/arrow-pointer-solid.svg", parent=self
+            ":/icons/arrow-pointer-solid.svg", parent=self
         )
         w.setToolTip("Cancel any mode")
         w.setIconSize(QSize(24, 24))
