@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import (
+    QGraphicsItem,
     QGraphicsItemGroup,
     QGraphicsPathItem,
     QGraphicsPixmapItem,
@@ -6,6 +7,7 @@ from PyQt6.QtWidgets import (
     QGraphicsLineItem,
     QGraphicsView,
     QGraphicsScene,
+    QWidget,
 )
 from PyQt6.QtGui import QPen, QTransform, QImage, QPixmap, QPainterPath
 from PyQt6.QtCore import (
@@ -23,7 +25,6 @@ from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-from typing import Optional, Union
 import logging
 from .marker import ProbeMarker
 from enum import Enum, auto
@@ -38,7 +39,7 @@ class StageSightViewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
 
-    def __init__(self, stage_sight: "StageSight", parent=None):
+    def __init__(self, stage_sight: "StageSight", parent: QWidget | None = None):
         super().__init__(parent)
         self.stage_sight = stage_sight
         self.__scene = s = QGraphicsScene(self)
@@ -71,7 +72,7 @@ class StageSightObject(QObject):
     # Signal emitted when a new position is set
     position_changed = pyqtSignal(QPointF)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
 
@@ -88,10 +89,10 @@ class StageSight(QGraphicsItemGroup):
 
     def __init__(
         self,
-        stage: Optional[StageInstrument],
-        camera: Optional[CameraInstrument],
+        stage: StageInstrument | None,
+        camera: CameraInstrument | None,
         probes: list[ProbeInstrument] = [],
-        parent=None,
+        parent: QGraphicsItem | None = None,
     ):
         super(QGraphicsItemGroup, self).__init__(parent)
         pen = QPen(LedgerColors.SecurityBlue.value.lighter(300))
@@ -323,7 +324,7 @@ class StageSight(QGraphicsItemGroup):
         else:
             self.setPos(position)
 
-    def update_pos(self, position: Optional[Vector] = None):
+    def update_pos(self, position: Vector | None = None):
         """Update Widget position according to the stage's position, received in parameter
 
         :param position: The stage's current position.
@@ -335,7 +336,7 @@ class StageSight(QGraphicsItemGroup):
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 
-    def setPos(self, *args, **kwargs):
+    def setPos(self, *args: QPointF | float, **kwargs: QPointF | float):
         """To make sure that the position of the stagesight is signaled
         at each change we override the setPos function.
 
@@ -359,7 +360,7 @@ class StageSight(QGraphicsItemGroup):
         return self.image_group.transform()
 
     @distortion.setter
-    def distortion(self, transform: Optional[QTransform]):
+    def distortion(self, transform: QTransform | None):
         self.resetTransform()
         self.image_group.resetTransform()
         if transform is not None:
@@ -374,9 +375,9 @@ class StageSight(QGraphicsItemGroup):
 
     def marker(
         self,
-        marker_type: Union[type[LaserInstrument], type[ProbeInstrument]],
+        marker_type: type[LaserInstrument] | type[ProbeInstrument],
         index: int,
-    ) -> Optional[ProbeMarker]:
+    ) -> ProbeMarker | None:
         if marker_type not in [LaserInstrument, ProbeInstrument]:
             return None
         index += 1

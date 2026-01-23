@@ -119,7 +119,7 @@ class Viewer(QGraphicsView):
         self.background_picture_path = None
 
         # Pin points for background picture
-        self.pins = []
+        self.pins: list[tuple[tuple[float, float], tuple[float, float]]] = []
         # PIN Markers
         self.pin_markers = [
             Marker(color=LedgerColors.SerenityPurple.value),
@@ -177,10 +177,10 @@ class Viewer(QGraphicsView):
 
         # We force to disconnect, in all cases (if already connected).
         if self._follow_stage_sight:
-            self.stage_sight.position_changed.disconnect()  # type: ignore
+            self.stage_sight.position_changed.disconnect()
 
         if value:
-            self.stage_sight.position_changed.connect(  # type: ignore
+            self.stage_sight.position_changed.connect(
                 lambda _: self.__setattr__(
                     "cam_pos_zoom",
                     (self.focused_element_position(), self.zoom),
@@ -321,8 +321,6 @@ class Viewer(QGraphicsView):
         """Selects the Viewer's mode. If toogle is set to true,
         the function behaves as 'toggling',
         meaning that the mode is reset to NONE if it is reselected."""
-        if isinstance(mode, int):
-            mode = Viewer.Mode(mode)
 
         if toggle and self.mode == mode:
             mode = Viewer.Mode.NONE
@@ -330,7 +328,7 @@ class Viewer(QGraphicsView):
         self.zone_poly.clear()
         self.zone_poly_item.setPolygon(self.zone_poly)
 
-        self.mode = mode
+        self.mode = Viewer.Mode(mode)
 
     def go_next(self):
         """Actions to perform when Laser Studio receive a Go Next command.
@@ -683,6 +681,10 @@ class Viewer(QGraphicsView):
         # If we remove the translation code above, the algorithm will still
         # work.
         pix_pos = pic.sceneTransform().inverted()[0].map(x, y)
+        pix_pos = (
+            pix_pos[0] if pix_pos[0] is not None else 0.0,
+            pix_pos[1] if pix_pos[1] is not None else 0.0,
+        )
 
         # Show the marker
         self.pin_markers[n].setPos(x, y)
@@ -832,13 +834,19 @@ class Viewer(QGraphicsView):
     def add_marker(
         self,
         position: None | tuple[float, float] = None,
-        color: QColor | Qt.GlobalColor | int | list[float] = QColorConstants.Red,
+        color: QColor
+        | Qt.GlobalColor
+        | int
+        | list[float]
+        | LedgerColors = QColorConstants.Red,
         label: str | None = None,
     ) -> IdMarker:
         """
         Add a marker at a specific position, or at current observed position
         """
-        if isinstance(color, list):
+        if isinstance(color, LedgerColors):
+            color = color.value
+        elif isinstance(color, list):
             color = QColor(
                 int(color[0] * 255),
                 int(color[1] * 255),

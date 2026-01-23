@@ -163,7 +163,7 @@ class ProbeMarker(Marker):
         super().__init__(parent)
         self.stage_sight = parent
         self.probe = probe
-        probe.offset_pos_changed.connect(self.update_pos)  # type: ignore
+        probe.offset_pos_changed.connect(self.update_pos)
         self.color = (
             QColorConstants.Red
             if isinstance(self.probe, LaserInstrument)

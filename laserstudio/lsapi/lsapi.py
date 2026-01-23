@@ -1,7 +1,7 @@
 # Client API library to interact with laserstudio via a REST API.
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
-from typing import Optional, Union, Tuple, List, Dict
+from typing import Any
 import requests
 from PIL import Image
 import io
@@ -17,7 +17,7 @@ class LSAPI:
     commands.
     """
 
-    def __init__(self, host="localhost", port: Optional[int] = None):
+    def __init__(self, host: str = "localhost", port: int | None = None):
         """
         Creates a new REST session to Laser Studio, through a TCP connection.
 
@@ -37,7 +37,11 @@ class LSAPI:
         self.session.close()
 
     def send(
-        self, command: str, params: Optional[dict] = None, is_put=False, is_delete=False
+        self,
+        command: str,
+        params: dict[str, Any] | None = None,
+        is_put: bool = False,
+        is_delete: bool = False,
     ) -> requests.Response:
         """
         Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
@@ -59,7 +63,7 @@ class LSAPI:
             else:
                 return self.session.post(url, json=params)
 
-    def go_next(self) -> dict:
+    def go_next(self) -> dict[str, Any]:
         """Jump to next scan position.
 
         :return: A dictionary giving the details about the go_next"""
@@ -67,9 +71,9 @@ class LSAPI:
 
     def autofocus(
         self,
-        register: Union[bool, Tuple[float, float, float]] = False,
+        register: bool | tuple[float, float, float] = False,
         get_points: bool = False,
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Autofocus the camera.
 
@@ -89,7 +93,7 @@ class LSAPI:
         #         "motion/autofocus", params={"new_point": list(register)}
         #     ).json()
 
-    def magicfocus(self, parameters: Optional[dict] = None):
+    def magicfocus(self, parameters: dict[str, Any] | None = None):
         """
         Perform a magic focus, or get its state (if no parameters are given).
         """
@@ -97,7 +101,7 @@ class LSAPI:
             return self.send("motion/magicfocus", params=parameters).json()
         return self.send("motion/magicfocus").json()
 
-    def markers(self) -> List[Dict[str, Union[int, Tuple[float, float]]]]:
+    def markers(self) -> list[dict[str, int | tuple[float, float]]]:
         """
         Get the list of markers in the scene.
 
@@ -107,14 +111,12 @@ class LSAPI:
 
     def marker(
         self,
-        color: Union[Tuple[float, float, float], Tuple[float, float, float, float]] = (
+        color: tuple[float, float, float] | tuple[float, float, float, float] = (
             0.0,
             0.0,
             0.0,
         ),
-        positions: Optional[
-            Union[List[Tuple[float, float]], Tuple[float, float]]
-        ] = None,
+        positions: list[tuple[float, float]] | tuple[float, float] | None = None,
     ):
         """
         Add a colored marker in the view at a specific position.
@@ -126,7 +128,7 @@ class LSAPI:
         """
         assert len(color) in (3, 4)
 
-        params: Dict[str, list] = {"color": list(color)}
+        params: dict[str, list[float]] = {"color": list(color)}
         if positions is not None:
             if isinstance(positions, tuple):
                 list_positions = [list(positions)]
@@ -135,7 +137,7 @@ class LSAPI:
             params["pos"] = list_positions
         return self.send("annotation/add_marker", params, is_put=True).json()
 
-    def go_to(self, index: int) -> List[float]:
+    def go_to(self, index: int) -> list[float]:
         """
         Jump to saved position, referenced by a memory point index.
 
@@ -144,7 +146,7 @@ class LSAPI:
         """
         return self.send(f"motion/go_to_memory_point/{index}", is_put=True).json()
 
-    def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def camera(self, path: str | None = None) -> Image.Image | None:
         """
         Returns the raw image of the camera.
 
@@ -160,7 +162,7 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
 
-    def accumulated_image(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+    def accumulated_image(self, path: str | None) -> numpy.ndarray | None:
         """
         Get the camera accumulator's data, as a numpy array.
         """
@@ -178,7 +180,7 @@ class LSAPI:
             response = self.send("images/camera/accumulator", {"path": path})
             return numpy.load(response.text.strip().strip('"'))
 
-    def averaging(self, reset=False) -> Optional[int]:
+    def averaging(self, reset: bool = False) -> int | None:
         """
         Get the number of images accumulated in the camera's accumulator.
 
@@ -188,8 +190,8 @@ class LSAPI:
         return self.send("images/camera/averaging", is_delete=reset).json()
 
     def reference_image(
-        self, num: Optional[int] = None, unset: bool = False, set: bool = False
-    ) -> Optional[numpy.ndarray]:
+        self, num: int | None = None, unset: bool = False, set: bool = False
+    ) -> numpy.ndarray | None:
         """
         Get and/or set the reference image for the camera.
         """
@@ -199,7 +201,7 @@ class LSAPI:
             is_delete=unset,
         )
 
-    def screenshot(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def screenshot(self, path: str | None = None) -> Image.Image | None:
         """
         Takes a screenshot of the current view of laser studio's scene.
 
@@ -215,11 +217,11 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/screenshot", {"path": path})
 
-    def position(self) -> List[float]:
+    def position(self) -> list[float]:
         res = self.send("motion/position")
         return res.json()["pos"]
 
-    def go_to_position(self, pos: List[float] = []) -> List[float]:
+    def go_to_position(self, pos: list[float] = []) -> list[float]:
         """
         Requests the main stage to move to position the current focused object to given coordinates.
         This waits for the stage to end of move, returns the final coordinates of the stage.
@@ -233,8 +235,8 @@ class LSAPI:
         return res.json()
 
     def instrument_settings(
-        self, label: str, settings: Optional[dict] = None
-    ) -> Optional[dict]:
+        self, label: str, settings: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """
         Retrieve or update the settings of a specific instrument.
         This method interacts with the API to either fetch the current settings
@@ -249,33 +251,7 @@ class LSAPI:
         """
         return self.send(f"instruments/{label}/settings", settings, is_put=True).json()
 
-    # def laser(
-    #     self,
-    #     num: int = 1,
-    #     active: Optional[bool] = None,
-    #     power: Optional[float] = None,
-    #     offset_current: Optional[float] = None,
-    # ) -> dict:
-    #     """
-    #     Controls the laser's state.
-
-    #     :param num: The index of the laser to control (starting from 1).
-    #     :param active: Sets the activation's state of the laser.
-    #     :param power: Sets the current power (in %).
-    #     :param offset_current: Sets the offset current of the laser (in mA).
-    #     :return: The actual settings values read back from the laser instrument.
-    #     """
-    #     return self.send(
-    #         f"instruments/laser/{num}",
-    #         {
-    #             "active": active,
-    #             "power": power,
-    #             "offset_current": offset_current,
-    #         },
-    #         is_put=True,
-    #     ).json()
-
-    def set_instrument_settings(self, label: str, settings: dict):
+    def set_instrument_settings(self, label: str, settings: dict[str, Any]):
         """
         Set the settings of a specific instrument.
         This method interacts with the API to update the settings of an instrument

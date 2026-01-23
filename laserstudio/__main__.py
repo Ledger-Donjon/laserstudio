@@ -26,7 +26,9 @@ def main():
 
     parser = argparse.ArgumentParser(prog="laserstudio")
     parser.add_argument(
-        "--log", choices=list(logging._nameToLevel.keys()), required=False
+        "--log",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        default="INFO",
     )
     parser.add_argument(
         "--config",
@@ -45,12 +47,7 @@ def main():
     if args.list_devices:
         list_devices()
         return 0
-
-    if args.log is not None:
-        try:
-            logger.setLevel(args.log)
-        except ValueError as e:
-            logger.error("Warning, error during setting log level:", e)
+    logger.setLevel(args.log)
 
     app.setApplicationName("Laser Studio")
     app.setApplicationDisplayName("Laser Studio")
@@ -106,7 +103,7 @@ def main():
         wizard = ConfigGeneratorWizard(config_generator.schema)
         wizard.exec()
         yaml_config = wizard.config_result_page.config
-        logger.info(f"Configuration generated successfully")
+        logger.info("Configuration generated successfully")
 
     win = LaserStudio(yaml_config)
     win.setWindowTitle(app.applicationDisplayName())

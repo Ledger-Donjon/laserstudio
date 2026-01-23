@@ -1,7 +1,7 @@
 import flask
 from flask_restx import Api, Resource, fields
 from flask_restx.api import HTTPStatus
-from typing import List, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Any
 from PyQt6.QtCore import (
     QObject,
     QThread,
@@ -27,7 +27,7 @@ class RestProxy(QObject):
     laser studio.
     """
 
-    def __init__(self, laser_studio: "LaserStudio", config: dict):
+    def __init__(self, laser_studio: "LaserStudio", config: dict[str, Any]):
         super().__init__()
         self.laser_studio: LaserStudio = laser_studio
         self.rest_object = RestServer(self)
@@ -43,7 +43,7 @@ class RestProxy(QObject):
         return QVariant(response)
 
     @pyqtSlot(QVariant, result="QVariant")
-    def handle_magicfocus(self, parameters: Optional[dict]):
+    def handle_magicfocus(self, parameters: dict[str, Any] | None):
         if (f := self.laser_studio.instruments.focus_helper) is None:
             return QVariant({"error": "No focus helper available"})
         if parameters is None:
@@ -83,7 +83,7 @@ class RestProxy(QObject):
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
     def handle_add_markers(
-        self, pos: Optional[List[List[float]]], color: Optional[List[float]]
+        self, pos: list[list[float]] | None, color: list[float] | None
     ):
         return QVariant(self.laser_studio.handle_add_markers(pos, color))
 
@@ -92,15 +92,15 @@ class RestProxy(QObject):
         return QVariant(self.laser_studio.handle_markers())
 
     @pyqtSlot(QVariant, result="QVariant")
-    def handle_position(self, pos: Optional[List[float]]):
+    def handle_position(self, pos: list[float] | None):
         return QVariant(self.laser_studio.handle_position(pos))
 
     @pyqtSlot(QVariant, result="QVariant")
-    def handle_camera(self, path: Optional[str]):
+    def handle_camera(self, path: str | None):
         return QVariant(self.laser_studio.handle_camera(path))
 
     @pyqtSlot(QVariant, result="QVariant")
-    def handle_camera_accumulator(self, path: Optional[str]):
+    def handle_camera_accumulator(self, path: str | None):
         return QVariant(self.laser_studio.handle_camera_accumulator(path))
 
     @pyqtSlot(QVariant, result="QVariant")
@@ -109,21 +109,21 @@ class RestProxy(QObject):
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
     def handle_camera_reference(
-        self, dotake: Optional[bool] = None, refname: Optional[str] = None
+        self, dotake: bool | None = None, refname: str | None = None
     ):
         return QVariant(self.laser_studio.handle_camera_reference(dotake, refname))
 
     @pyqtSlot(QVariant, result="QVariant")
-    def handle_screenshot(self, path: Optional[str]):
+    def handle_screenshot(self, path: str | None):
         return QVariant(self.laser_studio.handle_screenshot(path))
 
     @pyqtSlot(QVariant, QVariant, QVariant, QVariant, result="QVariant")
     def handle_laser(
         self,
         num: int,
-        active: Optional[bool],
-        power: Optional[float],
-        offset_current: Optional[float],
+        active: bool | None,
+        power: float | None,
+        offset_current: float | None,
     ):
         return QVariant({"error": "Not implemented"})
         return QVariant(
@@ -131,7 +131,7 @@ class RestProxy(QObject):
         )
 
     @pyqtSlot(QVariant, QVariant, result="QVariant")
-    def handle_instrument_settings(self, label: str, conf: Optional[dict]):
+    def handle_instrument_settings(self, label: str, conf: dict[str, Any] | None):
         return QVariant(self.laser_studio.handle_instrument_settings(label, conf))
 
 
@@ -140,7 +140,7 @@ class RestThread(QThread):
     Subclass of QThread where to launch the Rest server.
     """
 
-    def __init__(self, config: dict, parent=None) -> None:
+    def __init__(self, config: dict[str, Any], parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.host = config.get("host", "localhost")
         self.port = config.get("port", LSAPI.PORT)
@@ -156,15 +156,15 @@ class RestServer(QObject):
     Follows the singleton pattern
     """
 
-    _shared: Optional["RestServer"] = None
+    _shared: "RestServer"
 
     @staticmethod
-    def shared(proxy: Optional[RestProxy] = None) -> "RestServer":
-        if RestServer._shared is None:
-            RestServer._shared = RestServer(proxy)
+    def shared(proxy: RestProxy | None = None) -> "RestServer":
+        # if RestServer._shared is None:
+        #     RestServer._shared = RestServer(proxy)
         return RestServer._shared
 
-    def __init__(self, proxy: Optional[RestProxy], parent: Optional[QObject] = None):
+    def __init__(self, proxy: RestProxy | None, parent: QObject | None = None):
         super(RestServer, self).__init__(parent)
         self.proxy = proxy
         RestServer._shared = self
@@ -242,7 +242,7 @@ class Camera(Resource):
         HTTPStatus.NOT_FOUND, "No image can be produced (there may be no camera)"
     )
     def get(self):
-        im = cast(Optional[Image], RestServer.invoke("handle_camera", QVariant(None)))
+        im = cast(Image | None, RestServer.invoke("handle_camera", QVariant(None)))
         if im is None:
             flask_api.abort(
                 HTTPStatus.NOT_FOUND,
@@ -320,19 +320,19 @@ class CameraAveraging(Resource):
 @image.route("/camera/reference/<refname>")
 class CameraReference(Resource):
     @image.response(200, "Select the reference image")
-    def get(self, refname: Optional[str] = None):
+    def get(self, refname: str | None = None):
         return RestServer.invoke(
             "handle_camera_reference", QVariant(None), QVariant(refname)
         )
 
     @image.response(200, "Set the reference image")
-    def post(self, refname: Optional[str] = None):
+    def post(self, refname: str | None = None):
         return RestServer.invoke(
             "handle_camera_reference", QVariant(True), QVariant(refname)
         )
 
     @image.response(200, "Unset the reference image")
-    def delete(self, refname: Optional[str] = None):
+    def delete(self, refname: str | None = None):
         return RestServer.invoke(
             "handle_camera_reference", QVariant(False), QVariant(refname)
         )
@@ -460,7 +460,7 @@ class AddMarker(Resource):
 class Markers(Resource):
     def get(self):
         qvar = RestServer.invoke("handle_markers")
-        return cast(List[dict], qvar)
+        return cast(list[dict[str, Any]], qvar)
 
 
 instruments = flask_api.namespace("instruments", description="Control instruments")

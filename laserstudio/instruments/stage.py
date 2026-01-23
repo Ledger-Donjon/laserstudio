@@ -345,6 +345,23 @@ class StageInstrument(Instrument):
         """
         return self.stage.num_axis
 
+    def set_device_origin(self):
+        """
+        Set the device origin, which is different from the offset correction
+        here the device will get the current position as the origin,
+        this will be then permanent accross all projects.
+        """
+        if isinstance(self.stage, Corvus):
+            self.stage.set_origin()
+        elif isinstance(self.stage, CNCRouter):
+            self.stage.set_origin()
+        elif isinstance(self.stage, PI):
+            self.stage.set_origin()
+        else:
+            logging.getLogger("laserstudio").error(
+                f"Stage of type {type(self.stage)} does not support setting device's origin. Skipping operation."
+            )
+
     @property
     def settings(self):
         """

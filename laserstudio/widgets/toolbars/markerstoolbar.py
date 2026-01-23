@@ -1,11 +1,12 @@
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QColorConstants, QIcon, QColor
 from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy, QMenu, QFileDialog
 from ..return_line_edit import ReturnDoubleSpinBox
 from ...utils.util import colored_image
 from ..viewer import Viewer
 from .markerslistdockwidget import MarkersListDockWidget
 from ..coloredbutton import ColoredPushButton
+from ...utils.colors import LedgerColors
 
 
 class MarkersToolBar(QToolBar):
@@ -14,13 +15,18 @@ class MarkersToolBar(QToolBar):
         self.setObjectName("toolbar-markers")  # For settings save and restore
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
+        self.selected_color: QColor | Qt.GlobalColor | int | LedgerColors = (
+            QColorConstants.Red
+        )
+
+        self.viewer = viewer
 
         # Add a marker
-        w = QPushButton(self)
-        w.setIcon(QIcon(colored_image(":/icons/location-pin-plus.svg")))
+        self.add_marker_button = w = QPushButton(self)
+        self.set_color(self.selected_color)
         w.setIconSize(QSize(24, 24))
         w.setToolTip("Add marker")
-        w.clicked.connect(lambda: viewer.add_marker())
+        w.clicked.connect(lambda: self.viewer.add_marker(color=self.selected_color))
         self.addWidget(w)
 
         # Clear all markers
@@ -28,7 +34,7 @@ class MarkersToolBar(QToolBar):
         w.setIcon(QIcon(colored_image(":/icons/location-pin-clear.svg")))
         w.setIconSize(QSize(24, 24))
         w.setToolTip("Clear all markers")
-        w.clicked.connect(viewer.clear_markers)
+        w.clicked.connect(self.viewer.clear_markers)
         self.addWidget(w)
 
         # Load/save markers menu
@@ -38,6 +44,27 @@ class MarkersToolBar(QToolBar):
         markers_menu = QMenu("Markers", self)
         markers_menu.addAction("Load markers from file", lambda: self.load_markers())
         markers_menu.addAction("Save markers to file", lambda: self.save_markers())
+        # Submenu for setting the color of the markers
+        self._color_menu = color_menu = QMenu("Set color for new markers", self)
+        color_menu.addAction(
+            "Safety Orange", lambda: self.set_color(LedgerColors.SafetyOrange)
+        )
+        color_menu.addAction(
+            "Serenity Purple", lambda: self.set_color(LedgerColors.SerenityPurple)
+        )
+        color_menu.addAction(
+            "Security Blue", lambda: self.set_color(LedgerColors.SecurityBlue)
+        )
+        color_menu.addAction("Grellow", lambda: self.set_color(LedgerColors.Grellow))
+        color_menu.addAction("Red", lambda: self.set_color(QColorConstants.Red))
+        color_menu.addAction("Green", lambda: self.set_color(QColorConstants.Green))
+        color_menu.addAction("Blue", lambda: self.set_color(QColorConstants.Blue))
+        color_menu.addAction("Yellow", lambda: self.set_color(QColorConstants.Yellow))
+        color_menu.addAction("Magenta", lambda: self.set_color(QColorConstants.Magenta))
+        color_menu.addAction("Cyan", lambda: self.set_color(QColorConstants.Cyan))
+        color_menu.addAction("Black", lambda: self.set_color(QColorConstants.Black))
+        color_menu.addAction("White", lambda: self.set_color(QColorConstants.White))
+        markers_menu.addMenu(color_menu)
         w.setMenu(markers_menu)
         self.addWidget(w)
 
@@ -97,3 +124,13 @@ class MarkersToolBar(QToolBar):
         )
         if file_path:
             self.viewer.save_markers(file_path)
+
+    def set_color(self, color: QColor | Qt.GlobalColor | int | LedgerColors):
+        self.selected_color = color
+        self.add_marker_button.setIcon(
+            QIcon(
+                colored_image(
+                    ":/icons/location-pin-plus.svg", color=self.selected_color
+                )
+            )
+        )

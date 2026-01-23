@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
@@ -8,6 +9,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QScrollArea,
     QPushButton,
+    QWidget,
 )
 import sys
 import yaml
@@ -30,7 +32,7 @@ from ..utils.util import save_configuration_file
 
 
 class ConfigGeneratorWizard(QWizard):
-    def __init__(self, schema: dict, parent=None):
+    def __init__(self, schema: dict[str, Any], parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle("Configuration File Generator")
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
@@ -75,7 +77,7 @@ class ConfigGeneratorIntroductionPage(QWizardPage):
         label.setWordWrap(True)
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         label.setOpenExternalLinks(True)
-        label.linkActivated.connect(lambda url: print(url))
+        # label.linkActivated.connect(lambda url: print(url))
         layout.addWidget(label)
 
 
@@ -98,7 +100,7 @@ class ConfigResultPage(QWizardPage):
 
         layout.addWidget(save)
 
-        self.config = {}
+        self.config: dict[str, Any] = {}
 
     def initializePage(self):
         wiz = self.wizard()
@@ -127,7 +129,9 @@ class ConfigResultPage(QWizardPage):
 
 
 class ConfigPresentationPage(QWizardPage):
-    def __init__(self, parent: "ConfigGeneratorWizard", key: str, schema: dict):
+    def __init__(
+        self, parent: "ConfigGeneratorWizard", key: str, schema: dict[str, Any]
+    ):
         super().__init__(parent)
         layout = QVBoxLayout()
         self.setLayout(layout)

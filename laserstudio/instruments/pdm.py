@@ -1,9 +1,17 @@
 from PyQt6.QtCore import QTimer, QVariant, Qt
-from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource, InterlockStatus
+from pypdm import (
+    ConnectionFailure,
+    Link,
+    PDM,
+    SyncSource,
+    DelayLineType,
+    CurrentSource,
+    InterlockStatus,
+)
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
-from typing import Optional, cast
+from typing import cast, Any
 
 
 class PDMInstrument(LaserInstrument):
@@ -11,14 +19,14 @@ class PDMInstrument(LaserInstrument):
 
     __PDM_LINKS = {}
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         """
         :param config: YAML configuration object
         """
         super().__init__(config=config)
 
         # To refresh stage position in the view, in real-time
-        self._refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
+        self._refresh_interval = cast(int | None, config.get("refresh_interval_ms"))
 
         device_type = config.get("type")
         dev = config.get("dev")
@@ -69,11 +77,11 @@ class PDMInstrument(LaserInstrument):
             )
 
     @property
-    def refresh_interval(self) -> Optional[int]:
+    def refresh_interval(self) -> int | None:
         return self._refresh_interval
 
     @refresh_interval.setter
-    def refresh_interval(self, value: int):
+    def refresh_interval(self, value: int | None):
         self._refresh_interval = value
         if value is not None:
             QTimer.singleShot(value, Qt.TimerType.CoarseTimer, self.refresh_pdm)
@@ -97,7 +105,7 @@ class PDMInstrument(LaserInstrument):
 
     @frequency.setter
     def frequency(self, value: float):
-        self.pdm.frequency = value
+        self.pdm.frequency = int(value)
         self.pdm.apply()
 
     @property
@@ -106,7 +114,7 @@ class PDMInstrument(LaserInstrument):
 
     @delay.setter
     def delay(self, value: float):
-        self.pdm.delay = value
+        self.pdm.delay = int(value)
         self.pdm.apply()
 
     @property
@@ -115,9 +123,9 @@ class PDMInstrument(LaserInstrument):
 
     @pulse_width.setter
     def pulse_width(self, value: float):
-        self.pdm.pulse_width = value
+        self.pdm.pulse_width = int(value)
         self.pdm.apply()
-    
+
     @property
     def sync_source(self) -> SyncSource:
         return self.pdm.sync_source
@@ -198,14 +206,16 @@ class PDMInstrument(LaserInstrument):
         super_settings = super().settings
         super_settings.update(
             {
-                "interlock_status": "Open" if self.interlock_status == InterlockStatus.OPEN else "Closed",
+                "interlock_status": "Open"
+                if self.interlock_status == InterlockStatus.OPEN
+                else "Closed",
                 "refresh_interval_ms": self.refresh_interval,
             }
         )
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """
         Set the settings of the PDM.
         """

@@ -3,8 +3,7 @@ from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QCloseEvent
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
 from typing import Any
-
-from .widgets.viewer import Viewer, IdMarker
+from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
     PDMInstrument,
@@ -17,6 +16,7 @@ import logging
 import yaml
 from PIL import Image, ImageQt
 import numpy
+
 from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolBar,
@@ -36,6 +36,7 @@ from .widgets.toolbars import (
     FocusToolBar,
 )
 from .restserver.server import RestProxy
+from .utils.yaml_types import Config
 
 
 class LaserStudio(QMainWindow):
@@ -43,7 +44,7 @@ class LaserStudio(QMainWindow):
     Laser Studio main class and main window.
     """
 
-    def __init__(self, config: dict[str, Any] | None):
+    def __init__(self, config_file: Config | None):
         """
         Initialize the Laser Studio main window.
 
@@ -52,8 +53,7 @@ class LaserStudio(QMainWindow):
         """
         super().__init__()
 
-        if config is None:
-            config: dict[str, Any] = {}
+        config: Config = {} if config_file is None else config_file
 
         # Configuration file
         self.config = config
@@ -82,7 +82,12 @@ class LaserStudio(QMainWindow):
 
         # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(self)
-        group.idClicked.connect(lambda mode: self.viewer.select_mode(mode, True))
+
+        def id_clicked(id: int):
+            self.viewer.select_mode(Viewer.Mode(id), True)
+
+        group.idClicked.connect(id_clicked)
+
         self.viewer.mode_changed.connect(self.update_buttons_mode)
 
         # ToolBar: Main
@@ -228,13 +233,15 @@ class LaserStudio(QMainWindow):
         )
         shortcut.activated.connect(self.handle_go_next)
 
-        # Restore docks are previous session
-        geometry = self.settings.value("geometry")
-        if geometry is not None:
-            self.restoreGeometry(geometry)
-        window_state = self.settings.value("window-state")
-        if window_state is not None:
-            self.restoreState(window_state)
+        logging.getLogger("laserstudio").debug("LaserStudio initialized")
+
+        # # Restore docks are previous session
+        # geometry = self.settings.value("geometry")
+        # if geometry is not None:
+        #     self.restoreGeometry(geometry)
+        # window_state = self.settings.value("window-state")
+        # if window_state is not None:
+        #     self.restoreState(window_state)
 
     def closeEvent(self, a0: QCloseEvent | None):
         """Saves user settings before closing the application."""
@@ -246,12 +253,12 @@ class LaserStudio(QMainWindow):
                 w.close()
         super().closeEvent(a0)
 
-    def handle_go_next(self) -> dict:
+    def handle_go_next(self) -> dict[str, Any]:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        v = {}
+        v: dict[str, Any] = {}
         v.update(self.instruments.go_next())
         v.update(self.viewer.go_next())
         return v
@@ -452,7 +459,7 @@ class LaserStudio(QMainWindow):
         if self.instruments.stage is None or index not in range(
             len(self.instruments.stage.mem_points)
         ):
-            return {"pos": []}
+            return {"pos": list[float]()}
 
         point = self.instruments.stage.mem_points[index]
 
@@ -552,3 +559,9 @@ class LaserStudio(QMainWindow):
         stage = data.get("stage")
         if self.instruments.stage is not None and stage is not None:
             self.instruments.stage.settings = stage
+
+    def set_log_level(self, level: int):
+        """
+        Set the log level of the logger "laserstudio".
+        """
+        logging.getLogger("laserstudio").setLevel(level)

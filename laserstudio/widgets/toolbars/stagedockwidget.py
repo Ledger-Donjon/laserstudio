@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 import logging
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -43,7 +43,7 @@ class PositioningOffsetDialog(QDialog):
 
         self.original_offset_origin = self.stage.offset_origin
         self.stage.offset_origin = [0.0] * self.stage.num_axis
-        self.current_position = cast(list[float], self.stage.position.data)
+        self.current_position = self.stage.position.data
 
         self.setWindowTitle("Set Positioning Offset")
 
@@ -72,7 +72,7 @@ class PositioningOffsetDialog(QDialog):
             sb.setMaximum(1000000.0)
             sb.setDecimals(1)
             sb.setSuffix("\xa0µm")
-            sb.valueChanged.connect(lambda: self._pos_entries_value_changed())  # type: ignore
+            sb.valueChanged.connect(lambda: self._pos_entries_value_changed())
             self.pos_entries.append(sb)
             hbox.addWidget(sb)
         vbox.addLayout(hbox)
@@ -87,7 +87,7 @@ class PositioningOffsetDialog(QDialog):
             sb.setDecimals(1)
             sb.setSuffix("\xa0µm")
             sb.setValue(self.original_offset_origin[i])
-            sb.valueChanged.connect(lambda: self._offset_entries_value_changed())  # type: ignore
+            sb.valueChanged.connect(lambda: self._offset_entries_value_changed())
             self.offset_entries.append(sb)
             hbox.addWidget(sb)
         vbox.addLayout(hbox)
@@ -96,8 +96,8 @@ class PositioningOffsetDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        buttons.accepted.connect(lambda: self.accept())  # type: ignore
-        buttons.rejected.connect(lambda: self.reject())  # type: ignore
+        buttons.accepted.connect(lambda: self.accept())
+        buttons.rejected.connect(lambda: self.reject())
         vbox.addWidget(buttons)
         self.apply_offsets()
 
@@ -161,7 +161,8 @@ class StageDockWidget(QDockWidget):
         w = ColoredPushButton(
             ":/icons/fontawesome-free/directions-solid.svg", parent=self
         )
-        w.setText("Move")
+        # Use '&&' to display '&' in text labels in Qt
+        w.setText("Click && Move")
         w.setToolTip(
             "Move the stage to a new position, by clicking on the camera view."
         )
@@ -172,39 +173,75 @@ class StageDockWidget(QDockWidget):
         group.setId(w, laser_studio.viewer.Mode.STAGE)
 
         hbox2 = QHBoxLayout()
+        hbox2.setSpacing(2)
         grid.addLayout(hbox2, 0, 1)
         self.mem_point_selector = box = QComboBox()
+        hbox2.addWidget(box)
+
+        # Prepare the content of the memory point selector
         origin = [0.0] * self.stage.num_axis
-        box.addItem("Origin", Vector(*origin))
-        box.setItemData(
-            0,
-            "Origin: ["
-            + ", ".join([f"{c:+.02f}" + "\xa0µm" for c in origin])  # type: ignore
-            + "]",
-            Qt.ItemDataRole.ToolTipRole,
+        origin_label = "Origin"
+        origin_details = (
+            "Origin: [" + ", ".join([f"{c:+.02f}" + "\xa0µm" for c in origin]) + "]"
         )
+        box.addItem(origin_details, Vector(*origin))
+        box.setItemData(0, origin_label, Qt.ItemDataRole.UserRole)
+        box.setItemData(0, origin_details, Qt.ItemDataRole.ToolTipRole)
+
+        # Add the memory points to the selector
         for i in range(len(self.stage.mem_points)):
-            box.addItem(f"M{i}", self.stage.mem_points[i])
-            # Tooltip of the memory point's position
-            box.setItemData(
-                box.count() - 1,
+            short_label = f"M{i}"
+            detailed_label = (
                 f"M{i}: ["
                 + ", ".join(
                     [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data]
-                )  # type: ignore
-                + "]",
-                Qt.ItemDataRole.ToolTipRole,
+                )
+                + "]"
             )
-        hbox2.addWidget(box)
+            box.addItem(detailed_label, self.stage.mem_points[i])
+            box.setItemData(box.count() - 1, short_label, Qt.ItemDataRole.UserRole)
+            # Tooltip of the memory point's position
+            box.setItemData(
+                box.count() - 1, detailed_label, Qt.ItemDataRole.ToolTipRole
+            )
+
+        # Configure the memory point selector layout
+        box.setMinimumContentsLength(2)
+        box.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
         box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+        # Trick to make the Combobox to show the short label in the "line edit"
+        # instead of the detailed label (which is shown in the selection menu)
+        box.setEditable(True)
+        box.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        line_edit = box.lineEdit()
+        if line_edit is not None:
+            line_edit.setReadOnly(True)
+
+        def update_mem_point_label(index: int) -> None:
+            label = self.mem_point_selector.itemData(index, Qt.ItemDataRole.UserRole)
+            if label is None:
+                label = self.mem_point_selector.itemText(index)
+            line_edit = self.mem_point_selector.lineEdit()
+            if line_edit is not None:
+                line_edit.setText(str(label))
+
+        box.currentIndexChanged.connect(update_mem_point_label)
+        update_mem_point_label(box.currentIndex())
+
         hbox2.addWidget(w := QPushButton(self))
         w.setText("Go")
-        w.clicked.connect(self.go_to_mem_point_clicked)  # type: ignore
-        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        w.setContentsMargins(0, 0, 0, 0)
+        w.clicked.connect(self.go_to_mem_point_clicked)
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
+        hbox2.setStretch(0, 1)
+        hbox2.setStretch(1, 0)
         w = QPushButton(self)
         w.setText("Home")
-        w.clicked.connect(self.home)  # type: ignore
+        w.clicked.connect(self.home)
         grid.addWidget(w, 1, 0)
 
         w = QPushButton(self)
@@ -212,20 +249,20 @@ class StageDockWidget(QDockWidget):
         w.setToolTip("Get current stage position and copy in clipboard")
 
         def copy_position_to_clipboard():
-            pos = cast(list[float], self.stage.position.data)
+            pos = self.stage.position.data
             logging.getLogger("laserstudio").info(f"{pos} (copied in clipboard)...")
             clipboard = QGuiApplication.clipboard()
             if clipboard is not None:
                 clipboard.setText(str(pos))
 
-        w.clicked.connect(copy_position_to_clipboard)  # type: ignore
+        w.clicked.connect(copy_position_to_clipboard)
         grid.addWidget(w, 1, 1)
 
         hbox2 = QHBoxLayout()
         w = QPushButton(self)
         w.setText("Set Positioning Offset...")
         w.setToolTip("Set the positioning offset by entering coordinates values.")
-        w.clicked.connect(self.set_positioning_offset)  # type: ignore
+        w.clicked.connect(self.set_positioning_offset)
         w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         hbox2.addWidget(w)
         w = ColoredPushButton(":/icons/origin-offset-drag.svg", parent=self)
@@ -247,22 +284,22 @@ class StageDockWidget(QDockWidget):
             w.setToolTip(
                 "Set the current position as the origin of the device. This is permanent so will impact other projects."
             )
-            w.clicked.connect(self.stage.set_origin)  # type: ignore
+            w.clicked.connect(self.stage.set_device_origin)
             grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Reset GRBL")
-            w.clicked.connect(stage.reset_grbl)  # type: ignore
+            w.clicked.connect(stage.reset_grbl)
             grid.addWidget(w, 3, 1)
 
         elif isinstance(stage := self.stage.stage, SMC100):
             w = QPushButton(self)
             w.setText("Reset")
-            w.clicked.connect(stage.reset)  # type: ignore
+            w.clicked.connect(stage.reset)
             grid.addWidget(w, 3, 0)
 
             w = QPushButton(self)
             w.setText("Stop")
-            w.clicked.connect(stage.stop)  # type: ignore
+            w.clicked.connect(stage.stop)
             grid.addWidget(w, 3, 1)
 
         elif isinstance(stage := self.stage.stage, Corvus):
@@ -271,11 +308,11 @@ class StageDockWidget(QDockWidget):
             w.setToolTip(
                 "Set the current position as the origin of the device. This is permanent so will impact other projects."
             )
-            w.clicked.connect(self.stage.set_origin)  # type: ignore
+            w.clicked.connect(self.stage.set_device_origin)
             grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Enable Joystick")
-            w.clicked.connect(stage.enable_joystick)  # type: ignore
+            w.clicked.connect(stage.enable_joystick)
             grid.addWidget(w, 3, 1)
 
         hbox = QHBoxLayout()
@@ -288,7 +325,7 @@ class StageDockWidget(QDockWidget):
             box.addItem(f"Laser {i + 1}", userData=MoveFor(MoveFor.Type.LASER, i))
         for i in range(len(laser_studio.instruments.probes)):
             box.addItem(f"Probe {i + 1}", userData=MoveFor(MoveFor.Type.PROBE, i))
-        box.activated.connect(self.move_for_selection)  # type: ignore
+        box.activated.connect(self.move_for_selection)
         hbox.addWidget(QLabel("Focus on:"))
         hbox.addWidget(box)
         box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -315,7 +352,7 @@ class StageDockWidget(QDockWidget):
             w.addItem("Disabled")
             for joystick in joysticks:
                 w.addItem(joystick)
-            w.currentTextChanged.connect(self.activate_joystick)  # type: ignore
+            w.currentTextChanged.connect(self.activate_joystick)
             hbox.addWidget(QLabel("Joystick:"))
             hbox.addWidget(w)
             vbox.addLayout(hbox)
@@ -324,7 +361,7 @@ class StageDockWidget(QDockWidget):
         self.position = QLabel("")
         self.position.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.position.setStyleSheet("padding-left: 10px;padding-right: 10px")
-        self.stage.position_changed.connect(self.update_position)  # type: ignore
+        self.stage.position_changed.connect(self.update_position)
         self.position.setToolTip("The stage position")
         vbox.addWidget(self.position)
 
@@ -346,9 +383,7 @@ class StageDockWidget(QDockWidget):
         self.stage.move_to(data, wait=True)
 
     def update_position(self, position: Vector):
-        self.position.setText(
-            ", ".join([f"{c:+.02f}\xa0µm" for c in cast(list[float], position.data)])
-        )
+        self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in position.data]))
         f = QFont("monospace", 10)
         f.setStyleHint(QFont.StyleHint.Monospace)
         self.position.setFont(f)
@@ -401,8 +436,8 @@ class StageDockWidget(QDockWidget):
         if name == "PS4":
             self.joystick = JoystickHIDInstrument(HIDGAMEPAD.PS4)
         if self.joystick is not None:
-            self.joystick.axis_changed.connect(self.joystick_axis)  # type: ignore
-            self.joystick.button_pressed.connect(self.joystick_button)  # type: ignore
+            self.joystick.axis_changed.connect(self.joystick_axis)
+            self.joystick.button_pressed.connect(self.joystick_button)
 
     def joystick_button(self, button: int, pressed: bool):
         """

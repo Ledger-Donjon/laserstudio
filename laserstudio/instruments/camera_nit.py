@@ -9,7 +9,7 @@ class CameraNITInstrument(CameraInstrument):
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         try:
-            from pynit import PyNIT  # Lazy load the module # type: ignore
+            from pynit import PyNIT  # Lazy load the module
         except ImportError:
             raise ImportError(
                 "The pynit module is required to use the NIT."
