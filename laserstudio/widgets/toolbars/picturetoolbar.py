@@ -33,7 +33,7 @@ class PictureToolBar(QToolBar):
 
         # Button to load background picture.
         w = QPushButton(self)
-        w.setToolTip("Load background picture from file")
+        w.setToolTip("Load background picture from file...")
         w.setIcon(QIcon(colored_image(":/icons/fontawesome-free/image-regular.svg")))
         w.setIconSize(QSize(24, 24))
         w.clicked.connect(lambda: laser_studio.viewer.load_picture())

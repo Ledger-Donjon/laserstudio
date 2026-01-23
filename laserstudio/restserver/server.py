@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import flask
 from flask_restx import Api, Resource, fields
 from flask_restx.api import HTTPStatus
@@ -27,7 +29,7 @@ class RestProxy(QObject):
     laser studio.
     """
 
-    def __init__(self, laser_studio: "LaserStudio", config: dict[str, Any]):
+    def __init__(self, laser_studio: LaserStudio, config: dict[str, Any]):
         super().__init__()
         self.laser_studio: LaserStudio = laser_studio
         self.rest_object = RestServer(self)
@@ -81,11 +83,14 @@ class RestProxy(QObject):
     def handle_go_to_memory_point(self, index: int):
         return QVariant(self.laser_studio.handle_go_to_memory_point(index))
 
-    @pyqtSlot(QVariant, QVariant, result="QVariant")
+    @pyqtSlot(QVariant, QVariant, QVariant, result="QVariant")
     def handle_add_markers(
-        self, pos: list[list[float]] | None, color: list[float] | None
+        self,
+        pos: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
     ):
-        return QVariant(self.laser_studio.handle_add_markers(pos, color))
+        return QVariant(self.laser_studio.handle_add_markers(pos, color, label))
 
     @pyqtSlot(result="QVariant")
     def handle_markers(self):
@@ -440,8 +445,9 @@ marker = flask_api.model(
 )
 
 
-@annotations.route("/add_marker")
-@annotations.route("/add_measurement", doc={"description": "Alias for /add_marker"})
+@annotations.route("/add_markers")
+@annotations.route("/add_marker", doc={"description": "Alias for /add_markers"})
+@annotations.route("/add_measurement", doc={"description": "Alias for /add_markers"})
 class AddMarker(Resource):
     @annotations.expect(marker)
     def put(self):
@@ -450,9 +456,12 @@ class AddMarker(Resource):
         json = flask.request.json
         if not isinstance(json, dict):
             return "Given value is not a dictionary", 415
-        pos = json.get("pos")
+        positions = json.get("pos")
         color = json.get("color")
-        qvar = RestServer.invoke("handle_add_markers", QVariant(pos), QVariant(color))
+        label = json.get("label")
+        qvar = RestServer.invoke(
+            "handle_add_markers", QVariant(positions), QVariant(color), QVariant(label)
+        )
         return cast(dict, qvar)
 
 

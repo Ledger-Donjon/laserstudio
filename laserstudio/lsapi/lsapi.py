@@ -117,25 +117,31 @@ class LSAPI:
             0.0,
         ),
         positions: list[tuple[float, float]] | tuple[float, float] | None = None,
+        label: str | None = None,
     ):
         """
-        Add a colored marker in the view at a specific position.
+        Add colored marker(s) in the view at a specific position(s), with an optional label.
 
         :param color: (red, green, blue) or (red, green, blue, alpha) tuple or
             list. Each color channel is in [0, 1].
-        :param positions: the position of the marker, as a tuple. If None,
-            the position is retrieved from the stage's current position.
+        :param label: the label of the marker(s), as a string.
+        :param positions: the position of the marker(s), as a tuple or a list of tuples.
+            If None, the position is retrieved from the stage's current position.
         """
         assert len(color) in (3, 4)
 
-        params: dict[str, list[float]] = {"color": list(color)}
+        params: dict[str, list[float] | str | list[list[float]]] = {
+            "color": list(color)
+        }
+        if label is not None:
+            params["label"] = label
         if positions is not None:
             if isinstance(positions, tuple):
                 list_positions = [list(positions)]
             else:
                 list_positions = [list(position) for position in positions]
             params["pos"] = list_positions
-        return self.send("annotation/add_marker", params, is_put=True).json()
+        return self.send("annotation/add_markers", params, is_put=True).json()
 
     def go_to(self, index: int) -> list[float]:
         """

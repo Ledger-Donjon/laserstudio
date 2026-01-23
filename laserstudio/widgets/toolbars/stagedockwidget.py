@@ -267,7 +267,7 @@ class StageDockWidget(QDockWidget):
         hbox2.addWidget(w)
         w = ColoredPushButton(":/icons/origin-offset-drag.svg", parent=self)
         w.setToolTip(
-            "Modify the positioning offset by drag and replace on the camera view an element where it should be positioned to, according to other elements (zones, markers...)."
+            "Reposition an element visible on the camera where it should be, according to other elements (zones, markers...)."
         )
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
@@ -320,14 +320,17 @@ class StageDockWidget(QDockWidget):
         vbox.addLayout(hbox)
         # Move for
         self.move_for_selector = box = QComboBox()
-        box.addItem("Camera", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
+        box.addItem("Camera's center", userData=MoveFor(MoveFor.Type.CAMERA_CENTER))
         for i in range(len(laser_studio.instruments.lasers)):
             box.addItem(f"Laser {i + 1}", userData=MoveFor(MoveFor.Type.LASER, i))
         for i in range(len(laser_studio.instruments.probes)):
             box.addItem(f"Probe {i + 1}", userData=MoveFor(MoveFor.Type.PROBE, i))
         box.activated.connect(self.move_for_selection)
-        hbox.addWidget(QLabel("Focus on:"))
+        hbox.addWidget(QLabel("Focused item:"))
         hbox.addWidget(box)
+        box.setToolTip(
+            "The item to focus on\nThe stage will move in order to place the focused item at the desired position."
+        )
         box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Keyboard box

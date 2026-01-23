@@ -1,6 +1,13 @@
 #!/usr/bin/python3
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QCloseEvent
+from PyQt6.QtGui import (
+    QColor,
+    QShortcut,
+    QKeySequence,
+    QGuiApplication,
+    QCloseEvent,
+    QColorConstants,
+)
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
 from typing import Any
 from .widgets.viewer import Viewer
@@ -411,17 +418,21 @@ class LaserStudio(QMainWindow):
         return [marker.to_dict() for marker in self.viewer.markers]
 
     def handle_add_markers(
-        self, positions: list[list[float]] | None, color: list[float] | None
+        self,
+        positions: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
     ) -> dict[str, Any]:
-        """Add a marker.
+        """Add marker(s).
 
-        :param pos: The requested position(s) of the marker(s)
+        :param positions: The requested position(s) of the marker(s).
         :param color: The requested color of the marker(s). Defined as a list of 3 floats from 0.0 to 1.0 (RGB)
             or 4 floats from 0.0 to 1.0 (RGBA).
+        :param label: The requested label of the marker(s).
         :return: A dictionary containing the information about the markers' final position(s), and identifier(s)
         """
         if color is None:
-            qcolor = Qt.GlobalColor.red
+            qcolor = QColorConstants.Red
         else:
             if len(color) == 3:
                 color.append(1.0)
@@ -437,10 +448,10 @@ class LaserStudio(QMainWindow):
             )
 
         if positions is None:
-            markers = [self.viewer.add_marker(None, color=qcolor)]
+            markers = [self.viewer.add_marker(None, color=qcolor, label=label)]
         else:
             markers = [
-                self.viewer.add_marker((pos[0], pos[1]), color=qcolor)
+                self.viewer.add_marker((pos[0], pos[1]), color=qcolor, label=label)
                 for pos in positions
             ]
 

@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QGraphicsPixmapItem,
     QGraphicsLineItem,
     QWidget,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
@@ -458,6 +459,13 @@ class Viewer(QGraphicsView):
         """
         if event is None:
             return
+        if event.button() == Qt.MouseButton.RightButton:
+            item = self.itemAt(event.pos())
+            while item is not None:
+                if isinstance(item, Marker):
+                    super().mousePressEvent(event)
+                    return
+                item = item.parentItem()
         if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
@@ -866,7 +874,6 @@ class Viewer(QGraphicsView):
         marker.setPos(*position)
         marker.setZValue(2)
         marker.size = self.default_marker_size
-        marker.update_tooltip()
         return marker
 
     def clear_markers(self):
@@ -874,6 +881,12 @@ class Viewer(QGraphicsView):
         for marker in self.__markers:
             self.__scene.removeItem(marker)
         self.__markers.clear()
+
+    def remove_marker(self, marker: Marker):
+        """Remove a specific marker from the scene."""
+        self.__scene.removeItem(marker)
+        self.__markers.remove(marker)
+        marker.viewer = None
 
     @property
     def settings(self) -> dict[str, Any]:
@@ -906,10 +919,28 @@ class Viewer(QGraphicsView):
                     self.pin_markers[i].setPos(pin[0], pin[1])
                     self.pin_markers[i].show()
 
-    def load_markers(self, file_path: str):
+    def load_markers(self, file_path: str, interactive: bool = False):
         """Load markers from a file."""
         with open(file_path, "r") as f:
-            markers = json.load(f)
+            try:
+                markers: list[dict[str, Any]] = json.load(f)
+            except json.JSONDecodeError:
+                QMessageBox.critical(
+                    self,
+                    "Error loading markers",
+                    "The file contains invalid JSON.",
+                )
+                return
+        if interactive:
+            # Ask for confirmation
+            if not QMessageBox.information(
+                self,
+                f"{len(markers)} markers loaded",
+                f"{len(markers)} are ready to be added to the scene. Do you want to proceed?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            ):
+                return
+
         for marker in markers:
             color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
             color = QColor(

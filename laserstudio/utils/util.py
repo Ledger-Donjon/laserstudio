@@ -1,7 +1,15 @@
 import os
-from PyQt6.QtGui import QTransform, QPixmap, QColor, QPen, QPainter
+from PyQt6.QtGui import (
+    QTransform,
+    QPixmap,
+    QColor,
+    QPen,
+    QPainter,
+    QIcon,
+    QPainterPath,
+)
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
-from PyQt6.QtCore import Qt, QPointF, QRectF
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
 from typing import Any
 from .colors import LedgerColors
 import yaml
@@ -109,3 +117,34 @@ class ChartViewWithVMarker(QChartView):
         p2 = QPointF(p.x(), r.bottom())
         painter.drawLine(p1, p2)
         painter.restore()
+
+
+def create_color_qicon(
+    color: QColor | Qt.GlobalColor | int | LedgerColors, size: int = 16
+) -> QIcon:
+    """
+    Create a circle icon of a given color.
+    :param color: Color to create the icon from.
+    :return: Icon.
+    """
+    if isinstance(color, LedgerColors):
+        color = color.value
+    if isinstance(color, Qt.GlobalColor):
+        color = QColor(color)
+    if isinstance(color, int):
+        color = QColor(color)
+
+    pixmap = QPixmap(QSize(size, size))
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHints(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addEllipse(size / 2 - 3, size / 2 - 3, 6, 6)
+    painter.fillPath(path, QColor(0, 0, 0, 100))
+    path = QPainterPath()
+    path.addEllipse(size / 2 - 7, size / 2 - 7, 14, 14)
+    painter.setPen(QPen(Qt.GlobalColor.black, 1))
+    painter.fillPath(path, color)
+    painter.drawPath(path)
+    painter.end()
+    return QIcon(pixmap)

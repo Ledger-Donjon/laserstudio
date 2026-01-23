@@ -1,17 +1,25 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import (
+    QInputDialog,
     QGraphicsItem,
     QGraphicsItemGroup,
     QGraphicsEllipseItem,
     QGraphicsLineItem,
+    QGraphicsSceneContextMenuEvent,
+    QMenu,
 )
 from PyQt6.QtGui import QPen, QColor, QColorConstants
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtCore import Qt, QPointF, QPoint
 from typing import TYPE_CHECKING, Any, Optional
+from ..utils.colors import LedgerColors
+from ..utils.util import create_color_qicon
 
 if TYPE_CHECKING:
     from .stagesight import StageSight
+    from .viewer import Viewer
 
 
 class Marker(QGraphicsItemGroup):
@@ -23,6 +31,7 @@ class Marker(QGraphicsItemGroup):
     def __init__(
         self,
         parent: None | QGraphicsItem = None,
+        viewer: None | Viewer = None,
         color: QColor | Qt.GlobalColor | int | list[float] = QColorConstants.Red,
         fillcolor: QColor
         | Qt.GlobalColor
@@ -31,6 +40,7 @@ class Marker(QGraphicsItemGroup):
         label: str | None = None,
     ):
         super().__init__(parent)
+        self.viewer = viewer
         if isinstance(color, list):
             color = QColor(
                 int(color[0] * 255),
@@ -71,6 +81,7 @@ class Marker(QGraphicsItemGroup):
         item = self.__line2 = QGraphicsLineItem(0, 0, 0, 0)
         item.setPen(pen)
         self.addToGroup(item)
+        self.update_tooltip()
         self.__update_size()
 
     def __update_size(self):
@@ -157,6 +168,69 @@ class Marker(QGraphicsItemGroup):
             data["label"] = self.label
         return data
 
+    def update_tooltip(self):
+        """The tooltip of the marker gives its position and its ID."""
+        label = f"{self.label}\n" if self.label else ""
+        pos = (
+            "["
+            + ", ".join(
+                ["{:+.02f}\xa0µm".format(x) for x in (self.pos().x(), self.pos().y())]
+            )
+            + "]"
+        )
+        self._ellipse.setToolTip(label + pos)
+
+    def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent | None) -> None:
+        """Show a context menu when the marker is right-clicked."""
+        menu = QMenu()
+        menu.addSection(self.label)
+        menu.addAction("Change label...", self.set_label)
+        # Submenu for setting the color of the marker
+        color_menu = QMenu("Change color", menu)
+        for color in LedgerColors:
+            color_menu.addAction(
+                create_color_qicon(color),
+                color.name,
+                lambda c=color: self.set_color(c.value),
+            )
+        color_menu.addSeparator()
+        for color, name in [
+            (QColorConstants.Red, "Red"),
+            (QColorConstants.Green, "Green"),
+            (QColorConstants.Blue, "Blue"),
+            (QColorConstants.Yellow, "Yellow"),
+            (QColorConstants.Magenta, "Magenta"),
+            (QColorConstants.Cyan, "Cyan"),
+        ]:
+            color_menu.addAction(
+                create_color_qicon(color), name, lambda c=color: self.set_color(c)
+            )
+        menu.addMenu(color_menu)
+        menu.addAction("Remove marker", self.remove)
+        menu.exec(event.screenPos() if event is not None else QPoint())
+
+    def remove(self):
+        """Remove the marker from the viewer or the scene."""
+        if self.viewer is not None:
+            self.viewer.remove_marker(self)
+        else:
+            if (scene := self.scene()) is not None:
+                scene.removeItem(self)
+
+    def set_label(self):
+        """Set the label of the marker."""
+        label, ok = QInputDialog.getText(
+            None, "Set label", "Enter label:", text=self.label
+        )
+        if ok:
+            self.label = label
+            self.update_tooltip()
+
+    def set_color(self, color: QColor | Qt.GlobalColor | int):
+        """Set the color of the marker."""
+        self.color = color
+        self.update()
+
 
 class ProbeMarker(Marker):
     def __init__(self, probe: ProbeInstrument, parent: Optional["StageSight"] = None):
@@ -183,9 +257,6 @@ class ProbeMarker(Marker):
             self.setVisible(True)
         else:
             self.setVisible(False)
-
-    def setToolTip(self, toolTip: str | None):
-        self._ellipse.setToolTip(toolTip)
 
 
 class IdMarker(Marker):
@@ -220,10 +291,8 @@ class IdMarker(Marker):
         """Id of the Marker, as an integer."""
         return self._id
 
-    def update_tooltip(self):
-        """The tooltip of the marker gives its position and its ID."""
-        label = f"M{self.id}" if self.label is None else self.label
-        self.setToolTip(
-            f"{label}: "
-            + ", ".join(["{:.2f}".format(x) for x in (self.pos().x(), self.pos().y())])
-        )
+    def set_color(self, color: QColor | Qt.GlobalColor | int):
+        """Set the color of the marker."""
+        self.color = color
+        self.fillcolor = color
+        self.update()

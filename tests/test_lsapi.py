@@ -6,7 +6,9 @@ import numpy
 def test_add_marker():
     api = LSAPI()
     m = api.marker(
-        (random(), random(), random(), 0.7), p := (random() * 3000, random() * 3000)
+        (random(), random(), random(), 0.7),
+        p := (random() * 3000, random() * 3000),
+        label="test",
     )
     assert list(p) == m["pos"]
 
@@ -30,10 +32,11 @@ def test_add_5000_markers_seq():
 def test_add_5000_markers_batch_by100():
     api = LSAPI()
     for _ in range(50):
+        i = int(random() * 10)
         color = (random(), random(), random(), 0.7)
-        first = api.marker(color, (random() * 3000, random() * 3000))
+        first = api.marker(color, (random() * 3000, random() * 3000), label=f"Test {i}")
         positions = [(random() * 3000, random() * 3000) for _ in range(1, 100)]
-        markers = api.marker(color, positions)
+        markers = api.marker(color, positions, label=f"Test {i}")
 
         for i, m in enumerate(markers["markers"]):
             assert m["id"] == (1 + i) + first["id"]

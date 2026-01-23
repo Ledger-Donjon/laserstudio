@@ -34,9 +34,10 @@ class ColoredPushButton(QPushButton):
             icon.addPixmap(self.colored_pixmap, QIcon.Mode.Normal, QIcon.State.On)
             self.setIcon(icon)
 
+        self.setProperty("checkedTextColor", self.color)
+
     def changeEvent(self, e: Optional[QEvent]) -> None:
         value = super().changeEvent(e)
-        color_hex = self.color.getRgb()
-        color_hex = f"#{color_hex[0]:02x}{color_hex[1]:02x}{color_hex[2]:02x}"
-        self.setStyleSheet(f"QPushButton::checked{{color: {color_hex};}} ")
+        self.setProperty("checkedTextColor", self.color)
+        self.update()
         return value
