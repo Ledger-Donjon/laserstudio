@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from jsonschema import validate, ValidationError
 from typing import Any, TYPE_CHECKING, cast

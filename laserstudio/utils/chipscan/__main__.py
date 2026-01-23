@@ -1,23 +1,16 @@
 from .chipscan import ChipScan
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QLocale
 import sys
-import argparse
-import os.path
-import subprocess
-from ..util import resource_path
 from ..colors import LedgerPalette, LedgerStyle
 import yaml
 
 
 def main():
     app = QApplication(sys.argv)
-    parser = argparse.ArgumentParser(prog="chipscan")
 
     app.setApplicationName("Chip Scan")
     app.setApplicationDisplayName("Chip Scan")
-    # app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
     app.setStyle(LedgerStyle)
     app.setPalette(LedgerPalette)
     app.setStyleSheet(
