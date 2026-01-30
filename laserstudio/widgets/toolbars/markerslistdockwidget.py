@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QAction
 from PyQt6.QtWidgets import (
     QPushButton,
     QDockWidget,
@@ -13,8 +13,9 @@ from PyQt6.QtWidgets import (
     QStyledItemDelegate,
     QAbstractItemView,
     QStyleOptionViewItem,
+    QMenu,
 )
-from PyQt6.QtCore import QModelIndex
+from PyQt6.QtCore import QModelIndex, QPoint
 from ..viewer import Viewer
 from ..marker import Marker, IdMarker
 
@@ -24,8 +25,31 @@ class MarkersGroupListItem(QTreeWidgetItem):
         super().__init__(parent)
         self.number_of_checked = 0
         self.setFlags(self.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.setFirstColumnSpanned(True)
 
     def update_checked_state(self):
+        tw = self.treeWidget()
+        assert tw is not None
+        tw.blockSignals(True)
+
+        number_of_checked = 0
+        number_of_markers = 0
+        for i in range(self.childCount()):
+            child = self.child(i)
+            if isinstance(child, MarkersListItem):
+                if child.checkState(0) == Qt.CheckState.Checked:
+                    number_of_checked += 1
+                    number_of_markers += 1
+            elif isinstance(child, MarkersGroupListItem):
+                pass
+
+        if number_of_checked == 0:
+            self.setCheckState(0, Qt.CheckState.Unchecked)
+        elif number_of_checked == self.childCount():
+            self.setCheckState(0, Qt.CheckState.Checked)
+        else:
+            self.setCheckState(0, Qt.CheckState.PartiallyChecked)
+
         # To prevent the itemChanged signal from being emitted
         tw = self.treeWidget()
         assert tw is not None
@@ -57,16 +81,17 @@ class MarkersListItem(QTreeWidgetItem):
     def update_display(self) -> None:
         x, y = self.marker.pos().x(), self.marker.pos().y()
         label_text = self.marker.label or ""
-        self.setText(1, label_text)
-        self.setText(0, f"{x:.02f}\xa0µm, {y:.02f}\xa0µm")
-
-        id_text = f"{self.marker.id} " if isinstance(self.marker, IdMarker) else ""
+        id_text = f"#{self.marker.id} " if isinstance(self.marker, IdMarker) else ""
+        self.setText(0, id_text)
+        self.setText(1, f"{x:.02f}\xa0µm, {y:.02f}\xa0µm")
+        self.setText(2, label_text)
         label_tip = f"{self.marker.label} " if self.marker.label else ""
         self.setToolTip(
-            0, f"Marker {id_text}{label_tip}at {x:.02f}\xa0µm, {y:.02f}\xa0µm"
+            0, f"Marker #{id_text}{label_tip}at {x:.02f}\xa0µm, {y:.02f}\xa0µm"
         )
         self.setForeground(0, self.marker.qfillcolor)
         self.setForeground(1, self.marker.qfillcolor)
+        self.setForeground(2, self.marker.qfillcolor)
 
 
 class _NonEditableColumnDelegate(QStyledItemDelegate):
@@ -90,8 +115,102 @@ class MarkersListDockWidget(QDockWidget):
         for item in self.list.selectedItems():
             item.setCheckState(0, Qt.CheckState.Unchecked)
 
+    def _set_marker_items_visible(
+        self, items: list[MarkersListItem], visible: bool
+    ) -> None:
+        new_state = Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked
+        for item in items:
+            item.setCheckState(0, new_state)
+
+    def _set_group_items_visible(
+        self, items: list[MarkersGroupListItem], visible: bool
+    ) -> None:
+        new_state = Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked
+        for item in items:
+            item.setCheckState(0, new_state)
+
+    def _remove_marker_items(self, items: list[MarkersListItem]) -> None:
+        for item in items:
+            if isinstance(item.marker, IdMarker):
+                item.marker.remove()
+        self.refresh_list()
+
+    def show_context_menu(self, position: QPoint) -> None:
+        item = self.list.itemAt(position)
+        if item is None:
+            return
+
+        if not item.isSelected():
+            self.list.clearSelection()
+            item.setSelected(True)
+
+        menu = QMenu(self.list)
+        if isinstance(item, MarkersListItem):
+            marker_items = [
+                selected
+                for selected in self.list.selectedItems()
+                if isinstance(selected, MarkersListItem)
+            ]
+            if not marker_items:
+                return
+
+            go_action = QAction("Go to marker", menu)
+            go_action.setEnabled(len(marker_items) == 1)
+            if len(marker_items) == 1:
+                go_action.triggered.connect(lambda: self.show_marker(marker_items[0]))
+            menu.addAction(go_action)
+
+            menu.addSeparator()
+            menu.addAction(
+                "Show",
+                lambda: self._set_marker_items_visible(marker_items, True),
+            )
+            menu.addAction(
+                "Hide",
+                lambda: self._set_marker_items_visible(marker_items, False),
+            )
+
+            rename_action = QAction("Rename label...", menu)
+            rename_action.setEnabled(len(marker_items) == 1)
+            if len(marker_items) == 1:
+                rename_action.triggered.connect(
+                    lambda: self.list.editItem(marker_items[0], 1)
+                )
+            menu.addAction(rename_action)
+
+            menu.addSeparator()
+            remove_label = (
+                "Remove marker" if len(marker_items) == 1 else "Remove markers"
+            )
+            menu.addAction(
+                remove_label,
+                lambda: self._remove_marker_items(marker_items),
+            )
+        elif isinstance(item, MarkersGroupListItem):
+            group_items = [
+                selected
+                for selected in self.list.selectedItems()
+                if isinstance(selected, MarkersGroupListItem)
+            ]
+            if not group_items:
+                return
+            menu.addAction(
+                "Show all",
+                lambda: self._set_group_items_visible(group_items, True),
+            )
+            menu.addAction(
+                "Hide all",
+                lambda: self._set_group_items_visible(group_items, False),
+            )
+        else:
+            return
+
+        viewport = self.list.viewport()
+        if viewport is None:
+            return
+        menu.exec(viewport.mapToGlobal(position))
+
     def refresh_list(self):
-        self.list.clear()
         labeled_markers_by_color: dict[str, dict[str, list[Marker]]] = {}
         markers_by_colors: dict[str, list[Marker]] = {}
         for marker in self.viewer.markers:
@@ -115,12 +234,13 @@ class MarkersListDockWidget(QDockWidget):
                 else:
                     labeled_markers_by_color[marker.label][name].append(marker)
 
-        # Add labeled markers grouped by color and label
+        self.list.clear()
         self.list.itemChanged.disconnect(self.item_changed)
+
+        # Add labeled markers grouped by color and label
         for label in sorted(labeled_markers_by_color.keys()):
             number_of_markers = 0
             labeled_group = MarkersGroupListItem(self.list)
-            labeled_group.setFirstColumnSpanned(True)
 
             for color in sorted(labeled_markers_by_color[label].keys()):
                 labeled_markers: list[Marker] = labeled_markers_by_color[label][color]
@@ -131,8 +251,7 @@ class MarkersListDockWidget(QDockWidget):
                     f"{len(labeled_markers)} marker"
                     + ("" if len(labeled_markers) == 1 else "s"),
                 )
-                color_group.setFirstColumnSpanned(True)
-                for marker in labeled_markers:
+                for marker in sorted(labeled_markers, key=lambda m: m.id):
                     MarkersListItem(color_group, marker)
                 color_group.update_checked_state()
                 number_of_markers += len(labeled_markers)
@@ -153,8 +272,6 @@ class MarkersListDockWidget(QDockWidget):
             group.setText(
                 0, f"{len(markers)} marker" + ("" if len(markers) == 1 else "s")
             )
-            group.setFirstColumnSpanned(True)
-
             for marker in markers:
                 MarkersListItem(group, marker)
             group.update_checked_state()
@@ -169,15 +286,18 @@ class MarkersListDockWidget(QDockWidget):
 
         self.viewer = viewer
         self.list = QTreeWidget()
-        self.list.setHeaderLabels(["Position", "Label"])
-        self.list.setColumnCount(2)
+        self.list.setHeaderLabels(["Id", "Position", "Label"])
+        self.list.setColumnCount(3)
         self.list.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         self.list.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
         )
         self.list.setItemDelegateForColumn(0, _NonEditableColumnDelegate(self.list))
+        self.list.setItemDelegateForColumn(1, _NonEditableColumnDelegate(self.list))
         self.list.itemChanged.connect(self.item_changed)
+        self.list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self.show_context_menu)
 
         w = QWidget()
         self.setWidget(w)
@@ -208,8 +328,8 @@ class MarkersListDockWidget(QDockWidget):
 
     def item_changed(self, item: QTreeWidgetItem, column: int | None = None):
         if isinstance(item, MarkersListItem):
-            if column in (0, None):
-                new_label = item.text(0).strip()
+            if column in (2, None):
+                new_label = item.text(2).strip()
                 new_label = new_label if new_label else None
                 if new_label != item.marker.label:
                     item.marker.label = new_label

@@ -1,7 +1,6 @@
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColorConstants, QIcon, QColor
 from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy, QMenu, QFileDialog
-from numpy import ma
 from ..return_line_edit import ReturnDoubleSpinBox
 from ...utils.util import colored_image, create_color_qicon
 from ..viewer import Viewer
@@ -71,7 +70,10 @@ class MarkersToolBar(QToolBar):
                 lambda c=color: self.set_color(c),  # type: ignore
             )
         markers_menu.addMenu(color_menu)
-        markers_menu.addAction("Offset Markers", lambda: self.load_markers())
+        action = markers_menu.addAction("Offset Markers", lambda: None)  # type: ignore
+        if action is not None:
+            action.setEnabled(False)
+            action.setToolTip("Offset markers is not implemented yet")
         w.setMenu(markers_menu)
         self.addWidget(w)
 

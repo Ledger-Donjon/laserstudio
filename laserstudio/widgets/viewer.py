@@ -133,7 +133,11 @@ class Viewer(QGraphicsView):
             m.hide()
 
         # Markers
-        self.__markers: list[Marker] = []
+        self.__markers: set[IdMarker] = set()
+        self.__markers_by_label_by_color: dict[str | None, dict[str, set[IdMarker]]] = {
+            None: {}
+        }
+
         self.default_marker_size = 30.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
@@ -158,12 +162,16 @@ class Viewer(QGraphicsView):
         self.setMouseTracking(True)
 
     @property
-    def markers(self) -> list[Marker]:
-        return self.__markers
+    def markers(self) -> list[IdMarker]:
+        return list(self.__markers)
+
+    @property
+    def markers_by_label_by_color(self) -> dict[str | None, dict[str, set[IdMarker]]]:
+        return self.__markers_by_label_by_color
 
     def marker_size(self, value: float):
         self.default_marker_size = value
-        for m in self.__markers:
+        for m in self.markers:
             m.size = value
 
     @property
@@ -865,9 +873,16 @@ class Viewer(QGraphicsView):
             color = QColor(color)
         elif isinstance(color, int):
             color = QColor(color)
-        marker = IdMarker(color=color, label=label)
-        self.__markers.append(marker)
+        marker = IdMarker(viewer=self, color=color, label=label)
+        self.__markers.add(marker)
+        if label not in self.__markers_by_label_by_color:
+            self.__markers_by_label_by_color[label] = {marker.color_name: set([marker])}
+        elif marker.color_name not in self.__markers_by_label_by_color[label]:
+            self.__markers_by_label_by_color[label][marker.color_name] = set([marker])
+        else:
+            self.__markers_by_label_by_color[label][marker.color_name].add(marker)
         self.__scene.addItem(marker)
+
         if position is None:
             p = self.focused_element_position()
             position = p.x(), p.y()
@@ -880,12 +895,24 @@ class Viewer(QGraphicsView):
         """Removes all markers."""
         for marker in self.__markers:
             self.__scene.removeItem(marker)
+            marker.viewer = None
         self.__markers.clear()
+        self.__markers_by_label_by_color.clear()
 
-    def remove_marker(self, marker: Marker):
+    def remove_marker(self, marker: IdMarker):
         """Remove a specific marker from the scene."""
         self.__scene.removeItem(marker)
         self.__markers.remove(marker)
+        self.__markers_by_label_by_color[marker.label][marker.color_name].remove(marker)
+        if len(self.__markers_by_label_by_color[marker.label][marker.color_name]) == 0:
+            del self.__markers_by_label_by_color[marker.label][marker.color_name]
+        if len(self.__markers_by_label_by_color[marker.label]) == 0:
+            del self.__markers_by_label_by_color[marker.label]
+        logging.getLogger("laserstudio").debug(
+            f"Markers by label by color: {self.__markers_by_label_by_color}"
+        )
+        logging.getLogger("laserstudio").debug(f"Markers: {self.__markers}")
+        logging.getLogger("laserstudio").info(f"Marker {marker} removed")
         marker.viewer = None
 
     @property
@@ -955,4 +982,4 @@ class Viewer(QGraphicsView):
     def save_markers(self, file_path: str):
         """Save markers to a file."""
         with open(file_path, "w") as f:
-            json.dump([marker.to_dict() for marker in self.__markers], f)
+            json.dump([marker.to_dict() for marker in self.markers], f)

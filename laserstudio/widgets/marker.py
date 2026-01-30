@@ -170,15 +170,18 @@ class Marker(QGraphicsItemGroup):
 
     def update_tooltip(self):
         """The tooltip of the marker gives its position and its ID."""
-        label = f"{self.label}\n" if self.label else ""
-        pos = (
-            "["
+        tooltip = (
+            "Marker #" + (f"{self.id}" if isinstance(self, IdMarker) else "") + "\n"
+        )
+        tooltip += f"Label: {self.label}\n" if self.label else ""
+        tooltip += (
+            "Position: ["
             + ", ".join(
                 ["{:+.02f}\xa0µm".format(x) for x in (self.pos().x(), self.pos().y())]
             )
             + "]"
         )
-        self._ellipse.setToolTip(label + pos)
+        self._ellipse.setToolTip(tooltip)
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent | None) -> None:
         """Show a context menu when the marker is right-clicked."""
@@ -206,16 +209,8 @@ class Marker(QGraphicsItemGroup):
                 create_color_qicon(color), name, lambda c=color: self.set_color(c)
             )
         menu.addMenu(color_menu)
-        menu.addAction("Remove marker", self.remove)
+        # menu.addAction("Remove marker", self.remove)
         menu.exec(event.screenPos() if event is not None else QPoint())
-
-    def remove(self):
-        """Remove the marker from the viewer or the scene."""
-        if self.viewer is not None:
-            self.viewer.remove_marker(self)
-        else:
-            if (scene := self.scene()) is not None:
-                scene.removeItem(self)
 
     def set_label(self):
         """Set the label of the marker."""
@@ -268,9 +263,12 @@ class IdMarker(Marker):
     def __init__(
         self,
         parent: None | QGraphicsItem = None,
+        viewer: None | Viewer = None,
         color: QColor | Qt.GlobalColor | int | list[float] = QColorConstants.Red,
         label: str | None = None,
     ) -> None:
+        self._id = IdMarker.__id
+        IdMarker.__id += 1
         if isinstance(color, list):
             color = QColor(
                 int(color[0] * 255),
@@ -282,9 +280,9 @@ class IdMarker(Marker):
             color = QColor(color)
         elif isinstance(color, int):
             color = QColor(color)
-        super().__init__(parent, color=color, fillcolor=color, label=label)
-        self._id = IdMarker.__id
-        IdMarker.__id += 1
+        super().__init__(
+            parent, viewer=viewer, color=color, fillcolor=color, label=label
+        )
 
     @property
     def id(self):
@@ -296,3 +294,25 @@ class IdMarker(Marker):
         self.color = color
         self.fillcolor = color
         self.update()
+
+    @property
+    def color_name(self) -> str:
+        """Return HSL values as a string."""
+        return "".join([f"{v:02x}" for v in self.color_hsl])
+
+    @property
+    def color_hsl(self) -> tuple[int, int, int]:
+        """Return the HSL values of the color of the marker."""
+        hsl = self.qfillcolor.toHsl()
+        return hsl.hue(), hsl.saturation(), hsl.lightness()
+
+    def __str__(self) -> str:
+        return f"IdMarker(id={self.id}, label={self.label}, color={self.color_name})"
+
+    def remove(self):
+        """Remove the marker from the viewer or the scene."""
+        if self.viewer is not None:
+            self.viewer.remove_marker(self)
+        else:
+            if (scene := self.scene()) is not None:
+                scene.removeItem(self)

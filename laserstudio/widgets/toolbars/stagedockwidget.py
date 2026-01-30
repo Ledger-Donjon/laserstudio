@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 import logging
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtWidgets import (
@@ -16,8 +16,9 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QSizePolicy,
+    QMenu,
 )
-from PyQt6.QtGui import QGuiApplication, QFont
+from PyQt6.QtGui import QGuiApplication, QFont, QAction, QIcon
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import KeyboardBox, Direction
 from ...instruments.stage import (
@@ -30,6 +31,8 @@ from ...instruments.stage import (
 )
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
+from ..marker import IdMarker
+from ...utils.util import create_color_qicon
 
 
 if TYPE_CHECKING:
@@ -135,6 +138,7 @@ class StageDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         assert laser_studio.instruments.stage is not None
         self.stage = laser_studio.instruments.stage
+        self.viewer = laser_studio.viewer
         super().__init__("Stage Control", laser_studio)
 
         if self.stage.label:
@@ -175,61 +179,18 @@ class StageDockWidget(QDockWidget):
         hbox2 = QHBoxLayout()
         hbox2.setSpacing(2)
         grid.addLayout(hbox2, 0, 1)
-        self.mem_point_selector = box = QComboBox()
-        hbox2.addWidget(box)
+        self.mem_point_selector = QPushButton(self)
+        self.mem_point_selector.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.mem_point_menu = QMenu(self)
+        self.mem_point_selector.setMenu(self.mem_point_menu)
+        self.mem_point_menu.aboutToShow.connect(self.refresh_mem_point_menu)
+        hbox2.addWidget(self.mem_point_selector)
 
-        # Prepare the content of the memory point selector
         origin = [0.0] * self.stage.num_axis
-        origin_label = "Origin"
-        origin_details = (
-            "Origin: [" + ", ".join([f"{c:+.02f}" + "\xa0µm" for c in origin]) + "]"
-        )
-        box.addItem(origin_details, Vector(*origin))
-        box.setItemData(0, origin_label, Qt.ItemDataRole.UserRole)
-        box.setItemData(0, origin_details, Qt.ItemDataRole.ToolTipRole)
-
-        # Add the memory points to the selector
-        for i in range(len(self.stage.mem_points)):
-            short_label = f"M{i}"
-            detailed_label = (
-                f"M{i}: ["
-                + ", ".join(
-                    [f"{c:+.02f}" + "\xa0µm" for c in self.stage.mem_points[i].data]
-                )
-                + "]"
-            )
-            box.addItem(detailed_label, self.stage.mem_points[i])
-            box.setItemData(box.count() - 1, short_label, Qt.ItemDataRole.UserRole)
-            # Tooltip of the memory point's position
-            box.setItemData(
-                box.count() - 1, detailed_label, Qt.ItemDataRole.ToolTipRole
-            )
-
-        # Configure the memory point selector layout
-        box.setMinimumContentsLength(2)
-        box.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
-        )
-        box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-        # Trick to make the Combobox to show the short label in the "line edit"
-        # instead of the detailed label (which is shown in the selection menu)
-        box.setEditable(True)
-        box.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        line_edit = box.lineEdit()
-        if line_edit is not None:
-            line_edit.setReadOnly(True)
-
-        def update_mem_point_label(index: int) -> None:
-            label = self.mem_point_selector.itemData(index, Qt.ItemDataRole.UserRole)
-            if label is None:
-                label = self.mem_point_selector.itemText(index)
-            line_edit = self.mem_point_selector.lineEdit()
-            if line_edit is not None:
-                line_edit.setText(str(label))
-
-        box.currentIndexChanged.connect(update_mem_point_label)
-        update_mem_point_label(box.currentIndex())
+        origin_details = self._format_position_details("Origin", origin)
+        self._select_mem_point("Origin", Vector(*origin), origin_details)
 
         hbox2.addWidget(w := QPushButton(self))
         w.setText("Go")
@@ -374,7 +335,9 @@ class StageDockWidget(QDockWidget):
         """
         Called when the go to memory point button is clicked.
         """
-        data = self.mem_point_selector.currentData()
+        data = getattr(self, "_mem_point_selection", None)
+        if isinstance(data, IdMarker):
+            data = self._vector_from_marker(data)
         if not isinstance(data, Vector):
             logging.getLogger("laserstudio").error(f"Invalid memory point: {data}")
             return
@@ -384,6 +347,119 @@ class StageDockWidget(QDockWidget):
             )
             return
         self.stage.move_to(data, wait=True)
+
+    def _format_position_details(self, label: str, coords: list[float]) -> str:
+        coords_text = ", ".join([f"{c:+.02f}" + "\xa0µm" for c in coords])
+        return f"{label}: [{coords_text}]"
+
+    def _marker_menu_label(self, marker: IdMarker) -> str:
+        if marker.label:
+            return f"{marker.label} (#{marker.id})"
+        return f"Marker {marker.id}"
+
+    def _select_mem_point(
+        self,
+        label: str,
+        data: Vector | IdMarker,
+        tooltip: str | None = None,
+        icon: QIcon | None = None,
+    ) -> None:
+        self._mem_point_selection = data
+        self.mem_point_selector.setText(label)
+        if icon is not None:
+            self.mem_point_selector.setIcon(icon)
+        if tooltip is not None:
+            self.mem_point_selector.setToolTip(tooltip)
+
+    def _make_mem_point_handler(
+        self,
+        label: str,
+        data: Vector | IdMarker,
+        tooltip: str,
+        icon: QIcon | None = None,
+    ) -> Callable[[bool], None]:
+        def handler(_checked: bool = False) -> None:
+            self._select_mem_point(label, data, tooltip, icon)
+
+        return handler
+
+    def _vector_from_marker(self, marker: IdMarker) -> Vector:
+        pos = marker.pos()
+        coords = list(self.stage.position.data)
+        if len(coords) >= 1:
+            coords[0] = pos.x()
+        if len(coords) >= 2:
+            coords[1] = pos.y()
+        return Vector(*coords)
+
+    def refresh_mem_point_menu(self) -> None:
+        self.mem_point_menu.clear()
+        origin = [0.0] * self.stage.num_axis
+        origin_details = self._format_position_details("Origin", origin)
+        origin_action = QAction("Origin", self.mem_point_menu)
+        origin_action.setToolTip(origin_details)
+        origin_action.triggered.connect(
+            self._make_mem_point_handler("Origin", Vector(*origin), origin_details)
+        )
+        self.mem_point_menu.addAction(origin_action)
+
+        memory_menu = QMenu("Memory points", self.mem_point_menu)
+        self.mem_point_menu.addMenu(memory_menu)
+        if self.stage.mem_points:
+            for i, mem_point in enumerate(self.stage.mem_points):
+                short_label = f"M{i}"
+                details = self._format_position_details(
+                    short_label, list(mem_point.data)
+                )
+                action = QAction(details, memory_menu)
+                action.triggered.connect(
+                    self._make_mem_point_handler(short_label, mem_point, details)
+                )
+                memory_menu.addAction(action)
+        else:
+            no_memory = QAction("No memory points", memory_menu)
+            no_memory.setEnabled(False)
+            memory_menu.addAction(no_memory)
+
+        markers_menu = QMenu("Markers", self.mem_point_menu)
+        self.mem_point_menu.addMenu(markers_menu)
+        markers_by_label_by_color = self.viewer.markers_by_label_by_color
+
+        labels = sorted(markers_by_label_by_color.keys(), key=lambda l: l or "")
+        for label in labels:
+            markers_by_color = markers_by_label_by_color[label]
+            label_menu = QMenu(label or "Unlabeled", markers_menu)
+            markers_menu.addMenu(label_menu)
+            if not markers_by_color:
+                no_markers = QAction("No markers", label_menu)
+                no_markers.setEnabled(False)
+                label_menu.addAction(no_markers)
+                continue
+
+            for color in sorted(markers_by_color.keys()):
+                markers = markers_by_color[color]
+                color_menu = QMenu(
+                    f"{len(markers)} marker" + ("" if len(markers) == 1 else "s"),
+                    label_menu,
+                )
+                label_menu.addMenu(color_menu)
+                color_icon = None
+                for marker in markers:
+                    pos = marker.pos()
+                    details = self._format_position_details(
+                        f"#{marker.id}", [pos.x(), pos.y()]
+                    )
+                    action = QAction(details, color_menu)
+                    color_icon = color_icon or create_color_qicon(marker.qcolor)
+                    action.setIcon(color_icon)
+                    action.triggered.connect(
+                        self._make_mem_point_handler(
+                            f"#{marker.id}", marker, details, color_icon
+                        )
+                    )
+                    color_menu.addAction(action)
+                if color_icon is not None:
+                    color_menu.setIcon(color_icon)
 
     def update_position(self, position: Vector):
         self.position.setText(", ".join([f"{c:+.02f}\xa0µm" for c in position.data]))
