@@ -164,6 +164,8 @@ class Marker(QGraphicsItemGroup):
                 self.qfillcolor.alphaF(),
             ],
         }
+        if not self.isVisible():
+            data["hidden"] = True
         if self.label is not None:
             data["label"] = self.label
         return data

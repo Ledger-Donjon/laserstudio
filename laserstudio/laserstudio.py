@@ -422,6 +422,7 @@ class LaserStudio(QMainWindow):
         positions: list[list[float]] | None,
         color: list[float] | None,
         label: str | None,
+        visible: bool | None = True,
     ) -> dict[str, Any]:
         """Add marker(s).
 
@@ -429,8 +430,11 @@ class LaserStudio(QMainWindow):
         :param color: The requested color of the marker(s). Defined as a list of 3 floats from 0.0 to 1.0 (RGB)
             or 4 floats from 0.0 to 1.0 (RGBA).
         :param label: The requested label of the marker(s).
+        :param visible: If False, marker(s) are created but not displayed (setVisible(False)).
         :return: A dictionary containing the information about the markers' final position(s), and identifier(s)
         """
+        if visible is None:
+            visible = True
         if color is None:
             qcolor = QColorConstants.Red
         else:
@@ -448,10 +452,16 @@ class LaserStudio(QMainWindow):
             )
 
         if positions is None:
-            markers = [self.viewer.add_marker(None, color=qcolor, label=label)]
+            markers = [
+                self.viewer.add_marker(
+                    None, color=qcolor, label=label, visible=visible
+                )
+            ]
         else:
             markers = [
-                self.viewer.add_marker((pos[0], pos[1]), color=qcolor, label=label)
+                self.viewer.add_marker(
+                    (pos[0], pos[1]), color=qcolor, label=label, visible=visible
+                )
                 for pos in positions
             ]
 

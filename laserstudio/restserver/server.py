@@ -83,14 +83,17 @@ class RestProxy(QObject):
     def handle_go_to_memory_point(self, index: int):
         return QVariant(self.laser_studio.handle_go_to_memory_point(index))
 
-    @pyqtSlot(QVariant, QVariant, QVariant, result="QVariant")
+    @pyqtSlot(QVariant, QVariant, QVariant, QVariant, result="QVariant")
     def handle_add_markers(
         self,
         pos: list[list[float]] | None,
         color: list[float] | None,
         label: str | None,
+        visible: bool | None,
     ):
-        return QVariant(self.laser_studio.handle_add_markers(pos, color, label))
+        return QVariant(
+            self.laser_studio.handle_add_markers(pos, color, label, visible)
+        )
 
     @pyqtSlot(result="QVariant")
     def handle_markers(self):
@@ -426,7 +429,6 @@ class Position(Resource):
         json = flask.request.json
         if not isinstance(json, dict):
             return "Given value is not a dictionary", 415
-        pos = json.get("pos")
         return RestServer.invoke("handle_position", QVariant(pos))
 
     @motion.response(200, "Stage position and moving state", position_move)
@@ -441,6 +443,7 @@ marker = flask_api.model(
     {
         "pos": fields.List(viewer_pos),
         "color": fields.List(fields.Float, example=[0.0, 1.0, 0.0, 0.5]),
+        "visible": fields.Boolean(description="If False, marker(s) are created but not displayed."),
     },
 )
 
@@ -459,8 +462,13 @@ class AddMarker(Resource):
         positions = json.get("pos")
         color = json.get("color")
         label = json.get("label")
+        visible = json.get("visible", True)
         qvar = RestServer.invoke(
-            "handle_add_markers", QVariant(positions), QVariant(color), QVariant(label)
+            "handle_add_markers",
+            QVariant(positions),
+            QVariant(color),
+            QVariant(label),
+            QVariant(visible),
         )
         return cast(dict, qvar)
 

@@ -856,9 +856,12 @@ class Viewer(QGraphicsView):
         | list[float]
         | LedgerColors = QColorConstants.Red,
         label: str | None = None,
+        visible: bool = True,
     ) -> IdMarker:
         """
-        Add a marker at a specific position, or at current observed position
+        Add a marker at a specific position, or at current observed position.
+
+        :param visible: If False, the marker is created but not displayed (setVisible(False)).
         """
         if isinstance(color, LedgerColors):
             color = color.value
@@ -889,6 +892,7 @@ class Viewer(QGraphicsView):
         marker.setPos(*position)
         marker.setZValue(2)
         marker.size = self.default_marker_size
+        marker.setVisible(visible)
         return marker
 
     def clear_markers(self):
@@ -977,7 +981,8 @@ class Viewer(QGraphicsView):
                 int(color[3] * 255),
             )
             label = marker.get("label", None)
-            self.add_marker(marker["pos"], color, label=label)
+            visible = not marker.get("hidden", False)
+            self.add_marker(marker["pos"], color, label=label, visible=visible)
 
     def save_markers(self, file_path: str):
         """Save markers to a file."""

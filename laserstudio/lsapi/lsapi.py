@@ -118,6 +118,7 @@ class LSAPI:
         ),
         positions: list[tuple[float, float]] | tuple[float, float] | None = None,
         label: str | None = None,
+        visible: bool = True,
     ):
         """
         Add colored marker(s) in the view at a specific position(s), with an optional label.
@@ -127,11 +128,13 @@ class LSAPI:
         :param label: the label of the marker(s), as a string.
         :param positions: the position of the marker(s), as a tuple or a list of tuples.
             If None, the position is retrieved from the stage's current position.
+        :param visible: if False, the marker(s) are created but not displayed (setVisible(False)).
         """
         assert len(color) in (3, 4)
 
-        params: dict[str, list[float] | str | list[list[float]]] = {
-            "color": list(color)
+        params: dict[str, list[float] | str | list[list[float]] | bool] = {
+            "color": list(color),
+            "visible": visible,
         }
         if label is not None:
             params["label"] = label
