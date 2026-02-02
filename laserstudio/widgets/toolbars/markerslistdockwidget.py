@@ -74,9 +74,10 @@ class _MarkerNode(_TreeNode):
 class MarkersTreeModel(QAbstractItemModel):
     _headers = ["Id", "Position", "Label"]
 
-    def __init__(self, viewer: Viewer):
+    def __init__(self, viewer: Viewer, tree_view: QTreeView | None = None):
         super().__init__()
         self._viewer = viewer
+        self._tree_view = tree_view
         self._root = _GroupNode(None, "root")
 
     def _color_key(self, marker: Marker) -> str:
@@ -328,32 +329,52 @@ class MarkersTreeModel(QAbstractItemModel):
         if old_visible == new_visible:
             return
 
-        for marker_node in group.iter_marker_nodes():
-            if marker_node.marker.isVisible() != visible:
-                marker_node.marker.setVisible(visible)
+        view = self._viewer
+        tree = self._tree_view
+        if tree is not None:
+            tree.setUpdatesEnabled(False)
+        view.setUpdatesEnabled(False)
+        try:
+            for marker_node in group.iter_marker_nodes():
+                if marker_node.marker.isVisible() != visible:
+                    marker_node.marker.setVisible(visible)
 
-        group.visible_count = group.total_count if visible else 0
-        for group_node in group.iter_group_nodes():
-            group_node.visible_count = group_node.total_count if visible else 0
+            group.visible_count = group.total_count if visible else 0
+            for group_node in group.iter_group_nodes():
+                group_node.visible_count = group_node.total_count if visible else 0
 
-        delta = new_visible - old_visible
-        parent = group.parent
-        while parent is not None:
-            parent.visible_count += delta
-            parent = parent.parent
+            delta = new_visible - old_visible
+            parent = group.parent
+            while parent is not None:
+                parent.visible_count += delta
+                parent = parent.parent
 
-        self._emit_group_updates(group)
-        self._emit_descendant_check_updates(group)
+            self._emit_group_updates(group)
+            self._emit_descendant_check_updates(group)
+        finally:
+            view.setUpdatesEnabled(True)
+            if tree is not None:
+                tree.setUpdatesEnabled(True)
 
     def _toggle_marker_visibility(self, node: _MarkerNode, visible: bool) -> None:
         if node.marker.isVisible() == visible:
             return
-        node.marker.setVisible(visible)
-        delta = 1 if visible else -1
-        parent = node.parent
-        while parent is not None:
-            parent.visible_count += delta
-            parent = parent.parent
+        view = self._viewer
+        tree = self._tree_view
+        if tree is not None:
+            tree.setUpdatesEnabled(False)
+        view.setUpdatesEnabled(False)
+        try:
+            node.marker.setVisible(visible)
+            delta = 1 if visible else -1
+            parent = node.parent
+            while parent is not None:
+                parent.visible_count += delta
+                parent = parent.parent
+        finally:
+            view.setUpdatesEnabled(True)
+            if tree is not None:
+                tree.setUpdatesEnabled(True)
 
     def setData(
         self,
@@ -421,7 +442,7 @@ class MarkersListDockWidget(QDockWidget):
 
         self.viewer = viewer
         self.list = QTreeView()
-        self.model = MarkersTreeModel(self.viewer)
+        self.model = MarkersTreeModel(self.viewer, self.list)
         self.list.setModel(self.model)
         self.list.setUniformRowHeights(True)
         self.list.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
