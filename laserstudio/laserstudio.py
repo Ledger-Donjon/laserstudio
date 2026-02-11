@@ -1,4 +1,11 @@
 #!/usr/bin/python3
+import os
+import logging
+import yaml
+from PIL import Image, ImageQt
+import numpy
+from collections.abc import Sequence
+from typing import Any, cast
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import (
     QColor,
@@ -9,7 +16,6 @@ from PyQt6.QtGui import (
     QColorConstants,
 )
 from PyQt6.QtWidgets import QMainWindow, QButtonGroup
-from typing import Any
 from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
@@ -19,11 +25,6 @@ from .instruments.instruments import (
     CameraRaptorInstrument,
     LightInstrument,
 )
-import logging
-import yaml
-from PIL import Image, ImageQt
-import numpy
-
 from .instruments.stage import Vector
 from .widgets.toolbars import (
     PictureToolBar,
@@ -405,12 +406,31 @@ class LaserStudio(QMainWindow):
             return {"settings": inst.settings}
         return None
 
-    def handle_position(self, pos: list[float] | None) -> dict[str, Any]:
+    def handle_position(self, pos: Sequence[float] | None) -> dict[str, Any]:
         if self.instruments.stage is None:
             return {"pos": []}
+        stage = self.instruments.stage
         if pos is not None:
-            self.instruments.stage.move_to(Vector(*pos), wait=True)
-        return {"pos": self.instruments.stage.position.data}
+            if not isinstance(pos, (list, tuple)):
+                current_pos = cast(list[float], stage.position.data)
+                return {
+                    "error": "Invalid position: expected a list of coordinates",
+                    "pos": current_pos,
+                }
+            num_axis = stage.num_axis
+            if len(pos) > num_axis:
+                current_pos = cast(list[float], stage.position.data)
+                return {
+                    "error": "Too many coordinates for stage axes",
+                    "pos": current_pos,
+                }
+            if len(pos) < num_axis:
+                target = list(cast(list[float], stage.position.data))
+                for i, value in enumerate(pos):
+                    target[i] = value
+                pos = target
+            stage.move_to(Vector(*pos), wait=True)
+        return {"pos": cast(list[float], stage.position.data)}
 
     def handle_markers(self) -> list[dict[str, Any]]:
         """Handle a Markers API request to get the list of markers."""
