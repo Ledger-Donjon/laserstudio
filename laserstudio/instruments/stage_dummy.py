@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from .stage import Stage, Vector
-from typing import cast, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .stage import StageInstrument
@@ -8,7 +10,7 @@ if TYPE_CHECKING:
 class StageDummy(Stage):
     """Class to implement Dummy Stage"""
 
-    def __init__(self, config: dict, stage_instrument: "StageInstrument"):
+    def __init__(self, config: dict[str, Any], stage_instrument: StageInstrument):
         """
         :param config: YAML configuration object
         :param stage_instrument: The StageInstrument the Stage is attached to.
@@ -24,7 +26,6 @@ class StageDummy(Stage):
     @position.setter
     def position(self, value: Vector):
         self._position = value
-        self.stage_instrument.refresh_stage()
 
     @property
     def is_moving(self) -> bool:

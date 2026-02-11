@@ -218,7 +218,7 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        position = self.stage.position
+        position = Vector(*self.stage.position.data)
         self.mutex.unlock()
 
         # Apply shearing transformation
