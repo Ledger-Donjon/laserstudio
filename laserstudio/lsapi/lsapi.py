@@ -2,6 +2,7 @@
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
 from typing import Any
+from numpy.typing import NDArray
 import requests
 from PIL import Image
 import io
@@ -171,7 +172,7 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
 
-    def accumulated_image(self, path: str | None) -> numpy.ndarray | None:
+    def accumulated_image(self, path: str | None) -> NDArray[Any] | None:
         """
         Get the camera accumulator's data, as a numpy array.
         """
@@ -200,7 +201,7 @@ class LSAPI:
 
     def reference_image(
         self, num: int | None = None, unset: bool = False, set: bool = False
-    ) -> numpy.ndarray | None:
+    ) -> NDArray[Any] | None:
         """
         Get and/or set the reference image for the camera.
         """
