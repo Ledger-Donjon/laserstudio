@@ -429,7 +429,11 @@ class Position(Resource):
         json = flask.request.json
         if not isinstance(json, dict):
             return "Given value is not a dictionary", 415
-        return RestServer.invoke("handle_position", QVariant(pos))
+        pos = json.get("pos")
+        response = cast(dict, RestServer.invoke("handle_position", QVariant(pos)))
+        if "error" in response:
+            return response, HTTPStatus.BAD_REQUEST
+        return response
 
     @motion.response(200, "Stage position and moving state", position_move)
     def get(self):
