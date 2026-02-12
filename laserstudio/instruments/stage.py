@@ -246,6 +246,7 @@ class StageInstrument(Instrument):
         for i in range(len(position)):
             position[i] = position[i] * factors[i] + self.offset_origin[i]
 
+        position = Vector(*position)
         self.position_changed.emit(position)
         return position
 
