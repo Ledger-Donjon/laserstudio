@@ -14,10 +14,10 @@
       "type": "array",
       "minItems": 2,
       "maxItems": 2,
-      "description": "The relative position from the center of the camera, in micrometers.",
+      "description": "The relative position from the center of the camera without distortion, in pixels.",
       "items": {
-        "type": "integer",
-        "suffix": "um"
+        "type": "number",
+        "suffix": "px"
       }
     }
   }

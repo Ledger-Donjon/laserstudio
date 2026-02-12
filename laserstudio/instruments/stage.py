@@ -166,7 +166,9 @@ class StageInstrument(Instrument):
 
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
+                self.refresh_interval,
+                Qt.TimerType.CoarseTimer,
+                self.__autorefresh_stage,
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
@@ -179,7 +181,7 @@ class StageInstrument(Instrument):
                 f"Unit factor {factors} is a single value, it will be repeated for all axes."
             )
             factors = [float(factors)] * len(position)
-        
+
         if len(factors) != len(position):
             logging.getLogger("laserstudio").warning(
                 f"Unit factors {factors} has an inconsistent length from the number of axes ({len(position)}). Please check your configuration file"
@@ -189,23 +191,22 @@ class StageInstrument(Instrument):
                     "No unit factors provided. 1.0 will be repeated for all axes."
                 )
                 factors = [1.0] * len(position)
-            
+
             if len(factors) < len(position):
                 last_value = factors[-1]
                 logging.getLogger("laserstudio").warning(
                     f"Last value ({last_value}) will be repeated to the number of axes."
                 )
                 factors = factors + [last_value] * (len(position) - len(factors))
-            
+
             if len(factors) > len(position):
                 # Truncate array if there is too much values for the number of axes
                 logging.getLogger("laserstudio").warning(
                     f"Values will be truncated to the number of axes"
                 )
                 factors = factors[: len(position)]
-                
-        self.unit_factors: list[float] = factors
 
+        self.unit_factors: list[float] = factors
 
         # Offset origin
         self.offset_origin: list[float] = cast(
@@ -275,7 +276,9 @@ class StageInstrument(Instrument):
             )
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
+                self.refresh_interval,
+                Qt.TimerType.CoarseTimer,
+                self.__autorefresh_stage,
             )
 
     def move_relative(self, displacement: Vector, wait: bool, backlash: bool = False):
@@ -307,12 +310,18 @@ class StageInstrument(Instrument):
         """
         # Make sure about the dimension of the position vector
         if len(position) > self.num_axis:
-            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored.")
-            position = Vector(*position.data[:self.num_axis])
+            logging.getLogger("laserstudio").warning(
+                f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored."
+            )
+            position = Vector(*position.data[: self.num_axis])
         elif len(position) < self.num_axis:
-            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position.")
+            logging.getLogger("laserstudio").warning(
+                f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position."
+            )
             current_position = self.position
-            extra_positions = [current_position[i] for i in range(len(position), self.num_axis)]
+            extra_positions = [
+                current_position[i] for i in range(len(position), self.num_axis)
+            ]
             position = Vector(*(position.data + extra_positions))
 
         logging.getLogger("laserstudio").debug(f"Moving to {position}...")

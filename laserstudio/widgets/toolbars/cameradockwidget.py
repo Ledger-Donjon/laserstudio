@@ -1,6 +1,8 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from PyQt6.QtCore import Qt, QSize, QMargins
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
+from PyQt6.QtGui import QIcon, QPainter, QColor
 from PyQt6.QtWidgets import (
     QDockWidget,
     QPushButton,
@@ -9,11 +11,12 @@ from PyQt6.QtWidgets import (
     QSlider,
     QLabel,
     QDoubleSpinBox,
+    QComboBox,
 )
 from PyQt6.QtCharts import QBarSet, QBarSeries, QChart, QChartView
 
 from laserstudio.widgets.coloredbutton import ColoredPushButton
-from ...utils.util import colored_image
+from ...utils import util
 from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
 from ..return_line_edit import ReturnSpinBox
@@ -24,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class CameraImageAdjustementDockWidget(QDockWidget):
-    def __init__(self, laser_studio: "LaserStudio"):
+    def __init__(self, laser_studio: LaserStudio):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
@@ -172,7 +175,7 @@ class CameraImageAdjustementDockWidget(QDockWidget):
             axe.setLineVisible(False)
         self.chart.update()
 
-    def update_levels(self, black=None, white=None):
+    def update_levels(self, black: float | None = None, white: float | None = None):
         if black is None:
             black = self.black_level_slider.value() / self.black_level_slider.maximum()
         if white is None:
@@ -198,7 +201,7 @@ class CameraImageAdjustementDockWidget(QDockWidget):
 
 
 class CameraDockWidget(QDockWidget):
-    def __init__(self, laser_studio: "LaserStudio"):
+    def __init__(self, laser_studio: LaserStudio):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         self.camera = laser_studio.instruments.camera
@@ -243,7 +246,7 @@ class CameraDockWidget(QDockWidget):
         # Probes wizard button
         self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
         w = QPushButton("Probes/Spots Wizard")
-        w.clicked.connect(lambda: (self.probes_distortion_wizard.show()))
+        w.clicked.connect(lambda: self.probes_distortion_wizard.show())
         grid.addWidget(w, 2, 2)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
@@ -280,12 +283,41 @@ class CameraDockWidget(QDockWidget):
             w.clicked.connect(lambda b: self.camera.shutter.__setattr__("open", b))
             grid.addWidget(w, 4, 2)
 
-        
+        # Objective selector
+        self.obj_combobox = w = QComboBox()
+        for x in [1, 5, 10, 20, 50]:
+            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
+            w.addItem(icon, f"{x} X")
+            if x == self.camera.objective:
+                w.setCurrentIndex(w.count() - 1)
+        w.setStyleSheet("QListView::item {height:24px;}")
+        w.currentIndexChanged.connect(self.obj_changed)
+        grid.addWidget(QLabel("Objective:"), 5, 1)
+        grid.addWidget(w, 5, 2)
+
         # Second representation of the camera image
         stage_sight = StageSight(None, self.camera)
         self.second_view = w = StageSightViewer(stage_sight)
         w.setHidden(True)
-        grid.addWidget(w, 5, 1, 1, 2)
+        grid.addWidget(w, 6, 1, 1, 2)
 
         # Add stretch of last row
         grid.setRowStretch(grid.rowCount(), 1)
+
+        self.camera.parameter_changed.connect(self.camera_parameter_changed)
+
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective" and isinstance(value, float):
+            self.obj_combobox.blockSignals(True)
+            self.obj_combobox.setCurrentIndex(
+                self.obj_combobox.findText(f"{value:.0f} X")
+            )
+            self.obj_combobox.blockSignals(False)
+
+    def obj_changed(self):
+        """
+        Called when the magnification is changed in the UI.
+        """
+        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
+        assert self.laser_studio.viewer.stage_sight is not None
+        self.laser_studio.viewer.stage_sight.update_size()

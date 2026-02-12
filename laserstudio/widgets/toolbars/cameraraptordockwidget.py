@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from ...instruments.camera_raptor import (
     CameraRaptorInstrument,
     RaptorCameraControlReg0,
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class CameraRaptorDockWidget(CameraDockWidget):
-    def __init__(self, laser_studio: "LaserStudio"):
+    def __init__(self, laser_studio: LaserStudio):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
         super().__init__(laser_studio)
@@ -104,14 +106,14 @@ class CameraRaptorDockWidget(CameraDockWidget):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Objective:"))
-        w = self.mag_combobox = QComboBox()
+        w = self.obj_combobox = QComboBox()
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
             if x == self.camera.objective:
                 w.setCurrentIndex(w.count() - 1)
         w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.mag_changed)
+        w.currentIndexChanged.connect(self.obj_changed)
         hbox.addWidget(w)
 
         # Show last image number
@@ -179,10 +181,20 @@ class CameraRaptorDockWidget(CameraDockWidget):
             )
         )
 
-    def mag_changed(self):
+        self.camera.parameter_changed.connect(self.camera_parameter_changed)
+
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective" and isinstance(value, float):
+            self.obj_combobox.blockSignals(True)
+            self.obj_combobox.setCurrentIndex(
+                self.obj_combobox.findText(f"{value:.0f} X")
+            )
+            self.obj_combobox.blockSignals(False)
+
+    def obj_changed(self):
         """
         Called when the magnification is changed in the UI.
         """
-        self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
+        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()
