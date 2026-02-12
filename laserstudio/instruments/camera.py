@@ -129,11 +129,12 @@ class CameraInstrument(Instrument):
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
 
-        :param factor: The magnifying factor of the objective (5x, 10x, 20x, 50x...)
+        :param factor: The magnifying factor of the objective (1x, 5x, 10x, 20x, 50x...)
         """
         self.objective = factor
         self.width_um = self.width * self.pixel_size_in_um[0] / factor
         self.height_um = self.height * self.pixel_size_in_um[1] / factor
+        self.parameter_changed.emit("objective", factor)
 
     def get_last_qimage(self) -> QImage:
         """
