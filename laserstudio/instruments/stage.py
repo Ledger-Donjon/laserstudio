@@ -18,6 +18,7 @@ from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
 from .instrument import Instrument
+from copy import deepcopy
 
 __all__ = [
     "StageInstrument",
@@ -165,7 +166,7 @@ class StageInstrument(Instrument):
 
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
@@ -230,15 +231,15 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        position = cast(list[float], self.stage.position.data)
+        position = deepcopy(self.stage.position)
         self.mutex.unlock()
 
         # Apply shearing transformation
-        x = position[0]
-        y = position[1]
+        x = float(position.x)
+        y = float(position.y)
 
-        position[0] = x - self.shear[0] * y
-        position[1] = y - self.shear[1] * x
+        position.x = x - self.shear[0] * y
+        position.y = y - self.shear[1] * x
 
         factors = self.unit_factors
         if isinstance(factors, float) or isinstance(factors, int):
@@ -246,7 +247,6 @@ class StageInstrument(Instrument):
         for i in range(len(position)):
             position[i] = position[i] * factors[i] + self.offset_origin[i]
 
-        position = Vector(*position)
         self.position_changed.emit(position)
         return position
 
@@ -263,8 +263,9 @@ class StageInstrument(Instrument):
         """
         self.move_to(value, wait=False)
 
-    def refresh_stage(self):
-        """Called regularly to get stage position, and emits a pyQtSignal"""
+    def __autorefresh_stage(self):
+        """Called regularly to get stage position, and emits a pyQtSignal
+        This method is not public, it is called by a QTimer to refresh the stage position regularly."""
         try:
             self.position_changed.emit(position := self.position)
             logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
@@ -274,7 +275,7 @@ class StageInstrument(Instrument):
             )
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
             )
 
     def move_relative(self, displacement: Vector, wait: bool, backlash: bool = False):
