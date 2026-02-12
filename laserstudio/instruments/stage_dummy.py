@@ -21,7 +21,8 @@ class StageDummy(Stage):
 
     @property
     def position(self) -> Vector:
-        return self._position
+        # Do not return the object itself, but a copy
+        return Vector(*cast(list[float], self._position.data))
 
     @position.setter
     def position(self, value: Vector):

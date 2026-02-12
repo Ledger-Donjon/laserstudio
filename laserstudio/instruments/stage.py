@@ -173,26 +173,38 @@ class StageInstrument(Instrument):
             list[float], config.get("unit_factor", config.get("unit_factors", [1.0]))
         )
         position = self.stage.position
-        if type(factors) is not list:
-            factors = [factors] * len(position)
-        else:
-            # We ensure that there is at least one element in the array
+        if isinstance(factors, int) or isinstance(factors, float):
+            logging.getLogger("laserstudio").warning(
+                f"Unit factor {factors} is a single value, it will be repeated for all axes."
+            )
+            factors = [float(factors)] * len(position)
+        
+        if len(factors) != len(position):
+            logging.getLogger("laserstudio").warning(
+                f"Unit factors {factors} has an inconsistent length from the number of axes ({len(position)}). Please check your configuration file"
+            )
             if len(factors) == 0:
-                factors = [1.0]
+                logging.getLogger("laserstudio").warning(
+                    "No unit factors provided. 1.0 will be repeated for all axes."
+                )
+                factors = [1.0] * len(position)
+            
+            if len(factors) < len(position):
+                last_value = factors[-1]
+                logging.getLogger("laserstudio").warning(
+                    f"Last value ({last_value}) will be repeated to the number of axes."
+                )
+                factors = factors + [last_value] * (len(position) - len(factors))
+            
+            if len(factors) > len(position):
+                # Truncate array if there is too much values for the number of axes
+                logging.getLogger("laserstudio").warning(
+                    f"Values will be truncated to the number of axes"
+                )
+                factors = factors[: len(position)]
+                
+        self.unit_factors: list[float] = factors
 
-            # Truncate array if there is too much values for the number of axes
-            factors = factors[: len(position)]
-
-            # Completion with last value of the array until we get enough number of values
-            factors += [factors[-1]] * abs(len(position) - len(factors))
-
-        self.unit_factors = factors
-
-        assert type(self.unit_factors) is list and len(self.unit_factors) == len(
-            position
-        ), (
-            f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
-        )
 
         # Offset origin
         self.offset_origin: list[float] = cast(
@@ -218,18 +230,19 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        position = Vector(*self.stage.position.data)
+        position = cast(list[float], self.stage.position.data)
         self.mutex.unlock()
 
         # Apply shearing transformation
-        x = float(position[0])
-        y = float(position[1])
+        x = position[0]
+        y = position[1]
 
         position[0] = x - self.shear[0] * y
         position[1] = y - self.shear[1] * x
 
         factors = self.unit_factors
-        assert type(factors) is list and len(factors) == len(position)
+        if isinstance(factors, float) or isinstance(factors, int):
+            factors = [float(factors)] * len(position)
         for i in range(len(position)):
             position[i] = position[i] * factors[i] + self.offset_origin[i]
 

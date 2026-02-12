@@ -11,6 +11,7 @@ stage:
   refresh_interval_ms: 100
   type: Dummy
   unit_factor: 1000
+  num_axis: 3
 probes:
   - enable: true
     label: "Dummy Probe"
