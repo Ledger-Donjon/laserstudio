@@ -305,6 +305,16 @@ class StageInstrument(Instrument):
             If there is a configuration of z-offsetting for each move, it will be done and
             intermediates moves are blocking (eg, waiting to be done).
         """
+        # Make sure about the dimension of the position vector
+        if len(position) > self.num_axis:
+            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored.")
+            position = Vector(*position.data[:self.num_axis])
+        elif len(position) < self.num_axis:
+            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position.")
+            current_position = self.position
+            extra_positions = [current_position[i] for i in range(len(position), self.num_axis)]
+            position = Vector(*(position.data + extra_positions))
+
         logging.getLogger("laserstudio").debug(f"Moving to {position}...")
         if self.guardrail_enabled:
             displacement = self.position - position
