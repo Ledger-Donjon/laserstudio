@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 from PyQt6.QtCore import Qt, QSize, QMargins
 from PyQt6.QtGui import QIcon, QPainter, QColor
@@ -307,6 +308,9 @@ class CameraDockWidget(QDockWidget):
         self.camera.parameter_changed.connect(self.camera_parameter_changed)
 
     def camera_parameter_changed(self, parameter: str, value: Any):
+        logging.getLogger("laserstudio").info(
+            f"Camera parameter changed: {parameter} = {value}"
+        )
         if parameter == "objective" and isinstance(value, float):
             self.obj_combobox.blockSignals(True)
             self.obj_combobox.setCurrentIndex(
@@ -318,6 +322,9 @@ class CameraDockWidget(QDockWidget):
         """
         Called when the magnification is changed in the UI.
         """
+        logging.getLogger("laserstudio").info(
+            f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
+        )
         self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 from ...instruments.camera_raptor import (
     CameraRaptorInstrument,
@@ -106,14 +107,14 @@ class CameraRaptorDockWidget(CameraDockWidget):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Objective:"))
-        w = self.obj_combobox = QComboBox()
+        w = self.obj_combobox_raptor = QComboBox()
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
             if x == self.camera.objective:
                 w.setCurrentIndex(w.count() - 1)
         w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.obj_changed)
+        w.currentIndexChanged.connect(self.obj_raptor_changed)
         hbox.addWidget(w)
 
         # Show last image number
@@ -181,20 +182,29 @@ class CameraRaptorDockWidget(CameraDockWidget):
             )
         )
 
-        self.camera.parameter_changed.connect(self.camera_parameter_changed)
+        self.camera.parameter_changed.connect(self.camera_parameter_changed_raptor)
+        logging.getLogger("laserstudio").info("Camera Raptor DockWidget initialized")
 
-    def camera_parameter_changed(self, parameter: str, value: Any):
+    def camera_parameter_changed_raptor(self, parameter: str, value: Any):
+        logging.getLogger("laserstudio").info(
+            f"Camera Raptor parameter changed: {parameter} = {value} {type(value)}"
+        )
         if parameter == "objective" and isinstance(value, float):
-            self.obj_combobox.blockSignals(True)
-            self.obj_combobox.setCurrentIndex(
-                self.obj_combobox.findText(f"{value:.0f} X")
+            self.obj_combobox_raptor.blockSignals(True)
+            self.obj_combobox_raptor.setCurrentIndex(
+                self.obj_combobox_raptor.findText(f"{value:.0f} X")
             )
-            self.obj_combobox.blockSignals(False)
+            self.obj_combobox_raptor.blockSignals(False)
 
-    def obj_changed(self):
+    def obj_raptor_changed(self):
         """
         Called when the magnification is changed in the UI.
         """
-        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
+        logging.getLogger("laserstudio").info(
+            f"Objective changed to {self.obj_combobox_raptor.currentText().split()[0]}"
+        )
+        self.camera.select_objective(
+            float(self.obj_combobox_raptor.currentText().split()[0])
+        )
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()

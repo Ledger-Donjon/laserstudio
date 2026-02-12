@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 import pickle
 from PyQt6.QtCore import Qt
@@ -133,6 +134,7 @@ class CameraNITDockWidget(QDockWidget):
         vbox.addStretch()
 
         self.camera.parameter_changed.connect(self.camera_parameter_changed)
+        logging.getLogger("laserstudio").info("Camera NIT DockWidget initialized")
 
     def camera_parameter_changed(self, parameter: str, value: Any):
         if parameter == "objective" and isinstance(value, float):
@@ -182,6 +184,9 @@ class CameraNITDockWidget(QDockWidget):
         """
         Called when the magnification is changed in the UI.
         """
+        logging.getLogger("laserstudio").info(
+            f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
+        )
         self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()

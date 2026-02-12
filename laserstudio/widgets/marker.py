@@ -255,15 +255,13 @@ class ProbeMarker(Marker):
         """Update position and color."""
         if (pos := self.probe.offset_pos) is not None:
             if self.stage_sight is not None:
+                if self.stage_sight.camera is not None:
+                    magnification = self.stage_sight.camera.objective
+                    pos = (pos[0] / magnification, pos[1] / magnification)
+
                 self.setPos(
                     self.stage_sight.mapFromItem(self.stage_sight.image_group, *pos)
                 )
-                # We need to consider the objective lens magnification factor of the camera
-                if self.stage_sight.camera is not None:
-                    magnification = self.stage_sight.camera.objective
-                    self.setPos(self.pos() / magnification)
-                else:
-                    self.setPos(QPointF(*pos))
             else:
                 self.setPos(QPointF(*pos))
             self.setVisible(True)
