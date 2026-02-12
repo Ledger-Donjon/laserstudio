@@ -235,7 +235,11 @@ class LSAPI:
         """
         Requests the main stage to move to position the current focused object to given coordinates.
         This waits for the stage to end of move, returns the final coordinates of the stage.
-        These coordinates may be different from the requested one (if the focused element has a delta).
+        Final coordinates may be different from the requested one.
+
+        Note that position is a list of elements, that may be different from the number of axes of the stage.
+        If the number of elements is less than the number of axes, the missing elements (axes) are not moved.
+        If the number of elements is greater than the number of axes, the extra elements are ignored.
 
         :param pos: the position to reach.
         :return: the final coordinates of the stage.
