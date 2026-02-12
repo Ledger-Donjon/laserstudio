@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from PyQt6.QtWidgets import (
     QInputDialog,
     QGraphicsItem,
@@ -13,7 +14,7 @@ from PyQt6.QtGui import QPen, QColor, QColorConstants
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
 from PyQt6.QtCore import Qt, QPointF, QPoint
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from ..utils.colors import LedgerColors
 from ..utils.util import create_color_qicon
 
@@ -230,9 +231,13 @@ class Marker(QGraphicsItemGroup):
 
 
 class ProbeMarker(Marker):
-    def __init__(self, probe: ProbeInstrument, parent: Optional["StageSight"] = None):
+    def __init__(self, probe: ProbeInstrument, parent: StageSight | None = None):
         super().__init__(parent)
         self.stage_sight = parent
+        if self.stage_sight is not None and self.stage_sight.camera is not None:
+            self.stage_sight.camera.parameter_changed.connect(
+                self.__camera_parameter_changed
+            )
         self.probe = probe
         probe.offset_pos_changed.connect(self.update_pos)
         self.color = (
@@ -242,6 +247,10 @@ class ProbeMarker(Marker):
         )
         self.update_pos()
 
+    def __camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective":
+            self.update_pos()
+
     def update_pos(self):
         """Update position and color."""
         if (pos := self.probe.offset_pos) is not None:
@@ -249,6 +258,12 @@ class ProbeMarker(Marker):
                 self.setPos(
                     self.stage_sight.mapFromItem(self.stage_sight.image_group, *pos)
                 )
+                # We need to consider the objective lens magnification factor of the camera
+                if self.stage_sight.camera is not None:
+                    magnification = self.stage_sight.camera.objective
+                    self.setPos(self.pos() / magnification)
+                else:
+                    self.setPos(QPointF(*pos))
             else:
                 self.setPos(QPointF(*pos))
             self.setVisible(True)
