@@ -1,6 +1,7 @@
 from PyQt6.QtCore import pyqtSignal
 from typing import Any
 from .instrument import Instrument
+import logging
 
 
 class ProbeInstrument(Instrument):
@@ -37,4 +38,5 @@ class ProbeInstrument(Instrument):
     @offset_pos.setter
     def offset_pos(self, offset_pos: tuple[float, float] | None):
         self._offset_pos = offset_pos
+        logging.getLogger("laserstudio").info(f"Offset pos changed to {offset_pos}")
         self.offset_pos_changed.emit()

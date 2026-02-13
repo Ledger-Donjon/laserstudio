@@ -133,6 +133,8 @@ class StageSight(QGraphicsItemGroup):
         # Associate the CameraInstrument
         self.camera = camera
         self.update_size()
+        if camera is not None:
+            camera.new_image.connect(self.set_image)
 
         # Create Markers for probes
         self._probe_markers: list[ProbeMarker] = []
@@ -141,12 +143,19 @@ class StageSight(QGraphicsItemGroup):
             self.addToGroup(marker)
             self._probe_markers.append(marker)
 
-    def update_size(self):
+    def update_size(self, in_pixels: bool = False):
         """Update the size of the StageSight according to the camera."""
         if self.camera is not None:
             self._pause_update = False
-            self.camera.new_image.connect(self.set_image)
-            self.__update_size(QSizeF(self.camera.width_um, self.camera.height_um))
+            if in_pixels:
+                w, h = self.camera.width, self.camera.height
+            else:
+                w, h = self.camera.width_um, self.camera.height_um
+            unit = "px" if in_pixels else "µm"
+            logging.getLogger("laserstudio").info(
+                f"Camera width: {w}\xa0{unit}, height: {h}\xa0{unit}"
+            )
+            self.__update_size(QSizeF(w, h))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
 

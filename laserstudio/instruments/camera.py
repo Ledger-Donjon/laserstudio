@@ -42,10 +42,6 @@ class CameraInstrument(Instrument):
             list[float], config.get("pixel_size_in_um", [1.0, 1.0])
         )
 
-        # Objective
-        self.objective = cast(float, config.get("objective", 1.0))
-        self.select_objective(self.objective)
-
         # Correction matrix
         self.correction_matrix: Optional[QTransform] = None
 
@@ -65,7 +61,7 @@ class CameraInstrument(Instrument):
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
-        # Whtie and black levels adjustment
+        # White and black levels adjustment
         self.black_level = 0.0
         self.white_level = 1.0
 
@@ -92,6 +88,9 @@ class CameraInstrument(Instrument):
 
         # The value of a white pixel
         self.white_value = 2**8 - 1
+
+        # Objective
+        self.objective = cast(float, config.get("objective", 1.0))
 
     @property
     def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
@@ -131,10 +130,31 @@ class CameraInstrument(Instrument):
 
         :param factor: The magnifying factor of the objective (1x, 5x, 10x, 20x, 50x...)
         """
+        logging.getLogger("laserstudio").info(
+            f"Camera's objective changed to {factor}x"
+        )
+        logging.getLogger("laserstudio").info(
+            f"Camera's width: {self.width}px, height: {self.height}px"
+        )
+        logging.getLogger("laserstudio").info(
+            f"Image's dimension {self.width_um}\xa0µm; {self.height_um}\xa0µm (considering the objective)"
+        )
         self.objective = factor
-        self.width_um = self.width * self.pixel_size_in_um[0] / factor
-        self.height_um = self.height * self.pixel_size_in_um[1] / factor
         self.parameter_changed.emit("objective", factor)
+
+    @property
+    def width_um(self) -> float:
+        """
+        Returns the width in micrometers, considering the objective.
+        """
+        return self.width * self.pixel_size_in_um[0] / self.objective
+
+    @property
+    def height_um(self) -> float:
+        """
+        Returns the height in micrometers, considering the objective.
+        """
+        return self.height * self.pixel_size_in_um[1] / self.objective
 
     def get_last_qimage(self) -> QImage:
         """

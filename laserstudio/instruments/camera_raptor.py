@@ -182,8 +182,8 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         except SerialException as e:
             raise ConnectionFailure() from e
 
+        # Because of the ratio being wrong (v4l to cv2 conversion)
         self.width = self.width // 2
-        self.width_um = self.width_um // 2
 
         self.last_frame_number = 0
 

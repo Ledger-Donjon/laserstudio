@@ -136,6 +136,7 @@ class CameraPicker(StageSightViewer):
 
     def __init__(self, camera: CameraInstrument, *args):
         s = StageSight(stage=None, camera=camera)
+        s.update_size(in_pixels=True)
         super().__init__(stage_sight=s, *args)
         self.zoom = 1.0
         self.panning = False
