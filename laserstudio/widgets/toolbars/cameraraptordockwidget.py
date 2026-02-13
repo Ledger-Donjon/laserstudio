@@ -11,10 +11,8 @@ from .cameradockwidget import CameraDockWidget
 from PyQt6.QtWidgets import (
     QVBoxLayout,
     QCheckBox,
-    QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
-    QComboBox,
     QGridLayout,
 )
 from PyQt6.QtCore import Qt
@@ -103,19 +101,13 @@ class CameraRaptorDockWidget(CameraDockWidget):
         w.valueChanged.connect(self.camera.set_digital_gain_db)
         vbox.addWidget(w)
 
-        # Magnification selector.
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        hbox.addWidget(QLabel("Objective:"))
-        w = self.obj_combobox_raptor = QComboBox()
+        w = self.obj_combobox
+        w.clear()
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
             if x == self.camera.objective:
                 w.setCurrentIndex(w.count() - 1)
-        w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.obj_raptor_changed)
-        hbox.addWidget(w)
 
         # Show last image number
         self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")
@@ -181,30 +173,3 @@ class CameraRaptorDockWidget(CameraDockWidget):
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
             )
         )
-
-        self.camera.parameter_changed.connect(self.camera_parameter_changed_raptor)
-        logging.getLogger("laserstudio").info("Camera Raptor DockWidget initialized")
-
-    def camera_parameter_changed_raptor(self, parameter: str, value: Any):
-        logging.getLogger("laserstudio").info(
-            f"Camera Raptor parameter changed: {parameter} = {value} {type(value)}"
-        )
-        if parameter == "objective" and isinstance(value, float):
-            self.obj_combobox_raptor.blockSignals(True)
-            self.obj_combobox_raptor.setCurrentIndex(
-                self.obj_combobox_raptor.findText(f"{value:.0f} X")
-            )
-            self.obj_combobox_raptor.blockSignals(False)
-
-    def obj_raptor_changed(self):
-        """
-        Called when the magnification is changed in the UI.
-        """
-        logging.getLogger("laserstudio").info(
-            f"Objective changed to {self.obj_combobox_raptor.currentText().split()[0]}"
-        )
-        self.camera.select_objective(
-            float(self.obj_combobox_raptor.currentText().split()[0])
-        )
-        assert self.laser_studio.viewer.stage_sight is not None
-        self.laser_studio.viewer.stage_sight.update_size()

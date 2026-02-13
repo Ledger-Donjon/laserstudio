@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
-from typing import cast, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING, Any
 from PyQt6.QtWidgets import (
     QWizardPage,
     QWizard,
@@ -40,6 +40,10 @@ class PagesID(int, Enum):
 class CameraPicker(StageSightViewer):
     """
     A StageSightViewer in which a user can zoom and pan.
+    This viewer presents the image of the camera.
+    The size of the image is in pixels: we do not consider
+    the objective and the pixel to micrometer ratio (if any).
+    It permits to pick a relative point on the image in pixels.
     """
 
     # Signal emitted when the graphic view is clicked
@@ -134,13 +138,15 @@ class CameraPicker(StageSightViewer):
         self.centerOn(pos)
         event.accept()
 
-    def __init__(self, camera: CameraInstrument, *args):
+    def __init__(self, camera: CameraInstrument, *args: Any):
         s = StageSight(stage=None, camera=camera)
         s.update_size(in_pixels=True)
         super().__init__(stage_sight=s, *args)
         self.zoom = 1.0
         self.panning = False
         self.clicked_point_marker = Marker()
+        # Set scale to 5 percent of the image size
+        self.clicked_point_marker.size = 0.05 * s.size.width()
         s = self.scene()
         assert s is not None
         s.addItem(self.clicked_point_marker)

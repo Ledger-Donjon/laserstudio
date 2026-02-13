@@ -184,7 +184,7 @@ class CameraNITDockWidget(QDockWidget):
         """
         Called when the magnification is changed in the UI.
         """
-        logging.getLogger("laserstudio").info(
+        logging.getLogger("laserstudio").debug(
             f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
         )
         self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
