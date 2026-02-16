@@ -2,6 +2,7 @@
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
 from typing import Any
+from numpy.typing import NDArray
 import requests
 from PIL import Image
 import io
@@ -171,7 +172,7 @@ class LSAPI:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
 
-    def accumulated_image(self, path: str | None) -> numpy.ndarray | None:
+    def accumulated_image(self, path: str | None) -> NDArray[Any] | None:
         """
         Get the camera accumulator's data, as a numpy array.
         """
@@ -200,7 +201,7 @@ class LSAPI:
 
     def reference_image(
         self, num: int | None = None, unset: bool = False, set: bool = False
-    ) -> numpy.ndarray | None:
+    ) -> NDArray[Any] | None:
         """
         Get and/or set the reference image for the camera.
         """
@@ -234,7 +235,11 @@ class LSAPI:
         """
         Requests the main stage to move to position the current focused object to given coordinates.
         This waits for the stage to end of move, returns the final coordinates of the stage.
-        These coordinates may be different from the requested one (if the focused element has a delta).
+        Final coordinates may be different from the requested one.
+
+        Note that position is a list of elements, that may be different from the number of axes of the stage.
+        If the number of elements is less than the number of axes, the missing elements (axes) are not moved.
+        If the number of elements is greater than the number of axes, the extra elements are ignored.
 
         :param pos: the position to reach.
         :return: the final coordinates of the stage.

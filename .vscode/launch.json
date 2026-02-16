@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "LaserStudio Dummy",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "args": ["--config", "config.dummy.example.yaml"]
+        },
+
+        {
             "name": "LaserStudio",
             "type": "debugpy",
             "request": "launch",

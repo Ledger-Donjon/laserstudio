@@ -18,6 +18,7 @@ from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
 from .instrument import Instrument
+from copy import deepcopy
 
 __all__ = [
     "StageInstrument",
@@ -165,7 +166,7 @@ class StageInstrument(Instrument):
 
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
@@ -173,26 +174,38 @@ class StageInstrument(Instrument):
             list[float], config.get("unit_factor", config.get("unit_factors", [1.0]))
         )
         position = self.stage.position
-        if type(factors) is not list:
-            factors = [factors] * len(position)
-        else:
-            # We ensure that there is at least one element in the array
+        if isinstance(factors, int) or isinstance(factors, float):
+            logging.getLogger("laserstudio").warning(
+                f"Unit factor {factors} is a single value, it will be repeated for all axes."
+            )
+            factors = [float(factors)] * len(position)
+        
+        if len(factors) != len(position):
+            logging.getLogger("laserstudio").warning(
+                f"Unit factors {factors} has an inconsistent length from the number of axes ({len(position)}). Please check your configuration file"
+            )
             if len(factors) == 0:
-                factors = [1.0]
+                logging.getLogger("laserstudio").warning(
+                    "No unit factors provided. 1.0 will be repeated for all axes."
+                )
+                factors = [1.0] * len(position)
+            
+            if len(factors) < len(position):
+                last_value = factors[-1]
+                logging.getLogger("laserstudio").warning(
+                    f"Last value ({last_value}) will be repeated to the number of axes."
+                )
+                factors = factors + [last_value] * (len(position) - len(factors))
+            
+            if len(factors) > len(position):
+                # Truncate array if there is too much values for the number of axes
+                logging.getLogger("laserstudio").warning(
+                    f"Values will be truncated to the number of axes"
+                )
+                factors = factors[: len(position)]
+                
+        self.unit_factors: list[float] = factors
 
-            # Truncate array if there is too much values for the number of axes
-            factors = factors[: len(position)]
-
-            # Completion with last value of the array until we get enough number of values
-            factors += [factors[-1]] * abs(len(position) - len(factors))
-
-        self.unit_factors = factors
-
-        assert type(self.unit_factors) is list and len(self.unit_factors) == len(
-            position
-        ), (
-            f"Unit factor {self.unit_factors} is neither an number nor a list of numbers. Please check your configuration file"
-        )
 
         # Offset origin
         self.offset_origin: list[float] = cast(
@@ -218,18 +231,19 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        position = self.stage.position
+        position = deepcopy(self.stage.position)
         self.mutex.unlock()
 
         # Apply shearing transformation
-        x = float(position[0])
-        y = float(position[1])
+        x = float(position.x)
+        y = float(position.y)
 
-        position[0] = x - self.shear[0] * y
-        position[1] = y - self.shear[1] * x
+        position.x = x - self.shear[0] * y
+        position.y = y - self.shear[1] * x
 
         factors = self.unit_factors
-        assert type(factors) is list and len(factors) == len(position)
+        if isinstance(factors, float) or isinstance(factors, int):
+            factors = [float(factors)] * len(position)
         for i in range(len(position)):
             position[i] = position[i] * factors[i] + self.offset_origin[i]
 
@@ -249,8 +263,9 @@ class StageInstrument(Instrument):
         """
         self.move_to(value, wait=False)
 
-    def refresh_stage(self):
-        """Called regularly to get stage position, and emits a pyQtSignal"""
+    def __autorefresh_stage(self):
+        """Called regularly to get stage position, and emits a pyQtSignal
+        This method is not public, it is called by a QTimer to refresh the stage position regularly."""
         try:
             self.position_changed.emit(position := self.position)
             logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
@@ -260,7 +275,7 @@ class StageInstrument(Instrument):
             )
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_stage
+                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
             )
 
     def move_relative(self, displacement: Vector, wait: bool, backlash: bool = False):
@@ -290,6 +305,16 @@ class StageInstrument(Instrument):
             If there is a configuration of z-offsetting for each move, it will be done and
             intermediates moves are blocking (eg, waiting to be done).
         """
+        # Make sure about the dimension of the position vector
+        if len(position) > self.num_axis:
+            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored.")
+            position = Vector(*position.data[:self.num_axis])
+        elif len(position) < self.num_axis:
+            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position.")
+            current_position = self.position
+            extra_positions = [current_position[i] for i in range(len(position), self.num_axis)]
+            position = Vector(*(position.data + extra_positions))
+
         logging.getLogger("laserstudio").debug(f"Moving to {position}...")
         if self.guardrail_enabled:
             displacement = self.position - position
