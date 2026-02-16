@@ -38,5 +38,5 @@ class ProbeInstrument(Instrument):
     @offset_pos.setter
     def offset_pos(self, offset_pos: tuple[float, float] | None):
         self._offset_pos = offset_pos
-        logging.getLogger("laserstudio").info(f"Offset pos changed to {offset_pos}")
+        logging.getLogger("laserstudio").debug(f"Offset pos changed to {offset_pos}")
         self.offset_pos_changed.emit()
