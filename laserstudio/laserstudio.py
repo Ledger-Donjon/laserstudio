@@ -412,25 +412,25 @@ class LaserStudio(QMainWindow):
         stage = self.instruments.stage
         if pos is not None:
             if not isinstance(pos, (list, tuple)):
-                current_pos = cast(list[float], stage.position.data)
+                current_pos = [float(v) for v in stage.position.data]
                 return {
                     "error": "Invalid position: expected a list of coordinates",
                     "pos": current_pos,
                 }
             num_axis = stage.num_axis
             if len(pos) > num_axis:
-                current_pos = cast(list[float], stage.position.data)
+                current_pos = [float(v) for v in stage.position.data]
                 return {
                     "error": "Too many coordinates for stage axes",
                     "pos": current_pos,
                 }
             if len(pos) < num_axis:
-                target = list(cast(list[float], stage.position.data))
+                target = [float(v) for v in stage.position.data]
                 for i, value in enumerate(pos):
                     target[i] = value
                 pos = target
             stage.move_to(Vector(*pos), wait=True)
-        return {"pos": cast(list[float], stage.position.data)}
+        return {"pos": [float(v) for v in stage.position.data]}
 
     def handle_markers(self) -> list[dict[str, Any]]:
         """Handle a Markers API request to get the list of markers."""
@@ -473,9 +473,7 @@ class LaserStudio(QMainWindow):
 
         if positions is None:
             markers = [
-                self.viewer.add_marker(
-                    None, color=qcolor, label=label, visible=visible
-                )
+                self.viewer.add_marker(None, color=qcolor, label=label, visible=visible)
             ]
         else:
             markers = [
