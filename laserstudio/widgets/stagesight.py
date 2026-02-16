@@ -152,7 +152,7 @@ class StageSight(QGraphicsItemGroup):
             else:
                 w, h = self.camera.width_um, self.camera.height_um
             unit = "px" if in_pixels else "µm"
-            logging.getLogger("laserstudio").info(
+            logging.getLogger("laserstudio").debug(
                 f"Camera width: {w}\xa0{unit}, height: {h}\xa0{unit}"
             )
             self.__update_size(QSizeF(w, h))

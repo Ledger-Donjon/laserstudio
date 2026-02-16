@@ -3,7 +3,15 @@ import logging
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QColorConstants, QTextOption
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QTextEdit, QFrame
+from PyQt6.QtWidgets import (
+    QVBoxLayout,
+    QWidget,
+    QTextEdit,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QDoubleSpinBox,
+)
 from . import ProbeInstrument, LaserInstrument
 from .camerapages import CameraWizardPage, CameraPositionPage, CameraWizard
 from .camerapages import PagesID
@@ -71,6 +79,25 @@ class ProbePositionPage(CameraPositionPage):
             " indicated point instead of the center of the image."
         )
         self.probe = probe
+        layout = self.layout()
+        assert layout is not None
+        size_row = QHBoxLayout()
+        size_label = QLabel(f"{what} size:")
+        self.size_input = QDoubleSpinBox()
+        self.size_input.setToolTip(
+            "Size of the probe or laser spot in micrometers, before magnification by the objective lens."
+        )
+        self.size_input.setDecimals(2)
+        self.size_input.setRange(0.1, 100000.0)
+        self.size_input.setSingleStep(1.0)
+        self.size_input.setValue(self.probe.spot_size_um)
+        self.size_input.valueChanged.connect(self._spot_size_changed)
+        self.size_input.setSuffix("\xa0µm")
+        size_row.addWidget(size_label)
+        size_row.addWidget(self.size_input)
+        size_container = QWidget()
+        size_container.setLayout(size_row)
+        layout.addWidget(size_container)
 
     def set_position(self, xy: tuple[int, int] | None):
         super().set_position(xy)
@@ -81,6 +108,14 @@ class ProbePositionPage(CameraPositionPage):
                 f"Clicked point: {self.clicked_point.x():.02f}px, {self.clicked_point.y():.02f}px"
             )
             self.probe.offset_pos = self.clicked_point.x(), self.clicked_point.y()
+
+    def _spot_size_changed(self, value: float):
+        self.probe.spot_size_um = value
+        self.viewer.clicked_point_marker.size = value * (
+            self.viewer.stage_sight.camera.objective
+            if self.viewer.stage_sight.camera is not None
+            else 1
+        )
 
 
 class ProbesPositionWizard(CameraWizard):

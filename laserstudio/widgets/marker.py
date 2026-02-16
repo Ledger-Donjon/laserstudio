@@ -240,16 +240,19 @@ class ProbeMarker(Marker):
             )
         self.probe = probe
         probe.offset_pos_changed.connect(self.update_pos)
+        probe.spot_size_changed.connect(self.update_size)
         self.color = (
             QColorConstants.Red
             if isinstance(self.probe, LaserInstrument)
             else QColorConstants.Blue
         )
+        self.update_size()
         self.update_pos()
 
     def __camera_parameter_changed(self, parameter: str, value: Any):
         if parameter == "objective":
             self.update_pos()
+            self.update_size()
 
     def update_pos(self):
         """Update position and color."""
@@ -267,6 +270,11 @@ class ProbeMarker(Marker):
             self.setVisible(True)
         else:
             self.setVisible(False)
+
+    def update_size(self):
+        """Update the size of the marker,
+        according to the spot size of the probe/spot and the current objective of the camera."""
+        self.size = self.probe.spot_size_um
 
 
 class IdMarker(Marker):

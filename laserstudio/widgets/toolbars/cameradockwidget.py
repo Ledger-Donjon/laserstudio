@@ -308,7 +308,7 @@ class CameraDockWidget(QDockWidget):
         self.camera.parameter_changed.connect(self.camera_parameter_changed)
 
     def camera_parameter_changed(self, parameter: str, value: Any):
-        logging.getLogger("laserstudio").info(
+        logging.getLogger("laserstudio").debug(
             f"Camera parameter changed: {parameter} = {value}"
         )
         if parameter == "objective" and isinstance(value, float):
