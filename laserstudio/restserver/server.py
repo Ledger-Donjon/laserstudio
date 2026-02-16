@@ -14,10 +14,11 @@ from PyQt6.QtCore import (
     pyqtSlot,
     QVariant,
 )
-from ..lsapi.lsapi import LSAPI
 import io
 from PIL.Image import Image
 import numpy
+from ..lsapi.lsapi import LSAPI
+from ..utils.yaml_types import Config
 
 if TYPE_CHECKING:
     from ..laserstudio import LaserStudio
@@ -29,7 +30,7 @@ class RestProxy(QObject):
     laser studio.
     """
 
-    def __init__(self, laser_studio: LaserStudio, config: dict[str, Any]):
+    def __init__(self, laser_studio: LaserStudio, config: Config):
         super().__init__()
         self.laser_studio: LaserStudio = laser_studio
         self.rest_object = RestServer(self)
@@ -447,7 +448,9 @@ marker = flask_api.model(
     {
         "pos": fields.List(viewer_pos),
         "color": fields.List(fields.Float, example=[0.0, 1.0, 0.0, 0.5]),
-        "visible": fields.Boolean(description="If False, marker(s) are created but not displayed."),
+        "visible": fields.Boolean(
+            description="If False, marker(s) are created but not displayed."
+        ),
     },
 )
 
