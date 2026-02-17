@@ -132,9 +132,12 @@ class StageSight(QGraphicsItemGroup):
 
         # Associate the CameraInstrument
         self.camera = camera
+        self._pause_update = False
+        self._new_image_connected = False
         self.update_size()
         if camera is not None:
             camera.new_image.connect(self.set_image)
+            self._new_image_connected = True
 
         # Create Markers for probes
         self._probe_markers: list[ProbeMarker] = []
@@ -168,12 +171,15 @@ class StageSight(QGraphicsItemGroup):
     def pause_image_update(self, value: bool):
         if self.camera is None:
             return
-        if self._pause_update != value:
-            if value:
-                self.camera.new_image.disconnect(self.set_image)
-            else:
-                self.camera.new_image.connect(self.set_image)
         self._pause_update = value
+        if value:
+            if self._new_image_connected:
+                self.camera.new_image.disconnect(self.set_image)
+                self._new_image_connected = False
+        else:
+            if not self._new_image_connected:
+                self.camera.new_image.connect(self.set_image)
+                self._new_image_connected = True
 
     def _update_pen(self):
         if self.camera is None:
