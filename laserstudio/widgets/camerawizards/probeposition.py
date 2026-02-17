@@ -57,7 +57,7 @@ class ProbePositionIntroductionPage(CameraWizardPage):
 
 class ProbePositionPage(CameraPositionPage):
     """
-    Wizard page where the user get the camera image and can click
+    Wizard page where the user gets the camera image and can click
     on it to indicate the position of a probe/spot relatively to the
     camera image
     """
@@ -101,7 +101,7 @@ class ProbePositionPage(CameraPositionPage):
 
     def set_position(self, xy: tuple[int, int] | None):
         super().set_position(xy)
-        # Resume the camera image update
+        # Resume unconditionally the camera image update
         self.viewer.stage_sight.pause_image_update = False
         if self.clicked_point is not None:
             logging.getLogger("laserstudio").debug(

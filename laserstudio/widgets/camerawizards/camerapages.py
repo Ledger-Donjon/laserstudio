@@ -179,7 +179,7 @@ class CameraPresentationPage(CameraWizardPage):
 
 class CameraPositionPage(CameraPresentationPage):
     """
-    Wizard page where the user get the camera image and can click
+    Wizard page where the user gets the camera image and can click
     on it to indicate the position of an object
     """
 

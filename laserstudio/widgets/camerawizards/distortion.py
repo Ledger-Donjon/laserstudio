@@ -31,8 +31,9 @@ class DistortionIntroductionPage(CameraWizardPage):
 
 class CameraAlignmentPage(CameraPositionPage):
     """
-    Wizard page where the user get the camera image and can click on it to indicate the position of
-    an object which makes an association of the main stage's position and the object's
+    Wizard page where the user gets the camera image and can click on it
+    to indicate the position of an object, which makes an association
+    of the main stage's position and the object's
     position on the camera.
     """
 
@@ -100,7 +101,7 @@ class DistortedImagePresentationPage(CameraPresentationPage):
         if self.transform is None:
             self.setSubTitle(
                 "The computation of the distortion correction failed.\n"
-                "Some points may be to much aligned."
+                "Some points may be too much aligned.\n"
                 "Please retry.",
             )
             self.apply_button.setEnabled(False)
