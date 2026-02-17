@@ -107,15 +107,24 @@ class ProbePositionPage(CameraPositionPage):
             logging.getLogger("laserstudio").debug(
                 f"Clicked point: {self.clicked_point.x():.02f}px, {self.clicked_point.y():.02f}px"
             )
-            self.probe.offset_pos = self.clicked_point.x(), self.clicked_point.y()
+            c = self.viewer.stage_sight.camera
+            pixel_size = (
+                sum(c.pixel_size_in_um) / len(c.pixel_size_in_um)
+                if c is not None
+                else 1.0
+            )
+            self.probe.offset_pos = (
+                self.clicked_point.x() * pixel_size,
+                self.clicked_point.y() * pixel_size,
+            )
 
     def _spot_size_changed(self, value: float):
         self.probe.spot_size_um = value
-        self.viewer.clicked_point_marker.size = value * (
-            self.viewer.stage_sight.camera.objective
-            if self.viewer.stage_sight.camera is not None
-            else 1
-        )
+        c = self.viewer.stage_sight.camera
+        if c is not None:
+            value *= c.objective
+            value /= sum(c.pixel_size_in_um) / len(c.pixel_size_in_um)
+        self.viewer.clicked_point_marker.size = value
 
 
 class ProbesPositionWizard(CameraWizard):
