@@ -34,15 +34,11 @@ __all__ = [
     "SMC100",
     "PI",
     "Stage",
-    "Autofocus",
-    "Tic",
-    "TicDirection",
     "StageRest",
     "StageDummy",
     "get_serial_device",
     "DeviceSearchError",
     "Instrument",
-    "MoveFor",
 ]
 
 
@@ -56,6 +52,8 @@ class Vector(PystagesVector):
 
     @property
     def x(self) -> float:
+        if len(self.data) < 1:
+            return float("nan")
         return self.data[0]
 
     @x.setter
@@ -64,6 +62,8 @@ class Vector(PystagesVector):
 
     @property
     def y(self) -> float:
+        if len(self.data) < 2:
+            return float("nan")
         return self.data[1]
 
     @y.setter
@@ -72,6 +72,8 @@ class Vector(PystagesVector):
 
     @property
     def z(self) -> float:
+        if len(self.data) < 3:
+            return float("nan")
         return self.data[2]
 
     @z.setter
@@ -80,6 +82,8 @@ class Vector(PystagesVector):
 
     @property
     def w(self) -> float:
+        if len(self.data) < 4:
+            return float("nan")
         return self.data[3]
 
     @w.setter
