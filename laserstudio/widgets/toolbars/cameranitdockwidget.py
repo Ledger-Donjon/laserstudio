@@ -139,9 +139,14 @@ class CameraNITDockWidget(QDockWidget):
     def camera_parameter_changed(self, parameter: str, value: Any):
         if parameter == "objective" and isinstance(value, float):
             self.obj_combobox.blockSignals(True)
-            self.obj_combobox.setCurrentIndex(
-                self.obj_combobox.findText(f"{value:.0f} X")
-            )
+            index = self.obj_combobox.findText(f"{value:.0f} X")
+            if index != -1:
+                self.obj_combobox.setCurrentIndex(index)
+            else:
+                logging.getLogger("laserstudio").warning(
+                    f"Received unsupported objective value from camera: {value:.0f} X. "
+                    "The combobox will not reflect the actual value."
+                )
             self.obj_combobox.blockSignals(False)
 
     def gain_changed(self):

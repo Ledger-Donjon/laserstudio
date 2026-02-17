@@ -104,12 +104,18 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addWidget(w)
 
         w = self.obj_combobox
+        w.blockSignals(True)
         w.clear()
+        selected_index: int | None = None
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
+            if float(x) == self.camera.objective:
+                selected_index = x
+        w.blockSignals(False)
+
+        if selected_index is not None:
+            w.setCurrentIndex(selected_index)
 
         # Show last image number
         self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")

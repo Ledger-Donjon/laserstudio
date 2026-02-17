@@ -131,6 +131,7 @@ class CameraInstrument(Instrument):
 
         :param factor: The magnifying factor of the objective (1x, 5x, 10x, 20x, 50x...)
         """
+        self.objective = factor
         logging.getLogger("laserstudio").debug(
             f"Camera's objective changed to {factor}x"
         )
@@ -140,7 +141,6 @@ class CameraInstrument(Instrument):
         logging.getLogger("laserstudio").debug(
             f"Image's dimension {self.width_um}\xa0µm; {self.height_um}\xa0µm (considering the objective)"
         )
-        self.objective = factor
         self.parameter_changed.emit("objective", factor)
 
     @property
