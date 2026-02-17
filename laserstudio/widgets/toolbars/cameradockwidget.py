@@ -323,8 +323,15 @@ class CameraDockWidget(QDockWidget):
         Called when the magnification is changed in the UI.
         """
         logging.getLogger("laserstudio").debug(
-            f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
+            f"Objective changed to {self.obj_combobox.currentText()}"
         )
-        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
+        try:
+            objective = float(self.obj_combobox.currentText().split()[0])
+        except Exception:
+            logging.getLogger("laserstudio").warning(
+                f"Failed to parse objective from combobox current text: '{self.obj_combobox.currentText()}'."
+            )
+            return
+        self.camera.select_objective(objective)
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()

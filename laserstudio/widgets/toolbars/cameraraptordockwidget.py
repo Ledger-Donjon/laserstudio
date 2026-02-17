@@ -81,6 +81,8 @@ class CameraRaptorDockWidget(CameraDockWidget):
 
         vbox = QVBoxLayout()
         grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
+
         # Set the exposure time
         self.exposure_time_sb = w = QDoubleSpinBox()
         w.setToolTip("Set the camera's exposure time")
@@ -117,7 +119,8 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addStretch()
 
         vbox = QVBoxLayout()
-        hbox.addLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
 
         # Checkbox to activate the FAN
         w = QCheckBox("Fan")
