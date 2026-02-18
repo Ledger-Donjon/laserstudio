@@ -138,7 +138,7 @@ class Viewer(QGraphicsView):
             None: {}
         }
 
-        self.default_marker_size = 30.0
+        self.default_marker_size = 20.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
