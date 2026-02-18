@@ -1,3 +1,6 @@
+import logging
+from enum import Enum, auto
+from typing import Any
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
@@ -19,15 +22,12 @@ from PyQt6.QtCore import (
     QPointF,
     QObject,
 )
-
-from laserstudio.utils.colors import LedgerColors
+from .marker import ProbeMarker
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-import logging
-from .marker import ProbeMarker
-from enum import Enum, auto
+from ..utils.colors import LedgerColors
 
 
 class StageSightViewer(QGraphicsView):
@@ -134,9 +134,11 @@ class StageSight(QGraphicsItemGroup):
         self.camera = camera
         self._pause_update = False
         self._new_image_connected = False
+        self._in_pixels: bool = False
         self.update_size()
         if camera is not None:
             camera.new_image.connect(self.set_image)
+            camera.parameter_changed.connect(self.camera_parameter_changed)
             self._new_image_connected = True
 
         # Create Markers for probes
@@ -146,8 +148,15 @@ class StageSight(QGraphicsItemGroup):
             self.addToGroup(marker)
             self._probe_markers.append(marker)
 
-    def update_size(self, in_pixels: bool = False):
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective":
+            self.update_size()
+
+    def update_size(self, in_pixels: bool | None = None):
         """Update the size of the StageSight according to the camera."""
+        if in_pixels is None:
+            in_pixels = self._in_pixels
+        self._in_pixels = in_pixels
         if self.camera is not None:
             self._pause_update = False
             if in_pixels:

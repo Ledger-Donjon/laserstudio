@@ -110,7 +110,7 @@ class CameraRaptorDockWidget(CameraDockWidget):
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
             if float(x) == self.camera.objective:
-                selected_index = x
+                selected_index = w.count() - 1
         w.blockSignals(False)
 
         if selected_index is not None:

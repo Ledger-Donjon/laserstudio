@@ -339,5 +339,3 @@ class CameraDockWidget(QDockWidget):
             )
             return
         self.camera.select_objective(objective)
-        assert self.laser_studio.viewer.stage_sight is not None
-        self.laser_studio.viewer.stage_sight.update_size()

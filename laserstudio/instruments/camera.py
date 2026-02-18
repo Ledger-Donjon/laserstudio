@@ -550,7 +550,6 @@ class CameraInstrument(Instrument):
             )
         if "objective" in data:
             self.select_objective(data["objective"])
-            self.parameter_changed.emit("objective", data["objective"])
 
     @property
     def laplacian_std_dev(self) -> float:
