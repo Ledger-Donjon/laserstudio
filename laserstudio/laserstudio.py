@@ -195,8 +195,10 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.NONE))
         shortcut = QShortcut(Qt.Key.Key_R, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.ZONE))
-        # shortcut = QShortcut(Qt.Key_T, self)
-        # shortcut.activated.connect(self.zone_rot_mode)
+        shortcut = QShortcut(Qt.Key.Key_T, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.select_mode(Viewer.Mode.ZONE_TILTED)
+        )
         shortcut = QShortcut(Qt.Key.Key_M, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
