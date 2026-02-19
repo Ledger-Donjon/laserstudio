@@ -555,7 +555,13 @@ class LaserStudio(QMainWindow):
         """
         Restore settings in the settings.yaml file.
         """
-        data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        try:
+            data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        except FileNotFoundError:
+            logging.getLogger("laserstudio").warning(
+                "Settings file not found in directory " + os.getcwd()
+            )
+            return
         # Camera settings (maybe missing from settings)
         camera = data.get("camera")
         if (self.instruments.camera is not None) and (camera is not None):
