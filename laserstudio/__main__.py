@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication
 from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 from .laserstudio import LaserStudio
 from .utils.util import resource_path
-from .utils.colors import LedgerPalette, LedgerStyle
+from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 from .instruments.list_serials import list_devices
 
 
@@ -54,14 +54,7 @@ def main():
     app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
     app.setStyle(LedgerStyle)
     app.setPalette(LedgerPalette)
-    app.setStyleSheet(
-        "QToolBar { "
-        "border: 1px solid #252525;"
-        "border-radius: 4px;"
-        "margin: 3px;"
-        "padding: 6px;"
-        "background-color: #252525 }"
-    )
+    app.setStyleSheet(ledger_stylesheet())
 
     QLocale.setDefault(QLocale.c())
 

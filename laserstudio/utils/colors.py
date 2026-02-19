@@ -236,3 +236,118 @@ class LedgerProxyStyle(QProxyStyle):
 
 
 LedgerStyle = LedgerProxyStyle()
+
+
+def ledger_stylesheet() -> str:
+    base = LedgerPalette.color(QPalette.ColorRole.Base)
+    button = LedgerPalette.color(QPalette.ColorRole.Button)
+    text = LedgerPalette.color(QPalette.ColorRole.Text)
+    highlight_text = LedgerPalette.color(QPalette.ColorRole.HighlightedText)
+
+    border = base.darker(140)
+    header = base.lighter(110)
+    hover = button.lighter(115)
+    active = button.lighter(130)
+    accent = LedgerColors.SafetyOrange.value
+
+    return f"""
+QToolBar {{
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    margin: 3px;
+    padding: 4px;
+    background-color: {header.name()};
+}}
+
+QToolButton,
+QPushButton {{
+    background-color: {button.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    padding: 2px 6px;
+    min-height: 20px;
+}}
+QToolButton:hover,
+QPushButton:hover {{
+    background-color: {hover.name()};
+}}
+QToolButton:pressed,
+QPushButton:pressed {{
+    background-color: {active.name()};
+}}
+QToolButton:checked,
+QPushButton:checked {{
+    background-color: {active.name()};
+    border-color: {accent.name()};
+    color: {accent.name()};
+}}
+
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox {{
+    background-color: {base.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+    border-radius: 3px;
+    padding: 1px 4px;
+    min-height: 20px;
+    selection-background-color: {accent.name()};
+    selection-color: {highlight_text.name()};
+}}
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus {{
+    border-color: {accent.name()};
+}}
+
+QDockWidget::title {{
+    background: {header.name()};
+    border: 1px solid {border.name()};
+    padding: 4px 6px;
+}}
+
+QGroupBox {{
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    margin-top: 6px;
+}}
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 4px;
+    color: {text.name()};
+}}
+
+QMenu {{
+    background: {base.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+}}
+QMenu::item:selected {{
+    background: {accent.name()};
+    color: {highlight_text.name()};
+}}
+
+QSlider::groove:horizontal {{
+    height: 4px;
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::sub-page:horizontal {{
+    background: {accent.name()};
+    border-radius: 2px;
+}}
+QSlider::add-page:horizontal {{
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::handle:horizontal {{
+    width: 10px;
+    margin: -4px 0;
+    background: {accent.name()};
+    border-radius: 5px;
+}}
+""".strip()

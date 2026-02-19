@@ -2,7 +2,7 @@ from .chipscan import ChipScan
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QLocale
 import sys
-from ..colors import LedgerPalette, LedgerStyle
+from ..colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 import yaml
 
 
@@ -13,14 +13,7 @@ def main():
     app.setApplicationDisplayName("Chip Scan")
     app.setStyle(LedgerStyle)
     app.setPalette(LedgerPalette)
-    app.setStyleSheet(
-        "QToolBar { "
-        "border: 1px solid #252525;"
-        "border-radius: 4px;"
-        "margin: 3px;"
-        "padding: 6px;"
-        "background-color: #252525 }"
-    )
+    app.setStyleSheet(ledger_stylesheet())
 
     QLocale.setDefault(QLocale.c())
     with open("config.yaml") as stream:
