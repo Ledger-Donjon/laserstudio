@@ -1,3 +1,4 @@
+from __future__ import annotations
 from PyQt6.QtWidgets import (
     QGraphicsPolygonItem,
     QGraphicsView,
@@ -26,8 +27,9 @@ from PyQt6.QtGui import (
 from enum import Enum, auto
 from typing import Any
 from shapely import Polygon
-
-from laserstudio.utils.colors import LedgerColors
+import logging
+import json
+import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -35,12 +37,11 @@ from .stagesight import (
     ProbeInstrument,
     LaserInstrument,
 )
-import logging
-import json
-import numpy as np
 from .marker import IdMarker, Marker
 from .scangeometry import ScanGeometry
 from ..instruments.stage import MoveFor
+from ..utils.yaml_types import Config
+from ..utils.colors import LedgerColors
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -341,7 +342,7 @@ class Viewer(QGraphicsView):
 
         self.mode = Viewer.Mode(mode)
 
-    def go_next(self):
+    def go_next(self) -> Config:
         """Actions to perform when Laser Studio receive a Go Next command.
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
@@ -890,7 +891,7 @@ class Viewer(QGraphicsView):
             self.__markers_by_label_by_color[label][marker.color_name] = set([marker])
         else:
             self.__markers_by_label_by_color[label][marker.color_name].add(marker)
-        
+
         # Adding to the view
         self.__scene.addItem(marker)
 

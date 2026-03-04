@@ -14,6 +14,7 @@ from enum import Enum
 
 class LedgerColors(Enum):
     SafetyOrange = QColor(255, 83, 0)
+    SafetyOrangeLight = SafetyOrange.lighter(125)
     SerenityPurple = QColor(212, 160, 255)
     SecurityBlue = QColor(0, 27, 60)
     Grellow = QColor(222, 255, 0)
@@ -216,9 +217,7 @@ class LedgerProxyStyle(QProxyStyle):
 
         text_flags = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
         text_flags |= Qt.TextFlag.TextSingleLine
-        if self.styleHint(
-            QStyle.StyleHint.SH_UnderlineShortcut, option, widget
-        ):
+        if self.styleHint(QStyle.StyleHint.SH_UnderlineShortcut, option, widget):
             text_flags |= Qt.TextFlag.TextShowMnemonic
         else:
             text_flags |= Qt.TextFlag.TextHideMnemonic
@@ -243,19 +242,14 @@ def ledger_stylesheet() -> str:
     button = LedgerPalette.color(QPalette.ColorRole.Button)
     text = LedgerPalette.color(QPalette.ColorRole.Text)
     highlight_text = LedgerPalette.color(QPalette.ColorRole.HighlightedText)
-    muted = LedgerPalette.color(QPalette.ColorRole.PlaceholderText)
+    # muted = LedgerPalette.color(QPalette.ColorRole.PlaceholderText)
 
     border = base.darker(140)
     header = base.lighter(110)
     hover = button.lighter(115)
     active = button.lighter(130)
     accent = LedgerColors.SafetyOrange.value
-    accent_border = QColor(accent)
-    accent_border.setAlpha(70)
-    accent_border_rgba = (
-        f"rgba({accent_border.red()}, {accent_border.green()}, "
-        f"{accent_border.blue()}, {accent_border.alpha()})"
-    )
+    accent_border = LedgerColors.SafetyOrangeLight.value
 
     return f"""
 QToolBar {{
@@ -265,7 +259,6 @@ QToolBar {{
     padding: 4px;
     background-color: {header.name()};
 }}
-
 QToolButton,
 QPushButton {{
     background-color: {button.name()};
@@ -286,30 +279,22 @@ QPushButton:pressed {{
 QToolButton:checked,
 QPushButton:checked {{
     background-color: {active.name()};
-    border-color: {accent_border_rgba};
+    border-color: {accent_border.name()};
     color: {accent.name()};
 }}
-
-QLineEdit,
-QComboBox {{
-    background-color: {base.name()};
-    color: {text.name()};
-    border: 1px solid {border.name()};
-    border-radius: 3px;
-    padding: 1px 4px;
-    min-height: 20px;
-    selection-background-color: {accent.name()};
-    selection-color: {highlight_text.name()};
+QToolBarExtension {{
+    padding: 0;
 }}
-QLineEdit:focus,
-QComboBox:focus {{
-    border: 1px solid {accent.name()};
+QToolBarExtension:hover {{
+    background-color: {accent_border.name()};
 }}
-
 QDockWidget::title {{
     background: {header.name()};
     border: 1px solid {border.name()};
-    padding: 4px 6px;
+    padding-top: 4px;
+    padding-bottom: 0px;
+    padding-left: 5px;
+    padding-right: 5px;
 }}
 
 QGroupBox {{
@@ -342,7 +327,34 @@ QStatusBar {{
 QStatusBar::item {{
     border: none;
 }}
+QSlider::sub-page {{
+    background: {accent_border.name()};
+    border-radius: 2px;
+}}
+QSlider::add-page {{
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::groove {{
+    height: 4px;
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::handle {{
+    background: {accent_border.name()};
+    border: 1px solid {border.name()};
+    border-radius: 3px;
+    width: 10px;
+    height: 10px;
+    margin: -4px 0;
+}}
+QSlider::handle:hover {{
+    background: {accent.name()};
+}}
+""".strip()
 
+
+"""
 QLabel#active-mode {{
     padding: 2px 8px;
     border-radius: 4px;
@@ -376,4 +388,20 @@ QSlider::handle:horizontal {{
     background: {accent.name()};
     border-radius: 5px;
 }}
-""".strip()
+
+QLineEdit,
+QComboBox {{
+    background-color: {base.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+    border-radius: 3px;
+    padding: 1px 4px;
+    min-height: 20px;
+    selection-background-color: {accent.name()};
+    selection-color: {highlight_text.name()};
+}}
+QLineEdit:focus,
+QComboBox:focus {{
+    border: 1px solid {accent.name()};
+}}
+"""

@@ -272,12 +272,12 @@ class LaserStudio(QMainWindow):
                 w.close()
         super().closeEvent(a0)
 
-    def handle_go_next(self) -> dict[str, Any]:
+    def handle_go_next(self) -> Config:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        v: dict[str, Any] = {}
+        v: Config = {}
         v.update(self.instruments.go_next())
         v.update(self.viewer.go_next())
         return v
@@ -396,8 +396,8 @@ class LaserStudio(QMainWindow):
         return camera.current_reference_image
 
     def handle_instrument_settings(
-        self, label: str, settings: dict[str, Any] | None
-    ) -> dict[str, Any] | None:
+        self, label: str, settings: Config | None
+    ) -> Config | None:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -443,7 +443,7 @@ class LaserStudio(QMainWindow):
             stage.move_to(Vector(*pos), wait=True)
         return {"pos": [float(v) for v in stage.position.data]}
 
-    def handle_markers(self) -> list[dict[str, Any]]:
+    def handle_markers(self) -> list[Config]:
         """Handle a Markers API request to get the list of markers."""
 
         return [marker.to_dict() for marker in self.viewer.markers]
@@ -454,7 +454,7 @@ class LaserStudio(QMainWindow):
         color: list[float] | None,
         label: str | None,
         visible: bool | None = True,
-    ) -> dict[str, Any]:
+    ) -> Config:
         """Add marker(s).
 
         :param positions: The requested position(s) of the marker(s).
@@ -550,6 +550,7 @@ class LaserStudio(QMainWindow):
             Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
         }
         return labels.get(mode, f"Mode: {mode.name}")
+
     def save_settings(self):
         """
         Save some settings in the settings.yaml file.

@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt, QPointF, QPoint
 from typing import TYPE_CHECKING, Any
 from ..utils.colors import LedgerColors
 from ..utils.util import create_color_qicon
+from ..utils.yaml_types import Config
 
 if TYPE_CHECKING:
     from .stagesight import StageSight
@@ -155,8 +156,8 @@ class Marker(QGraphicsItemGroup):
         self.__fillcolor = value
         self._ellipse.setBrush(value)
 
-    def to_dict(self) -> dict[str, Any]:
-        data: dict[str, Any] = {
+    def to_dict(self) -> Config:
+        data: Config = {
             "id": self.id if isinstance(self, IdMarker) else -1,
             "pos": [self.pos().x(), self.pos().y()],
             "color": [

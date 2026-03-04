@@ -1,6 +1,7 @@
+from __future__ import annotations
 from laserstudio.lsapi import LSAPI
 from time import sleep
-import quicklog
+from quicklog import Log, new_record  # type: ignore
 import datetime
 import os
 
@@ -31,7 +32,7 @@ imagespath = os.path.abspath(os.path.join(os.curdir, "images", date_str))
 os.makedirs(imagespath, exist_ok=True)
 
 
-def take_images(name):
+def take_images(name: str):
     name_ir = os.path.join(imagespath, "ir_image" + name)
     api.set_instrument_settings("raptor", ir_settings["raptor"])
     sleep(1)
@@ -59,7 +60,7 @@ def take_images(name):
 
 z = api.position()[2]
 
-log = quicklog.Log("photoemission.quicklog")
+log: Log = Log("photoemission.quicklog")
 
 begin_x = 0
 end_x = n_steps[0] + 1
@@ -72,9 +73,9 @@ for x_step in range(begin_x, min(end_x, n_steps[0] + 1)):
     )
 
     for y_step in range(0, n_steps[1] + 1):
-        rec = quicklog.new_record()
+        rec: dict[str, str] = new_record()  # type: ignore
         rec["pos"] = str(position)
-        rec["step"] = step
+        rec["step"] = str(step)
 
         # debug prints
         print(f"{x_step=}, {y_step=}")
@@ -89,4 +90,4 @@ for x_step in range(begin_x, min(end_x, n_steps[0] + 1)):
         take_images(
             name=f"_{x_step}_{y_step}_",
         )
-        log.append(rec)
+        log.append(rec)  # type: ignore

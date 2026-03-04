@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from __future__ import annotations
 import argparse
 import logging
 import os.path
@@ -15,13 +16,14 @@ from .laserstudio import LaserStudio
 from .utils.util import resource_path
 from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 from .instruments.list_serials import list_devices
+from .utils.yaml_types import Config
 
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("laserstudio")
 
 
-def main():
+def main() -> int:
     app = QApplication(sys.argv)
 
     parser = argparse.ArgumentParser(prog="laserstudio")
@@ -69,7 +71,7 @@ def main():
             f"Encountered error while opening configuration file {args.config}: {e}"
         )
 
-    yaml_config = None
+    yaml_config: Config | None = None
     if stream is not None:
         # Load the found or given configuration file
         try:
