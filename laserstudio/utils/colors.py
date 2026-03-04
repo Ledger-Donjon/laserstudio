@@ -243,12 +243,19 @@ def ledger_stylesheet() -> str:
     button = LedgerPalette.color(QPalette.ColorRole.Button)
     text = LedgerPalette.color(QPalette.ColorRole.Text)
     highlight_text = LedgerPalette.color(QPalette.ColorRole.HighlightedText)
+    muted = LedgerPalette.color(QPalette.ColorRole.PlaceholderText)
 
     border = base.darker(140)
     header = base.lighter(110)
     hover = button.lighter(115)
     active = button.lighter(130)
     accent = LedgerColors.SafetyOrange.value
+    accent_border = QColor(accent)
+    accent_border.setAlpha(70)
+    accent_border_rgba = (
+        f"rgba({accent_border.red()}, {accent_border.green()}, "
+        f"{accent_border.blue()}, {accent_border.alpha()})"
+    )
 
     return f"""
 QToolBar {{
@@ -279,13 +286,11 @@ QPushButton:pressed {{
 QToolButton:checked,
 QPushButton:checked {{
     background-color: {active.name()};
-    border-color: {accent.name()};
+    border-color: {accent_border_rgba};
     color: {accent.name()};
 }}
 
 QLineEdit,
-QSpinBox,
-QDoubleSpinBox,
 QComboBox {{
     background-color: {base.name()};
     color: {text.name()};
@@ -297,10 +302,8 @@ QComboBox {{
     selection-color: {highlight_text.name()};
 }}
 QLineEdit:focus,
-QSpinBox:focus,
-QDoubleSpinBox:focus,
 QComboBox:focus {{
-    border-color: {accent.name()};
+    border: 1px solid {accent.name()};
 }}
 
 QDockWidget::title {{
@@ -329,6 +332,29 @@ QMenu {{
 QMenu::item:selected {{
     background: {accent.name()};
     color: {highlight_text.name()};
+}}
+
+QStatusBar {{
+    background: {header.name()};
+    color: {text.name()};
+    border-top: 1px solid {border.name()};
+}}
+QStatusBar::item {{
+    border: none;
+}}
+
+QLabel#active-mode {{
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid {border.name()};
+    color: {muted.name()};
+    background: {base.name()};
+    font-weight: 600;
+}}
+QLabel#active-mode[modeActive="true"] {{
+    border-color: {accent.name()};
+    color: {accent.name()};
+    background: {header.name()};
 }}
 
 QSlider::groove:horizontal {{

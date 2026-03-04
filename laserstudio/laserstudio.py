@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
     QCloseEvent,
     QColorConstants,
 )
-from PyQt6.QtWidgets import QMainWindow, QButtonGroup
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QLabel
 from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
@@ -97,6 +97,15 @@ class LaserStudio(QMainWindow):
         group.idClicked.connect(id_clicked)
 
         self.viewer.mode_changed.connect(self.update_buttons_mode)
+
+        self.mode_indicator = QLabel()
+        self.mode_indicator.setObjectName("active-mode")
+        self.mode_indicator.setToolTip("Active viewer mode")
+        self.mode_indicator.setProperty("modeActive", False)
+        status_bar = self.statusBar()
+        if status_bar is not None:
+            status_bar.addPermanentWidget(self.mode_indicator)
+        self.update_mode_indicator(int(self.viewer.mode))
 
         # ToolBar: Main
         toolbar = MainToolBar(self)
@@ -509,12 +518,38 @@ class LaserStudio(QMainWindow):
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
+        self.update_mode_indicator(id)
         if id == self.viewer_buttons_group.checkedId():
             return
         for b in self.viewer_buttons_group.buttons():
             if id == self.viewer_buttons_group.id(b):
                 b.setChecked(True)
 
+    def update_mode_indicator(self, id: int):
+        """Update the mode indicator label."""
+        try:
+            mode = Viewer.Mode(id)
+        except ValueError:
+            mode = Viewer.Mode.NONE
+        self.mode_indicator.setText(self._mode_label(mode))
+        self.mode_indicator.setProperty("modeActive", mode != Viewer.Mode.NONE)
+        style = self.mode_indicator.style()
+        if style is not None:
+            style.unpolish(self.mode_indicator)
+            style.polish(self.mode_indicator)
+        self.mode_indicator.update()
+
+    def _mode_label(self, mode: Viewer.Mode) -> str:
+        labels = {
+            Viewer.Mode.NONE: "Mode: None (Esc)",
+            Viewer.Mode.STAGE: "Mode: Move (M)",
+            Viewer.Mode.ZONE: "Mode: Zone (R)",
+            Viewer.Mode.ZONE_TILTED: "Mode: Tilted Zone (T)",
+            Viewer.Mode.ZONE_POLY: "Mode: Poly Zone",
+            Viewer.Mode.PIN: "Mode: Pin (P)",
+            Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
+        }
+        return labels.get(mode, f"Mode: {mode.name}")
     def save_settings(self):
         """
         Save some settings in the settings.yaml file.
