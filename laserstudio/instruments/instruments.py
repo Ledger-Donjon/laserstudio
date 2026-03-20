@@ -117,7 +117,7 @@ class Instruments:
         # focusing. This can be considered as an abstract instrument.
         self.focus_helper: FocusInstrument | None = None
         if self.camera is not None and self.stage is not None:
-            focus_config = config.get("focus")
+            focus_config = config.get("focus", {})
             if type(focus_config) is dict:
                 self.focus_helper = FocusInstrument(
                     focus_config, self.camera, self.stage
