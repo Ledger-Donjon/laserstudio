@@ -210,6 +210,9 @@ class PDMInstrument(LaserInstrument):
                 if self.interlock_status == InterlockStatus.OPEN
                 else "Closed",
                 "refresh_interval_ms": self.refresh_interval,
+                "delay_line_type": self.delay_line_type.name,
+                "pulse_width_ps": self.pulse_width,
+                "delay_ps": self.delay,
             }
         )
         return super_settings
@@ -225,3 +228,14 @@ class PDMInstrument(LaserInstrument):
             self.parameter_changed.emit(
                 "refresh_interval_ms", data["refresh_interval_ms"]
             )
+        if "delay_line_type" in data:
+            self.delay_line_type = DelayLineType[data["delay_line_type"]]
+            self.parameter_changed.emit(
+                "delay_line_type", DelayLineType[data["delay_line_type"]]
+            )
+        if "pulse_width_ps" in data:
+            self.pulse_width = data["pulse_width_ps"]
+            self.parameter_changed.emit("pulse_width", data["pulse_width_ps"])
+        if "delay_ps" in data:
+            self.delay = data["delay_ps"]
+            self.parameter_changed.emit("delay", data["delay_ps"])
