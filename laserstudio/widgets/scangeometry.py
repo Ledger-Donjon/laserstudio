@@ -188,7 +188,7 @@ class ScanGeometry(QGraphicsItemGroup):
 
     @color.setter
     def color(self, value: QColor):
-        logging.getLogger("laserstudio").info(f"Scan geometry color: {value.name()}")
+        logging.getLogger("laserstudio").debug(f"Scan geometry color: {value.name()}")
         self.__scan_path.color = value
         self.__update_scan_path()
 

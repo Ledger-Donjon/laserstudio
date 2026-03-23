@@ -72,7 +72,7 @@ class ScanPath(QGraphicsItemGroup):
 
         color = self.color
         color_t = QColor(color)
-        logging.getLogger("laserstudio").info(f"Scan path color: {color.name()}")
+        logging.getLogger("laserstudio").debug(f"Scan path color: {color.name()}")
         color_t.setAlpha(100)
 
         # Add circles for all points in the path.
