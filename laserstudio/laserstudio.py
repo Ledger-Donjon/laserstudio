@@ -572,7 +572,18 @@ class LaserStudio(QMainWindow):
         data["probes"] = [probe.settings for probe in self.instruments.probes]
 
         # Lasers
-        data["lasers"] = [laser.settings for laser in self.instruments.lasers]
+        lasers_settings = list[dict[str, Any]]()
+        for laser in self.instruments.lasers:
+            laser_settings = laser.settings
+            if laser_settings.get("on_off", False):
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk to be set on during setting restoration, "
+                    "the parameter 'on_off' is not saved in the settings file."
+                )
+            _ = laser_settings.pop("on_off", None)
+            lasers_settings.append(laser_settings)
+        data["lasers"] = lasers_settings
 
         # Focus
         if self.instruments.focus_helper is not None:
@@ -626,6 +637,13 @@ class LaserStudio(QMainWindow):
         # Lasers
         lasers = data.get("lasers", [])
         for pdata, laser in zip(lasers, self.instruments.lasers):
+            if "on_off" in pdata:
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk during settings restoration, "
+                    "the parameter 'on_off' is ignored from the settings."
+                )
+            _ = pdata.pop("on_off", None)
             laser.settings = pdata
 
         # Focus
