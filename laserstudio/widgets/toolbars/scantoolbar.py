@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy
+from PyQt6.QtGui import QIcon, QColorConstants
+from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy, QComboBox
 from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
 from ...widgets.return_line_edit import ReturnSpinBox, ReturnDoubleSpinBox
+from ...utils.colors import LedgerColors
+from ...utils.util import create_color_qicon
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -60,6 +62,30 @@ class ScanToolBar(QToolBar):
         w.setCheckable(True)
         w.setChecked(laser_studio.scanning_enabled)
         w.toggled.connect(lambda v: laser_studio.__setattr__("scanning_enabled", v))
+        self.addWidget(w)
+
+        # Color drop down menu
+        w = self.color_combobox = QComboBox()
+        w.setToolTip("Select the color of the scan path")
+        w.setIconSize(QSize(24, 24))
+        for color in LedgerColors:
+            w.addItem(create_color_qicon(color), None, color.value)
+        for color in [
+            QColorConstants.Red,
+            QColorConstants.Green,
+            QColorConstants.Blue,
+            QColorConstants.Yellow,
+            QColorConstants.Magenta,
+            QColorConstants.Cyan,
+            QColorConstants.Black,
+            QColorConstants.White,
+        ]:
+            w.addItem(create_color_qicon(color), None, color)
+        w.currentIndexChanged.connect(
+            lambda _: laser_studio.viewer.scan_geometry.__setattr__(
+                "color", self.color_combobox.currentData()
+            )
+        )
         self.addWidget(w)
 
         # Density

@@ -181,6 +181,17 @@ class ScanGeometry(QGraphicsItemGroup):
         self.__scan_path.diameter = value
         self.__update_scan_path()
 
+    @property
+    def color(self) -> QColor:
+        """Color of the scan path"""
+        return self.__scan_path.color
+
+    @color.setter
+    def color(self, value: QColor):
+        logging.getLogger("laserstudio").info(f"Scan geometry color: {value.name()}")
+        self.__scan_path.color = value
+        self.__update_scan_path()
+
     @staticmethod
     def shapely_to_yaml(
         geometry: BaseGeometry | Polygon | MultiPolygon | GeometryCollection,
