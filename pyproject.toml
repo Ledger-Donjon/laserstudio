@@ -39,7 +39,7 @@ dependencies = [
 requires-python = ">=3.10,<3.13"
 
 [tool.poetry]
-version = "0.0.0"
+version = "1.1.0"
 
 [project.urls]
 Documentation = "https://laserstudio.readthedocs.io/"
