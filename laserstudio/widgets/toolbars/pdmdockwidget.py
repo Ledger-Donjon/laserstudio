@@ -157,6 +157,7 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(1000)
         w.setMaximum(1000000)
         w.setValue(2000)
+        w.reset()
         w.valueChanged.connect(
             lambda: self.laser.__setattr__(
                 "refresh_interval", self.refresh_interval_input.value()

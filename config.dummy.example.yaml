@@ -5,6 +5,8 @@ camera:
   type: USB
   refresh_interval_ms: 50
   index: 0
+  objective: 5.0
+  pixel_size_in_um: [15, 15]
 stage:
   enable: true
   label: "Dummy stage"
@@ -15,3 +17,4 @@ stage:
 probes:
   - enable: true
     label: "Dummy Probe"
+    spot_size_um: 20.0

@@ -1,6 +1,8 @@
 # Client API library to interact with laserstudio via a REST API.
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
+from __future__ import annotations
+
 from typing import Any
 from numpy.typing import NDArray
 import requests
@@ -68,7 +70,9 @@ class LSAPI:
         """Jump to next scan position.
 
         :return: A dictionary giving the details about the go_next"""
-        return self.send("motion/go_next", {}).json()
+        response = self.send("motion/go_next", {})
+        result: dict[str, Any] = response.json()
+        return result
 
     def autofocus(
         self,
@@ -108,7 +112,10 @@ class LSAPI:
 
         :return: A list of dictionaries, each containing the marker's id, position and RGBA color.
         """
-        return self.send("annotation/markers").json()
+        markers: list[dict[str, int | tuple[float, float]]] = self.send(
+            "annotation/markers"
+        ).json()
+        return markers
 
     def marker(
         self,
@@ -154,7 +161,10 @@ class LSAPI:
         :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send(f"motion/go_to_memory_point/{index}", is_put=True).json()
+        pos: list[float] = self.send(
+            f"motion/go_to_memory_point/{index}", is_put=True
+        ).json()
+        return pos
 
     def camera(self, path: str | None = None) -> Image.Image | None:
         """
@@ -171,6 +181,7 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
+            return None
 
     def accumulated_image(self, path: str | None) -> NDArray[Any] | None:
         """
@@ -181,14 +192,15 @@ class LSAPI:
             response = self.send("images/camera/accumulator")
             c = response.content
             if type(c) is bytes:
-                frame = numpy.load(c)
+                frame: NDArray[Any] = numpy.load(c)
                 return frame
             # This should not happen
             return None
         else:
             # We request for the data to be saved on the host machine at given path
             response = self.send("images/camera/accumulator", {"path": path})
-            return numpy.load(response.text.strip().strip('"'))
+            frame = numpy.load(response.text.strip().strip('"'))
+            return frame
 
     def averaging(self, reset: bool = False) -> int | None:
         """
@@ -197,7 +209,11 @@ class LSAPI:
         :param reset: If True, reset the accumulator.
         :return: The number of images accumulated in the camera's accumulator.
         """
-        return self.send("images/camera/averaging", is_delete=reset).json()
+        response = self.send("images/camera/averaging", is_delete=reset)
+        if response.status_code == 200:
+            averaging: int = response.json()
+            return averaging
+        return None
 
     def reference_image(
         self, num: int | None = None, unset: bool = False, set: bool = False
@@ -210,6 +226,7 @@ class LSAPI:
             {} if set else None,
             is_delete=unset,
         )
+        return None
 
     def screenshot(self, path: str | None = None) -> Image.Image | None:
         """
@@ -226,10 +243,12 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/screenshot", {"path": path})
+            return None
 
     def position(self) -> list[float]:
         res = self.send("motion/position")
-        return res.json()["pos"]
+        pos: list[float] = res.json()["pos"]
+        return pos
 
     def go_to_position(self, pos: list[float] = []) -> list[float]:
         """
@@ -246,7 +265,8 @@ class LSAPI:
         """
         params = {"pos": pos}
         res = self.send("motion/position", params, is_put=True)
-        return res.json()
+        pos = res.json()
+        return pos
 
     def instrument_settings(
         self, label: str, settings: dict[str, Any] | None = None
@@ -263,7 +283,10 @@ class LSAPI:
         :return: The response from the API containing the instrument's settings,
                  or None if the operation fails.
         """
-        return self.send(f"instruments/{label}/settings", settings, is_put=True).json()
+        settings = self.send(
+            f"instruments/{label}/settings", settings, is_put=True
+        ).json()
+        return settings
 
     def set_instrument_settings(self, label: str, settings: dict[str, Any]):
         """

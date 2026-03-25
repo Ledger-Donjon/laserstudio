@@ -69,18 +69,18 @@ class CameraNITDockWidget(QDockWidget):
         hbox.addWidget(w)
         # Button to trigger the NIT camera gain
         # Checkbox to activate/deactivate the timer
-        self.button_agc = w = ColoredPushButton()
+        self.agc_button = w = ColoredPushButton()
         w.setText("AGC")
         w.setToolTip("Auto gain control (every 1 second)")
         w.setCheckable(True)
         # w.setChecked(True)
-        w.clicked.connect(self.agc_changed)
+        w.clicked.connect(self.agc_button_changed)
         hbox.addWidget(w)
         # Timer to trigger gain autoset every 1 seconds
         self.timer = QTimer()
         self.timer.timeout.connect(self.gain_autoset)
         self.timer.setInterval(1000)  # 1 second interval
-        self.agc_changed(self.button_agc.isChecked())
+        self.agc_button_changed(self.agc_button.isChecked())
 
         # Averaging management
         hbox = QHBoxLayout()
@@ -168,7 +168,7 @@ class CameraNITDockWidget(QDockWidget):
 
     def gain_autoset(self):
         """
-        Called when the auto gain button is clicked.
+        Called when the auto gain is triggered by the timer.
         """
         low, high = self.camera.gain_autoset()
         self.hist_low_input.setValue(low)
@@ -214,7 +214,7 @@ class CameraNITDockWidget(QDockWidget):
         except FileNotFoundError:
             QMessageBox().critical(None, "Error", "Shading correction file not found.")
 
-    def agc_changed(self, state: bool):
+    def agc_button_changed(self, state: bool):
         """
         Called when AGC button is toggled.
         Enables or disables Automatic Gain Correction.
@@ -222,8 +222,8 @@ class CameraNITDockWidget(QDockWidget):
         :param state: True when button is checked, which enables AGC. False otherwise.
         """
         if state:
-            # Apply gain correcttion immediately, don't wait 1 second for the timer to
-            # expire.
+            # Apply gain correction immediately, don't wait 1 second
+            # for the timer to timeout.
             self.gain_autoset()
             # Re-enabled timer
             self.timer.start()

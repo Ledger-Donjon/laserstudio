@@ -46,8 +46,8 @@ class CameraNITInstrument(CameraInstrument):
         :rtype: tuple[float, float]
         """
         return (
-            self.pynit.gain_controller.get_low() * 64,
-            self.pynit.gain_controller.get_high() * 64,
+            float(self.pynit.gain_controller.get_low() * 64),
+            float(self.pynit.gain_controller.get_high() * 64),
         )
 
     @gain.setter
@@ -76,7 +76,8 @@ class CameraNITInstrument(CameraInstrument):
         :return: A tuple containing the low and high bounds of the calculated gain.
         :rtype: tuple[float, float]
         """
-        return self.pynit.gain_autoset()
+        low, high = self.pynit.gain_autoset()
+        return float(low), float(high)
 
     @property
     def shade_correction(self) -> bytes:

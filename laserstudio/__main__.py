@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from __future__ import annotations
 import argparse
 import logging
 import os.path
@@ -13,15 +14,16 @@ from PyQt6.QtWidgets import QApplication
 from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 from .laserstudio import LaserStudio
 from .utils.util import resource_path
-from .utils.colors import LedgerPalette, LedgerStyle
+from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 from .instruments.list_serials import list_devices
+from .utils.yaml_types import Config
 
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("laserstudio")
 
 
-def main():
+def main() -> int:
     app = QApplication(sys.argv)
 
     parser = argparse.ArgumentParser(prog="laserstudio")
@@ -54,14 +56,7 @@ def main():
     app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
     app.setStyle(LedgerStyle)
     app.setPalette(LedgerPalette)
-    app.setStyleSheet(
-        "QToolBar { "
-        "border: 1px solid #252525;"
-        "border-radius: 4px;"
-        "margin: 3px;"
-        "padding: 6px;"
-        "background-color: #252525 }"
-    )
+    app.setStyleSheet(ledger_stylesheet())
 
     QLocale.setDefault(QLocale.c())
 
@@ -76,7 +71,7 @@ def main():
             f"Encountered error while opening configuration file {args.config}: {e}"
         )
 
-    yaml_config = None
+    yaml_config: Config | None = None
     if stream is not None:
         # Load the found or given configuration file
         try:

@@ -1,13 +1,14 @@
 import requests
-from typing import cast, Any
+from typing import cast
+from ..utils.yaml_types import Config
 
 
 class RestInstrument:
     """Class to implement REST instrument"""
 
-    SESSIONS = {}
+    SESSIONS: dict[str, requests.Session] = {}
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """
@@ -24,7 +25,7 @@ class RestInstrument:
         """
         return self.send(self.api_command)
 
-    def put(self, params: dict[str, Any]) -> requests.Response:
+    def put(self, params: Config) -> requests.Response:
         """Convenience function for addressing a PUT request on default API command
         with given parameter.
 
@@ -32,7 +33,7 @@ class RestInstrument:
         """
         return self.send(self.api_command, params=params, is_put=True)
 
-    def post(self, params: dict[str, Any]) -> requests.Response:
+    def post(self, params: Config) -> requests.Response:
         """Convenience function for addressing a POST request on default API command
         with given parameter.
 
@@ -41,7 +42,7 @@ class RestInstrument:
         return self.send(self.api_command, params=params)
 
     def send(
-        self, command: str, params: dict[str, Any] | None = None, is_put: bool = False
+        self, command: str, params: Config | None = None, is_put: bool = False
     ) -> requests.Response:
         """
         Sends to the session a HTTP GET, POST or PUT command according to the

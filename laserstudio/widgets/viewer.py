@@ -1,3 +1,4 @@
+from __future__ import annotations
 from PyQt6.QtWidgets import (
     QGraphicsPolygonItem,
     QGraphicsView,
@@ -26,8 +27,9 @@ from PyQt6.QtGui import (
 from enum import Enum, auto
 from typing import Any
 from shapely import Polygon
-
-from laserstudio.utils.colors import LedgerColors
+import logging
+import json
+import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -35,12 +37,11 @@ from .stagesight import (
     ProbeInstrument,
     LaserInstrument,
 )
-import logging
-import json
-import numpy as np
 from .marker import IdMarker, Marker
 from .scangeometry import ScanGeometry
 from ..instruments.stage import MoveFor
+from ..utils.yaml_types import Config
+from ..utils.colors import LedgerColors
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -171,8 +172,10 @@ class Viewer(QGraphicsView):
 
     def marker_size(self, value: float):
         self.default_marker_size = value
+        self.setUpdatesEnabled(False)
         for m in self.markers:
             m.size = value
+        self.setUpdatesEnabled(True)
 
     @property
     def follow_stage_sight(self) -> bool:
@@ -339,7 +342,7 @@ class Viewer(QGraphicsView):
 
         self.mode = Viewer.Mode(mode)
 
-    def go_next(self):
+    def go_next(self) -> Config:
         """Actions to perform when Laser Studio receive a Go Next command.
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
@@ -865,22 +868,22 @@ class Viewer(QGraphicsView):
         """
         Add a marker at a specific position, or at current observed position.
 
+        :param position: The position of the marker. If None, the position is retrieved from the stage's current position.
+        :param color: The color of the marker.
+        :param label: The label of the marker.
         :param visible: If False, the marker is created but not displayed (setVisible(False)).
+        :return: The added marker.
         """
-        if isinstance(color, LedgerColors):
-            color = color.value
-        elif isinstance(color, list):
-            color = QColor(
-                int(color[0] * 255),
-                int(color[1] * 255),
-                int(color[2] * 255),
-                int(color[3] * 255),
-            )
-        elif isinstance(color, Qt.GlobalColor):
-            color = QColor(color)
-        elif isinstance(color, int):
-            color = QColor(color)
-        marker = IdMarker(viewer=self, color=color, label=label)
+        # Creation of the marker
+        if position is None:
+            p = self.focused_element_position()
+            position = p.x(), p.y()
+
+        marker = IdMarker(viewer=self, color=color, label=label, position=position)
+        marker.setVisible(visible)
+        marker.size = self.default_marker_size
+
+        # Adding to the model
         self.__markers.add(marker)
         if label not in self.__markers_by_label_by_color:
             self.__markers_by_label_by_color[label] = {marker.color_name: set([marker])}
@@ -888,15 +891,10 @@ class Viewer(QGraphicsView):
             self.__markers_by_label_by_color[label][marker.color_name] = set([marker])
         else:
             self.__markers_by_label_by_color[label][marker.color_name].add(marker)
+
+        # Adding to the view
         self.__scene.addItem(marker)
 
-        if position is None:
-            p = self.focused_element_position()
-            position = p.x(), p.y()
-        marker.setPos(*position)
-        marker.setZValue(2)
-        marker.size = self.default_marker_size
-        marker.setVisible(visible)
         return marker
 
     def clear_markers(self):
@@ -971,22 +969,26 @@ class Viewer(QGraphicsView):
             if not QMessageBox.information(
                 self,
                 f"{len(markers)} markers loaded",
-                f"{len(markers)} are ready to be added to the scene. Do you want to proceed?",
+                f"{len(markers)} markers are ready to be added. Do you want to proceed?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             ):
                 return
 
-        for marker in markers:
-            color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
-            color = QColor(
-                int(color[0] * 255),
-                int(color[1] * 255),
-                int(color[2] * 255),
-                int(color[3] * 255),
-            )
-            label = marker.get("label", None)
-            visible = not marker.get("hidden", False)
-            self.add_marker(marker["pos"], color, label=label, visible=visible)
+        self.setUpdatesEnabled(False)
+        try:
+            for marker in markers:
+                color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
+                color = QColor(
+                    int(color[0] * 255),
+                    int(color[1] * 255),
+                    int(color[2] * 255),
+                    int(color[3] * 255),
+                )
+                label = marker.get("label", None)
+                visible = not marker.get("hidden", False)
+                self.add_marker(marker["pos"], color, label=label, visible=visible)
+        finally:
+            self.setUpdatesEnabled(True)
 
     def save_markers(self, file_path: str):
         """Save markers to a file."""

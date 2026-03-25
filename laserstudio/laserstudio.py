@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
     QCloseEvent,
     QColorConstants,
 )
-from PyQt6.QtWidgets import QMainWindow, QButtonGroup
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QLabel
 from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
@@ -97,6 +97,15 @@ class LaserStudio(QMainWindow):
         group.idClicked.connect(id_clicked)
 
         self.viewer.mode_changed.connect(self.update_buttons_mode)
+
+        self.mode_indicator = QLabel()
+        self.mode_indicator.setObjectName("active-mode")
+        self.mode_indicator.setToolTip("Active viewer mode")
+        self.mode_indicator.setProperty("modeActive", False)
+        status_bar = self.statusBar()
+        if status_bar is not None:
+            status_bar.addPermanentWidget(self.mode_indicator)
+        self.update_mode_indicator(int(self.viewer.mode))
 
         # ToolBar: Main
         toolbar = MainToolBar(self)
@@ -195,8 +204,10 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.NONE))
         shortcut = QShortcut(Qt.Key.Key_R, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.ZONE))
-        # shortcut = QShortcut(Qt.Key_T, self)
-        # shortcut.activated.connect(self.zone_rot_mode)
+        shortcut = QShortcut(Qt.Key.Key_T, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.select_mode(Viewer.Mode.ZONE_TILTED)
+        )
         shortcut = QShortcut(Qt.Key.Key_M, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
@@ -261,12 +272,12 @@ class LaserStudio(QMainWindow):
                 w.close()
         super().closeEvent(a0)
 
-    def handle_go_next(self) -> dict[str, Any]:
+    def handle_go_next(self) -> Config:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        v: dict[str, Any] = {}
+        v: Config = {}
         v.update(self.instruments.go_next())
         v.update(self.viewer.go_next())
         return v
@@ -385,8 +396,8 @@ class LaserStudio(QMainWindow):
         return camera.current_reference_image
 
     def handle_instrument_settings(
-        self, label: str, settings: dict[str, Any] | None
-    ) -> dict[str, Any] | None:
+        self, label: str, settings: Config | None
+    ) -> Config | None:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -432,7 +443,7 @@ class LaserStudio(QMainWindow):
             stage.move_to(Vector(*pos), wait=True)
         return {"pos": [float(v) for v in stage.position.data]}
 
-    def handle_markers(self) -> list[dict[str, Any]]:
+    def handle_markers(self) -> list[Config]:
         """Handle a Markers API request to get the list of markers."""
 
         return [marker.to_dict() for marker in self.viewer.markers]
@@ -443,7 +454,7 @@ class LaserStudio(QMainWindow):
         color: list[float] | None,
         label: str | None,
         visible: bool | None = True,
-    ) -> dict[str, Any]:
+    ) -> Config:
         """Add marker(s).
 
         :param positions: The requested position(s) of the marker(s).
@@ -507,11 +518,38 @@ class LaserStudio(QMainWindow):
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
+        self.update_mode_indicator(id)
         if id == self.viewer_buttons_group.checkedId():
             return
         for b in self.viewer_buttons_group.buttons():
             if id == self.viewer_buttons_group.id(b):
                 b.setChecked(True)
+
+    def update_mode_indicator(self, id: int):
+        """Update the mode indicator label."""
+        try:
+            mode = Viewer.Mode(id)
+        except ValueError:
+            mode = Viewer.Mode.NONE
+        self.mode_indicator.setText(self._mode_label(mode))
+        self.mode_indicator.setProperty("modeActive", mode != Viewer.Mode.NONE)
+        style = self.mode_indicator.style()
+        if style is not None:
+            style.unpolish(self.mode_indicator)
+            style.polish(self.mode_indicator)
+        self.mode_indicator.update()
+
+    def _mode_label(self, mode: Viewer.Mode) -> str:
+        labels = {
+            Viewer.Mode.NONE: "Mode: None (Esc)",
+            Viewer.Mode.STAGE: "Mode: Move (M)",
+            Viewer.Mode.ZONE: "Mode: Zone (R)",
+            Viewer.Mode.ZONE_TILTED: "Mode: Tilted Zone (T)",
+            Viewer.Mode.ZONE_POLY: "Mode: Poly Zone",
+            Viewer.Mode.PIN: "Mode: Pin (P)",
+            Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
+        }
+        return labels.get(mode, f"Mode: {mode.name}")
 
     def save_settings(self):
         """
@@ -534,7 +572,18 @@ class LaserStudio(QMainWindow):
         data["probes"] = [probe.settings for probe in self.instruments.probes]
 
         # Lasers
-        data["lasers"] = [laser.settings for laser in self.instruments.lasers]
+        lasers_settings = list[dict[str, Any]]()
+        for laser in self.instruments.lasers:
+            laser_settings = laser.settings
+            if laser_settings.get("on_off", False):
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk to be set on during setting restoration, "
+                    "the parameter 'on_off' is not saved in the settings file."
+                )
+            _ = laser_settings.pop("on_off", None)
+            lasers_settings.append(laser_settings)
+        data["lasers"] = lasers_settings
 
         # Focus
         if self.instruments.focus_helper is not None:
@@ -553,7 +602,13 @@ class LaserStudio(QMainWindow):
         """
         Restore settings in the settings.yaml file.
         """
-        data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        try:
+            data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        except FileNotFoundError:
+            logging.getLogger("laserstudio").warning(
+                "Settings file not found in directory " + os.getcwd()
+            )
+            return
         # Camera settings (maybe missing from settings)
         camera = data.get("camera")
         if (self.instruments.camera is not None) and (camera is not None):
@@ -582,6 +637,13 @@ class LaserStudio(QMainWindow):
         # Lasers
         lasers = data.get("lasers", [])
         for pdata, laser in zip(lasers, self.instruments.lasers):
+            if "on_off" in pdata:
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk during settings restoration, "
+                    "the parameter 'on_off' is ignored from the settings."
+                )
+            _ = pdata.pop("on_off", None)
             laser.settings = pdata
 
         # Focus

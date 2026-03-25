@@ -2,6 +2,7 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsItemGroup, QGraphicsEllipseItem, QGraphicsPathItem
 from PyQt6.QtGui import QPen, QColor, QPainterPath
 from ..utils.colors import LedgerColors
+import logging
 
 
 class ScanPath(QGraphicsItemGroup):
@@ -12,6 +13,7 @@ class ScanPath(QGraphicsItemGroup):
         self.__path: list[QPointF] = []
         self.__diameter = diameter
         self.__hist_size = hist_size
+        self.__color: QColor = LedgerColors.SafetyOrange.value
 
     @property
     def path(self) -> list[QPointF]:
@@ -47,6 +49,16 @@ class ScanPath(QGraphicsItemGroup):
         self.__hist_size = value
         self.__rebuild()
 
+    @property
+    def color(self) -> QColor:
+        """Color of the scan path"""
+        return self.__color
+
+    @color.setter
+    def color(self, value: QColor):
+        self.__color = value
+        self.__rebuild()
+
     def set(self, path: list[QPointF], hist_size: int, diameter: float):
         """Sets all attributes and rebuild the graphic object at once."""
         self.__hist_size = hist_size
@@ -58,8 +70,9 @@ class ScanPath(QGraphicsItemGroup):
         for i in self.childItems():
             i.setParentItem(None)
 
-        color = LedgerColors.Grellow.value
+        color = self.color
         color_t = QColor(color)
+        logging.getLogger("laserstudio").debug(f"Scan path color: {color.name()}")
         color_t.setAlpha(100)
 
         # Add circles for all points in the path.

@@ -14,6 +14,7 @@ from enum import Enum
 
 class LedgerColors(Enum):
     SafetyOrange = QColor(255, 83, 0)
+    SafetyOrangeLight = SafetyOrange.lighter(125)
     SerenityPurple = QColor(212, 160, 255)
     SecurityBlue = QColor(0, 27, 60)
     Grellow = QColor(222, 255, 0)
@@ -216,9 +217,7 @@ class LedgerProxyStyle(QProxyStyle):
 
         text_flags = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
         text_flags |= Qt.TextFlag.TextSingleLine
-        if self.styleHint(
-            QStyle.StyleHint.SH_UnderlineShortcut, option, widget
-        ):
+        if self.styleHint(QStyle.StyleHint.SH_UnderlineShortcut, option, widget):
             text_flags |= Qt.TextFlag.TextShowMnemonic
         else:
             text_flags |= Qt.TextFlag.TextHideMnemonic
@@ -236,3 +235,173 @@ class LedgerProxyStyle(QProxyStyle):
 
 
 LedgerStyle = LedgerProxyStyle()
+
+
+def ledger_stylesheet() -> str:
+    base = LedgerPalette.color(QPalette.ColorRole.Base)
+    button = LedgerPalette.color(QPalette.ColorRole.Button)
+    text = LedgerPalette.color(QPalette.ColorRole.Text)
+    highlight_text = LedgerPalette.color(QPalette.ColorRole.HighlightedText)
+    # muted = LedgerPalette.color(QPalette.ColorRole.PlaceholderText)
+
+    border = base.darker(140)
+    header = base.lighter(110)
+    hover = button.lighter(115)
+    active = button.lighter(130)
+    accent = LedgerColors.SafetyOrange.value
+    accent_border = LedgerColors.SafetyOrangeLight.value
+
+    return f"""
+QToolBar {{
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    margin: 3px;
+    padding: 4px;
+    background-color: {header.name()};
+}}
+QToolButton,
+QPushButton {{
+    background-color: {button.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    padding: 2px 6px;
+    min-height: 20px;
+}}
+QToolButton:hover,
+QPushButton:hover {{
+    background-color: {hover.name()};
+}}
+QToolButton:pressed,
+QPushButton:pressed {{
+    background-color: {active.name()};
+}}
+QToolButton:checked,
+QPushButton:checked {{
+    background-color: {active.name()};
+    border-color: {accent_border.name()};
+    color: {accent.name()};
+}}
+QToolBarExtension {{
+    padding: 0;
+}}
+QToolBarExtension:hover {{
+    background-color: {accent_border.name()};
+}}
+QDockWidget::title {{
+    background: {header.name()};
+    border: 1px solid {border.name()};
+    padding-top: 4px;
+    padding-bottom: 0px;
+    padding-left: 5px;
+    padding-right: 5px;
+}}
+
+QGroupBox {{
+    border: 1px solid {border.name()};
+    border-radius: 4px;
+    margin-top: 6px;
+}}
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 4px;
+    color: {text.name()};
+}}
+
+QMenu {{
+    background: {base.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+}}
+QMenu::item:selected {{
+    background: {accent.name()};
+    color: {highlight_text.name()};
+}}
+
+QStatusBar {{
+    background: {header.name()};
+    color: {text.name()};
+    border-top: 1px solid {border.name()};
+}}
+QStatusBar::item {{
+    border: none;
+}}
+QSlider::sub-page {{
+    background: {accent_border.name()};
+    border-radius: 2px;
+}}
+QSlider::add-page {{
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::groove {{
+    height: 4px;
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::handle {{
+    background: {accent_border.name()};
+    border: 1px solid {border.name()};
+    border-radius: 3px;
+    width: 10px;
+    height: 10px;
+    margin: -4px 0;
+}}
+QSlider::handle:hover {{
+    background: {accent.name()};
+}}
+""".strip()
+
+
+"""
+QLabel#active-mode {{
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid {border.name()};
+    color: {muted.name()};
+    background: {base.name()};
+    font-weight: 600;
+}}
+QLabel#active-mode[modeActive="true"] {{
+    border-color: {accent.name()};
+    color: {accent.name()};
+    background: {header.name()};
+}}
+
+QSlider::groove:horizontal {{
+    height: 4px;
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::sub-page:horizontal {{
+    background: {accent.name()};
+    border-radius: 2px;
+}}
+QSlider::add-page:horizontal {{
+    background: {border.name()};
+    border-radius: 2px;
+}}
+QSlider::handle:horizontal {{
+    width: 10px;
+    margin: -4px 0;
+    background: {accent.name()};
+    border-radius: 5px;
+}}
+
+QLineEdit,
+QComboBox {{
+    background-color: {base.name()};
+    color: {text.name()};
+    border: 1px solid {border.name()};
+    border-radius: 3px;
+    padding: 1px 4px;
+    min-height: 20px;
+    selection-background-color: {accent.name()};
+    selection-color: {highlight_text.name()};
+}}
+QLineEdit:focus,
+QComboBox:focus {{
+    border: 1px solid {accent.name()};
+}}
+"""
