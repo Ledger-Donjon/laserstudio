@@ -5,7 +5,7 @@ import yaml
 from PIL import Image, ImageQt
 import numpy
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
 from PyQt6.QtGui import (
     QColor,
@@ -84,7 +84,7 @@ class LaserStudio(QMainWindow):
             self.viewer.add_stage_sight(
                 self.instruments.stage,
                 self.instruments.camera,
-                self.instruments.probes + self.instruments.lasers,
+                self.instruments.probes + [*self.instruments.lasers],
             )
             self.viewer.reset_camera()
 
