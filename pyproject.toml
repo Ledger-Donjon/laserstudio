@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "pyqt6",
-    "pystages>=1.2",
+    "pystages>=1.3",
     "pillow>=10.4.0",
     "opencv-python>=4.9.0.80",
     "pyyaml",
@@ -26,7 +26,7 @@ dependencies = [
     "triangle",
     "requests>=2.32.3,<3.0.0",
     "numpy<2.0",
-    "pypdm",
+    "pypdm>=2.0",
     "flask",
     "flask-restx",
     "hidapi>=0.14.0",
@@ -34,9 +34,9 @@ dependencies = [
     "donjon_hyshlr",
     "scipy",
     "PyQt6-Charts",
-    # "pylmscontroller",
+    "pylmscontroller",
 ]
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.13"
 
 [tool.poetry]
 version = "0.0.0"
@@ -45,23 +45,16 @@ version = "0.0.0"
 Documentation = "https://laserstudio.readthedocs.io/"
 
 [project.scripts]
+chipscan = 'laserstudio.utils.chipscan.__main__:main'
 laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 laserstudio_generate_config_cli = 'laserstudio.config_generator:main_cli'
 laserstudio_generate_config = 'laserstudio.config_generator:main_gui'
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.0.0"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "*"
-sphinx-rtd-theme = "*"
-myst_parser = "*"
-# sphinx-togglebutton = "*"
-# sphinx-book-theme = "*"
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+lint = ["mypy", "types-pyserial", "types-PyYAML", "types-requests", "scipy-stubs"]
+docs = ["sphinx", "sphinx-rtd-theme", "myst_parser"]
 
 [tool.poetry-dynamic-versioning]
 enable = true
@@ -77,3 +70,9 @@ persistent-substitution = true
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

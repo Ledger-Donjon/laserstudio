@@ -1,38 +1,159 @@
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QMargins
 from PyQt6.QtGui import QIcon, QPainter
 from PyQt6.QtWidgets import (
     QToolBar,
     QPushButton,
     QLabel,
+    QGroupBox,
     QMessageBox,
     QWidget,
     QVBoxLayout,
     QMenu,
+    QDockWidget,
+    QFormLayout,
+    QSpinBox,
+    QDoubleSpinBox,
+    QCheckBox,
 )
+from ...utils.colors import LedgerColors
 from ...utils.util import colored_image, ChartViewWithVMarker
 from ..coloredbutton import ColoredPushButton
 from ...instruments.camera import CameraInstrument
 from ...instruments.stage import StageInstrument
-from ...instruments.focus import FocusInstrument
+from ...instruments.focus import FocusInstrument, FocusSearchSettings
 from PyQt6.QtCharts import QLineSeries, QChart
 from typing import Optional
 
 
-class FocusChartWindow(QWidget):
+class FocusSettingsWidget(QGroupBox):
+    def __init__(self, title: str, focus_settings: FocusSearchSettings | None):
+        super().__init__(title)
+        self.setCheckable(True)
+        self.focus_settings = focus_settings
+        self.setLayout(form := QFormLayout())
+        self.span = QDoubleSpinBox()
+        form.addRow("Span", self.span)
+        self.span.setSuffix("\xa0µm")
+        self.span.setMinimum(1)
+        self.span.setMaximum(10000)
+
+        self.steps = QSpinBox()
+        form.addRow("Steps", self.steps)
+        self.steps.setMinimum(2)
+        self.steps.setMaximum(100)
+
+        self.averaging = QSpinBox()
+        form.addRow("Averaging", self.averaging)
+        self.averaging.setMinimum(1)
+        self.averaging.setMaximum(100)
+
+        self.multi_peaks = QCheckBox()
+        form.addRow("Multi Peaks", self.multi_peaks)
+
+        self.best_is_highest_z = QCheckBox()
+        form.addRow("Best is Highest Z", self.best_is_highest_z)
+
+        self.update_ui()
+
+        self.span.valueChanged.connect(lambda: self.update_focus_settings())
+        self.steps.valueChanged.connect(lambda: self.update_focus_settings())
+        self.averaging.valueChanged.connect(lambda: self.update_focus_settings())
+        self.multi_peaks.stateChanged.connect(lambda: self.update_focus_settings())
+        self.best_is_highest_z.stateChanged.connect(
+            lambda: self.update_focus_settings()
+        )
+
+    def update_focus_settings(self):
+        """
+        Update the focus settings when the UI is changed.
+        """
+        if self.focus_settings is None:
+            return
+        self.focus_settings.span = self.span.value()
+        self.focus_settings.steps = self.steps.value()
+        self.focus_settings.averaging = self.averaging.value()
+        self.focus_settings.multi_peaks = self.multi_peaks.isChecked()
+        self.focus_settings.best_is_highest_z = self.best_is_highest_z.isChecked()
+
+    def update_ui(self):
+        """
+        Update the UI from the focus settings.
+        """
+        if self.focus_settings is None:
+            self.setChecked(False)
+            return
+        self.setChecked(True)
+        self.span.setValue(self.focus_settings.span)
+        self.steps.setValue(self.focus_settings.steps)
+        self.averaging.setValue(self.focus_settings.averaging)
+        self.multi_peaks.setChecked(self.focus_settings.multi_peaks)
+        self.best_is_highest_z.setChecked(self.focus_settings.best_is_highest_z)
+
+
+class MagicFocusParametersDockWidget(QDockWidget):
+    """
+    Dock widget for the magic focus settings.
+    """
+
+    def __init__(self, focus_helper: FocusInstrument, parent: QWidget | None = None):
+        super().__init__("Magic Focus Parameters", parent)
+        self.setObjectName(
+            "magic-focus-parameters-dockwidget"
+        )  # For settings save and restore
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        self.setVisible(False)
+
+        w = QWidget()
+        self.coarse_settings_widget = FocusSettingsWidget(
+            "Coarse", focus_helper.coarse_focus_settings
+        )
+        self.fine_settings_widget = FocusSettingsWidget(
+            "Fine", focus_helper.fine_focus_settings
+        )
+        w.setLayout(vbox := QVBoxLayout())
+        vbox.addWidget(self.coarse_settings_widget)
+        vbox.addWidget(self.fine_settings_widget)
+        self.setWidget(w)
+
+    def update_parameters(self):
+        """
+        Update the parameters in the dock widget.
+        """
+
+
+class MagicFocusDockWidget(QDockWidget):
+    """
+    Dock widget for the magic focus.
+    """
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__("Magic Focus Chart", parent)
+        self.setObjectName("magic-focus-dockwidget")  # For settings save and restore
+
+        self.chart_window = FocusChart()
+        self.setWindowTitle("Magic Focus")
+        self.setWidget(self.chart_window)
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        self.setVisible(False)
+
+
+class FocusChart(QWidget):
     """
     Window for displaying the focus chart.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("focus-chart-window")  # For settings save and restore
         self.setWindowTitle("Focus Chart")
-        self.setWindowFlags(
-            Qt.WindowType.Window
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
-        )
-        self.setGeometry(100, 100, 800, 600)
         self.setVisible(False)
         # Chart for focus results
         self.chart = QChart()
@@ -41,6 +162,8 @@ class FocusChartWindow(QWidget):
         w.setChart(self.chart)
         w.setRenderHint(QPainter.RenderHint.Antialiasing)
         w.setMinimumSize(600, 400)
+        self.chart.setBackgroundVisible(False)
+        self.chart.setMargins(QMargins(0, 0, 0, 0))
 
         self.coarse_serie = QLineSeries()
         self.coarse_serie.setName("Coarse")
@@ -49,6 +172,14 @@ class FocusChartWindow(QWidget):
         self.chart.addSeries(self.coarse_serie)
         self.chart.addSeries(self.fine_serie)
         self.chart.createDefaultAxes()
+
+        # Text color
+        self.chart.axes()[0].setLabelsColor(LedgerColors.SerenityPurple.value)
+        self.chart.axes()[1].setLabelsColor(LedgerColors.SerenityPurple.value)
+        # Set color of text in legend
+        legend = self.chart.legend()
+        if legend is not None:
+            legend.setLabelColor(LedgerColors.SerenityPurple.value)
 
         self.setLayout(vbox := QVBoxLayout())
         vbox.addWidget(w)
@@ -119,16 +250,35 @@ class FocusToolBar(QToolBar):
         self.stage = stage
         self.camera = camera
 
+        self.magic_focus_settings_dockwidget = MagicFocusParametersDockWidget(
+            self.focus_helper
+        )
+
         # Try to find focus automatically
         self.button_magic_focus = w = ColoredPushButton(
             ":/icons/fontawesome-free/wand-magic-sparkles-solid.svg", parent=self
         )
-        w.setCheckable(True)
+        # w.setCheckable(True)
         w.setIconSize(QSize(24, 24))
         w.setToolTip(
             "Automatically find best focus position using camera image analysis."
         )
-        w.clicked.connect(self.magic_focus)
+        menu = QMenu("Magic Focus", self)
+        action = menu.addAction("Perform magic focus", lambda: self.magic_focus(True))
+        assert action is not None, "Perform magic focus action could not be created"
+        self._menu_magic_focus_perform = action
+        action = menu.addAction(
+            "Interrupt magic focus", lambda: self.magic_focus(False)
+        )
+        assert action is not None, "Interrupt magic focus action could not be created"
+        self._menu_magic_focus_interrupt = action
+        action.setVisible(False)
+        menu.addAction(
+            "Show parameters", lambda: self.magic_focus_settings_dockwidget.show()
+        )
+        w.setMenu(menu)
+        # w.clicked.connect(self.magic_focus)
+
         self.addWidget(w)
 
         # Register focus point at current position
@@ -159,25 +309,36 @@ class FocusToolBar(QToolBar):
         self.sharpness.setToolTip("The sharpness value of the current image.")
         self.addWidget(self.sharpness)
 
-        self.chart_window = FocusChartWindow()
+        self.magic_focus_dockwidget = MagicFocusDockWidget()
+        self.chart_window = self.magic_focus_dockwidget.chart_window
 
         self.focus_helper.parameter_changed.connect(
             lambda _: self.update_autofocus_buttons()
         )
 
-    def magic_focus(self):
+    def magic_focus(self, do_it: bool = True):
         """
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
         """
+        self._menu_magic_focus_perform.setVisible(not do_it)
+        self._menu_magic_focus_interrupt.setVisible(do_it)
+
+        if not do_it:
+            if self.focus_helper.focus_thread is not None:
+                self.focus_helper.focus_thread.requestInterruption()
+                self.focus_helper.focus_thread.wait()
+            self.chart_window.clear()
+            return
+
         assert (
             self.focus_helper.focus_thread is None
             or not self.focus_helper.focus_thread.isRunning()
         ), "Magic Focus thread is already running"
-        self.button_magic_focus.setEnabled(False)
 
         self.chart_window.clear()
         self.chart_window.show()
+        self.magic_focus_dockwidget.show()
 
         t = self.focus_helper.magic_focus()
         t.new_point.connect(
@@ -195,9 +356,9 @@ class FocusToolBar(QToolBar):
 
     def magic_focus_finished(self):
         """Called when focus search thread has finished."""
-        # Reenable the button
-        self.button_magic_focus.setChecked(False)
-        self.button_magic_focus.setEnabled(True)
+        # Reenable the perform and interrupt actions
+        self._menu_magic_focus_perform.setVisible(True)
+        self._menu_magic_focus_interrupt.setVisible(False)
 
         # Show the graphs
         assert (t := self.focus_helper.focus_thread) is not None

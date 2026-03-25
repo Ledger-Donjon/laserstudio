@@ -1,12 +1,18 @@
+import logging
+from enum import Enum, auto
+from typing import Any
 from PyQt6.QtWidgets import (
+    QGraphicsItem,
     QGraphicsItemGroup,
+    QGraphicsPathItem,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsLineItem,
     QGraphicsView,
     QGraphicsScene,
+    QWidget,
 )
-from PyQt6.QtGui import QPen, QColor, QTransform, QImage, QPixmap
+from PyQt6.QtGui import QPen, QTransform, QImage, QPixmap, QPainterPath
 from PyQt6.QtCore import (
     pyqtSignal,
     pyqtBoundSignal,
@@ -16,14 +22,12 @@ from PyQt6.QtCore import (
     QPointF,
     QObject,
 )
+from .marker import ProbeMarker
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-from typing import Optional, Union
-import logging
-from .marker import ProbeMarker
-from enum import Enum, auto
+from ..utils.colors import LedgerColors
 
 
 class StageSightViewer(QGraphicsView):
@@ -35,7 +39,7 @@ class StageSightViewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
 
-    def __init__(self, stage_sight: "StageSight", parent=None):
+    def __init__(self, stage_sight: "StageSight", parent: QWidget | None = None):
         super().__init__(parent)
         self.stage_sight = stage_sight
         self.__scene = s = QGraphicsScene(self)
@@ -68,7 +72,7 @@ class StageSightObject(QObject):
     # Signal emitted when a new position is set
     position_changed = pyqtSignal(QPointF)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
 
 
@@ -85,13 +89,13 @@ class StageSight(QGraphicsItemGroup):
 
     def __init__(
         self,
-        stage: Optional[StageInstrument],
-        camera: Optional[CameraInstrument],
+        stage: StageInstrument | None,
+        camera: CameraInstrument | None,
         probes: list[ProbeInstrument] = [],
-        parent=None,
+        parent: QGraphicsItem | None = None,
     ):
         super(QGraphicsItemGroup, self).__init__(parent)
-        pen = QPen(QColor(0, 100, 255, 150))
+        pen = QPen(LedgerColors.SecurityBlue.value.lighter(300))
         pen.setCosmetic(True)
 
         self.image_group = QGraphicsItemGroup()
@@ -112,6 +116,11 @@ class StageSight(QGraphicsItemGroup):
         item.setPen(pen)
         self.addToGroup(item)
 
+        # Average arc
+        item = self.__arc = QGraphicsPathItem()
+        item.setPen(pen)
+        self.addToGroup(item)
+
         self.__object = StageSightObject()
 
         self.setPos(QPointF(0.0, 0.0))
@@ -123,7 +132,14 @@ class StageSight(QGraphicsItemGroup):
 
         # Associate the CameraInstrument
         self.camera = camera
+        self._pause_update = False
+        self._new_image_connected = False
+        self._in_pixels: bool = False
         self.update_size()
+        if camera is not None:
+            camera.new_image.connect(self.set_image)
+            camera.parameter_changed.connect(self.camera_parameter_changed)
+            self._new_image_connected = True
 
         # Create Markers for probes
         self._probe_markers: list[ProbeMarker] = []
@@ -132,12 +148,26 @@ class StageSight(QGraphicsItemGroup):
             self.addToGroup(marker)
             self._probe_markers.append(marker)
 
-    def update_size(self):
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective":
+            self.update_size()
+
+    def update_size(self, in_pixels: bool | None = None):
         """Update the size of the StageSight according to the camera."""
+        if in_pixels is None:
+            in_pixels = self._in_pixels
+        self._in_pixels = in_pixels
         if self.camera is not None:
             self._pause_update = False
-            self.camera.new_image.connect(self.set_image)
-            self.__update_size(QSizeF(self.camera.width_um, self.camera.height_um))
+            if in_pixels:
+                w, h = self.camera.width, self.camera.height
+            else:
+                w, h = self.camera.width_um, self.camera.height_um
+            unit = "px" if in_pixels else "µm"
+            logging.getLogger("laserstudio").debug(
+                f"Camera width: {w}\xa0{unit}, height: {h}\xa0{unit}"
+            )
+            self.__update_size(QSizeF(w, h))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
 
@@ -150,12 +180,29 @@ class StageSight(QGraphicsItemGroup):
     def pause_image_update(self, value: bool):
         if self.camera is None:
             return
-        if self._pause_update != value:
-            if value:
-                self.camera.new_image.disconnect(self.set_image)
-            else:
-                self.camera.new_image.connect(self.set_image)
         self._pause_update = value
+        if value:
+            if self._new_image_connected:
+                self.camera.new_image.disconnect(self.set_image)
+                self._new_image_connected = False
+        else:
+            if not self._new_image_connected:
+                self.camera.new_image.connect(self.set_image)
+                self._new_image_connected = True
+
+    def _update_pen(self):
+        if self.camera is None:
+            return
+        pen = QPen(
+            LedgerColors.SecurityBlue.value.lighter(300)
+            if self.camera.is_average_valid
+            else LedgerColors.SafetyOrange.value
+        )
+        pen.setCosmetic(True)
+        self.__rect.setPen(pen)
+        self.__line1.setPen(pen)
+        self.__line2.setPen(pen)
+        self.__arc.setPen(pen)
 
     def __update_size(self, size: QSizeF):
         """Update the size of the items of the StageSight.
@@ -205,6 +252,25 @@ class StageSight(QGraphicsItemGroup):
             width / (image_size.width() or 1.0), -height / (image_size.height() or 1.0)
         )
         image.setTransform(transform)
+        self._update_pen()
+
+        # Get the enclosing rect into main scene
+        scene_rect: QRectF = self.image_group.mapRectToScene(self.__rect.rect())
+        # Get the length of the cross' lines according to the size of
+        # the enclosing rect.
+        rad = min(scene_rect.width(), scene_rect.height()) / 20.0
+        if self.camera is not None and not self.camera.is_average_valid:
+            path = QPainterPath()
+            # Add the arc
+            path.arcTo(
+                QRectF(-rad, -rad, rad * 2, rad * 2),
+                -90,
+                360 * self.camera.average_count / self.camera.image_averaging,
+            )
+            self.__arc.setPath(path)
+            self.__arc.setVisible(True)
+        else:
+            self.__arc.setVisible(False)
 
     def set_pixmap(self, pixmap: QPixmap):
         """
@@ -282,7 +348,7 @@ class StageSight(QGraphicsItemGroup):
         else:
             self.setPos(position)
 
-    def update_pos(self, position: Optional[Vector] = None):
+    def update_pos(self, position: Vector | None = None):
         """Update Widget position according to the stage's position, received in parameter
 
         :param position: The stage's current position.
@@ -294,7 +360,7 @@ class StageSight(QGraphicsItemGroup):
         scene_pos = self.scene_coords_from_stage_coords(position)
         self.setPos(scene_pos)
 
-    def setPos(self, *args, **kwargs):
+    def setPos(self, *args: QPointF | float, **kwargs: QPointF | float):
         """To make sure that the position of the stagesight is signaled
         at each change we override the setPos function.
 
@@ -318,7 +384,7 @@ class StageSight(QGraphicsItemGroup):
         return self.image_group.transform()
 
     @distortion.setter
-    def distortion(self, transform: Optional[QTransform]):
+    def distortion(self, transform: QTransform | None):
         self.resetTransform()
         self.image_group.resetTransform()
         if transform is not None:
@@ -333,9 +399,9 @@ class StageSight(QGraphicsItemGroup):
 
     def marker(
         self,
-        marker_type: Union[type[LaserInstrument], type[ProbeInstrument]],
+        marker_type: type[LaserInstrument] | type[ProbeInstrument],
         index: int,
-    ) -> Optional[ProbeMarker]:
+    ) -> ProbeMarker | None:
         if marker_type not in [LaserInstrument, ProbeInstrument]:
             return None
         index += 1

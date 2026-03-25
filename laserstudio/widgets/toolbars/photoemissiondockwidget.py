@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QToolBar,
+    QDockWidget,
     QPushButton,
     QSpinBox,
     QHBoxLayout,
@@ -12,28 +13,33 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from ...instruments.camera import CameraInstrument
+from ...utils.colors import LedgerColors
+from ..coloredbutton import ColoredPushButton
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class PhotoEmissionToolBar(QToolBar):
+class PhotoEmissionDockWidget(QDockWidget):
     def __init__(self, laser_studio: "LaserStudio"):
         self.laser_studio = laser_studio
         assert laser_studio.instruments.camera is not None
         super().__init__("Photoemission", laser_studio)
+
         self.setObjectName("toolbar-photoemission")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
         assert isinstance(laser_studio.instruments.camera, CameraInstrument)
         self.camera = laser_studio.instruments.camera
 
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
+
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         vbox = QVBoxLayout()
         w.setLayout(vbox)
 
@@ -73,7 +79,8 @@ class PhotoEmissionToolBar(QToolBar):
         self.memory_buttons: list[QPushButton] = []
         # Button to take a reference image
         for m in ["M1", "M2", "M3", "M4"]:
-            w = QPushButton(m)
+            w = ColoredPushButton()
+            w.setText(m)
             self.memory_buttons.append(w)
             w.setToolTip(f"Set reference image {m}")
             w.setCheckable(True)
@@ -91,6 +98,7 @@ class PhotoEmissionToolBar(QToolBar):
         w = QWidget()
         vbox.addWidget(w)
         hbox = QHBoxLayout(w)
+        hbox.setContentsMargins(0, 0, 0, 0)
         w.setLayout(hbox)
         w = QLabel("Image Averaging")
         hbox.addWidget(w)
@@ -115,7 +123,13 @@ class PhotoEmissionToolBar(QToolBar):
         self.camera.new_image.connect(
             lambda _: (
                 self.averaged_images.setText(
-                    f"Images averaged: {self.camera.average_count}"
+                    f"Images averaged: {self.camera.average_count} / {self.camera.image_averaging}"
+                ),
+                # Change the color of the averaged images label
+                self.averaged_images.setStyleSheet(
+                    f"color: {LedgerColors.SafetyOrange.value.name(QColor.NameFormat.HexArgb)}"
+                    if not self.camera.is_average_valid
+                    else None
                 ),
             )
         )

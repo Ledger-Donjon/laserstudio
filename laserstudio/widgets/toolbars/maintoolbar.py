@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+import logging
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QToolBar, QPushButton, QLabel, QMenu
@@ -15,6 +16,7 @@ class MainToolBar(QToolBar):
         :param viewer: Required for the menu to remove markers.
         """
         super().__init__("Main", laser_studio)
+        self.laser_studio = laser_studio
         self.setObjectName("toolbar-main")  # For settings save and restore
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(Qt.ToolBarArea.AllToolBarAreas)
@@ -31,9 +33,7 @@ class MainToolBar(QToolBar):
         self.addWidget(w)
 
         # Button to unselect any viewer mode.
-        w = ColoredPushButton(
-            ":/icons/fontawesome-free/arrow-pointer-solid.svg", parent=self
-        )
+        w = ColoredPushButton(":/icons/arrow-pointer-solid.svg", parent=self)
         w.setToolTip("Cancel any mode")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
@@ -53,5 +53,25 @@ class MainToolBar(QToolBar):
             "Save configuration file",
             lambda: save_configuration_file(laser_studio.config),
         )
+        self.log_level_menu = QMenu("Log level", self)
+
+        def set_log_level(level: int) -> None:
+            self.laser_studio.set_log_level(level)
+            for action in self.log_level_menu.actions():
+                action.setChecked(action.text() == logging.getLevelName(level))
+
+        for level in [
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.CRITICAL,
+        ]:
+            action = self.log_level_menu.addAction(
+                logging.getLevelName(level), lambda _level=level: set_log_level(_level)
+            )
+            action.setCheckable(True) if action is not None else None
+        set_log_level(logging.getLogger("laserstudio").level)
+        settings_menu.addMenu(self.log_level_menu)
         w.setMenu(settings_menu)
         self.addWidget(w)

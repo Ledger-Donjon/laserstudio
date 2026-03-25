@@ -1,9 +1,12 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
 import pickle
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
-    QToolBar,
+    QDockWidget,
     QPushButton,
     QComboBox,
     QWidget,
@@ -12,7 +15,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QMessageBox,
 )
-from ..return_line_edit import ReturnSpinBox
+from ..coloredbutton import ColoredPushButton
+from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
 from ...utils import util
 
@@ -21,8 +25,8 @@ if TYPE_CHECKING:
 from PyQt6.QtCore import QTimer
 
 
-class CameraNITToolBar(QToolBar):
-    def __init__(self, laser_studio: "LaserStudio"):
+class CameraNITDockWidget(QDockWidget):
+    def __init__(self, laser_studio: LaserStudio):
         """
         Initialize the camera NIT toolbar.
 
@@ -32,17 +36,20 @@ class CameraNITToolBar(QToolBar):
         self.camera = laser_studio.instruments.camera
         self.laser_studio = laser_studio
 
-        super().__init__("NIT Camera parameters", laser_studio)
+        super().__init__("NIT Camera Parameters", laser_studio)
+
+        if self.camera.label is not None:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
+
         self.setObjectName("toolbar-camera-nit")  # For settings save and restore
         self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.setFloatable(True)
 
         w = QWidget()
-        self.addWidget(w)
+        self.setWidget(w)
         vbox = QVBoxLayout()
         w.setLayout(vbox)
 
@@ -50,30 +57,30 @@ class CameraNITToolBar(QToolBar):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Gain:"))
-        vbox.setContentsMargins(0, 0, 0, 0)
-        w = self.hist_low_input = ReturnSpinBox()
+        w = self.hist_low_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
         w.returnPressed.connect(self.gain_changed)
         hbox.addWidget(w)
-        w = self.hist_high_input = ReturnSpinBox()
+        w = self.hist_high_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
         w.returnPressed.connect(self.gain_changed)
         hbox.addWidget(w)
         # Button to trigger the NIT camera gain
         # Checkbox to activate/deactivate the timer
-        self.button_agc = w = QPushButton("AGC")
+        self.agc_button = w = ColoredPushButton()
+        w.setText("AGC")
         w.setToolTip("Auto gain control (every 1 second)")
         w.setCheckable(True)
         # w.setChecked(True)
-        w.clicked.connect(self.agc_changed)
+        w.clicked.connect(self.agc_button_changed)
         hbox.addWidget(w)
         # Timer to trigger gain autoset every 1 seconds
         self.timer = QTimer()
         self.timer.timeout.connect(self.gain_autoset)
         self.timer.setInterval(1000)  # 1 second interval
-        self.agc_changed(self.button_agc.isChecked())
+        self.agc_button_changed(self.agc_button.isChecked())
 
         # Averaging management
         hbox = QHBoxLayout()
@@ -90,14 +97,14 @@ class CameraNITToolBar(QToolBar):
         hbox = QHBoxLayout()
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Objective:"))
-        w = self.mag_combobox = QComboBox()
+        w = self.obj_combobox = QComboBox()
         for x in [5, 10, 20, 50]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
             if x == self.camera.objective:
                 w.setCurrentIndex(w.count() - 1)
         w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.mag_changed)
+        w.currentIndexChanged.connect(self.obj_changed)
         hbox.addWidget(w)
 
         # Shading correction
@@ -123,6 +130,25 @@ class CameraNITToolBar(QToolBar):
         w.clicked.connect(self.shade_load)
         hbox.addWidget(w)
 
+        # Add stretch of last row
+        vbox.addStretch()
+
+        self.camera.parameter_changed.connect(self.camera_parameter_changed)
+        logging.getLogger("laserstudio").info("Camera NIT DockWidget initialized")
+
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective" and isinstance(value, float):
+            self.obj_combobox.blockSignals(True)
+            index = self.obj_combobox.findText(f"{value:.0f} X")
+            if index != -1:
+                self.obj_combobox.setCurrentIndex(index)
+            else:
+                logging.getLogger("laserstudio").warning(
+                    f"Received unsupported objective value from camera: {value:.0f} X. "
+                    "The combobox will not reflect the actual value."
+                )
+            self.obj_combobox.blockSignals(False)
+
     def gain_changed(self):
         """
         Called when histogram gain bound is changed in the UI.
@@ -142,7 +168,7 @@ class CameraNITToolBar(QToolBar):
 
     def gain_autoset(self):
         """
-        Called when the auto gain button is clicked.
+        Called when the auto gain is triggered by the timer.
         """
         low, high = self.camera.gain_autoset()
         self.hist_low_input.setValue(low)
@@ -159,11 +185,14 @@ class CameraNITToolBar(QToolBar):
         except ValueError:
             pass
 
-    def mag_changed(self):
+    def obj_changed(self):
         """
         Called when the magnification is changed in the UI.
         """
-        self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
+        logging.getLogger("laserstudio").debug(
+            f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
+        )
+        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()
 
@@ -185,7 +214,7 @@ class CameraNITToolBar(QToolBar):
         except FileNotFoundError:
             QMessageBox().critical(None, "Error", "Shading correction file not found.")
 
-    def agc_changed(self, state: bool):
+    def agc_button_changed(self, state: bool):
         """
         Called when AGC button is toggled.
         Enables or disables Automatic Gain Correction.
@@ -193,8 +222,8 @@ class CameraNITToolBar(QToolBar):
         :param state: True when button is checked, which enables AGC. False otherwise.
         """
         if state:
-            # Apply gain correcttion immediately, don't wait 1 second for the timer to
-            # expire.
+            # Apply gain correction immediately, don't wait 1 second
+            # for the timer to timeout.
             self.gain_autoset()
             # Re-enabled timer
             self.timer.start()

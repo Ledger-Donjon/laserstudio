@@ -2,13 +2,13 @@ from .probe import ProbeInstrument
 from random import uniform
 from PyQt6.QtCore import QVariant
 from .shutter import ShutterInstrument
-from typing import Optional
+from typing import Optional, Any
 from .lmscontroller import LMSControllerInstrument
 import logging
 
 
 class LaserInstrument(ProbeInstrument):
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config=config)
         # Sweep parameters, in order to change the current_percentage
         # regularly, within a random value from sweep_min to sweep_max,
@@ -21,7 +21,7 @@ class LaserInstrument(ProbeInstrument):
         # Shutter
         self.shutter: Optional[ShutterInstrument] = None
         shutter = config.get("shutter")
-        if type(shutter) is dict and shutter.get("enable", True):
+        if type(shutter) is dict[str, Any] and shutter.get("enable", True):
             try:
                 device_type = shutter.get("type")
                 if device_type == "LMSController":
@@ -34,23 +34,6 @@ class LaserInstrument(ProbeInstrument):
                 logging.getLogger("laserstudio").warning(
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
                 )
-
-    @property
-    def settings(self) -> dict:
-        """Export settings to a dict for yaml serialization."""
-        settings = super().settings
-        settings["sweep_max"] = self.sweep_max
-        settings["sweep_min"] = self.sweep_min
-        settings["sweep_freq"] = self.sweep_freq
-        return settings
-
-    @settings.setter
-    def settings(self, data: dict):
-        """Import settings from a dict."""
-        ProbeInstrument.settings.__set__(self, data)
-        self.sweep_max = data.get("sweep_max", self.sweep_max)
-        self.sweep_min = data.get("sweep_min", self.sweep_min)
-        self.sweep_freq = data.get("sweep_freq", self.sweep_freq)
 
     @property
     def on_off(self) -> bool: ...
@@ -73,9 +56,53 @@ class LaserInstrument(ProbeInstrument):
     def offset_current(self, value: float):
         self.parameter_changed.emit("offset_current", QVariant(value))
 
-    def go_next(self) -> dict[str, float]:
+    def go_next(self) -> dict[str, Any]:
         self._sweep_iteration += 1
-        if self._sweep_iteration % self.sweep_freq == 0:
+        if self.sweep_freq and (self._sweep_iteration % self.sweep_freq) == 0:
             self.current_percentage = uniform(self.sweep_min, self.sweep_max)
-            return {"current_percentage": self.current_percentage}
-        return {}
+        return {"current_percentage": self.current_percentage}
+
+    @property
+    def settings(self) -> dict[str, Any]:
+        """
+        Return a dict of settings for the PDM.
+        """
+        super_settings = super().settings
+        super_settings.update(
+            {
+                "on_off": self.on_off,
+                "current_percentage": self.current_percentage,
+                "offset_current": self.offset_current,
+                "sweep_max": self.sweep_max,
+                "sweep_min": self.sweep_min,
+                "sweep_freq": self.sweep_freq,
+            }
+        )
+        return super_settings
+
+    @settings.setter
+    def settings(self, data: dict[str, Any]):
+        """
+        Set the settings of the PDM.
+        """
+        ProbeInstrument.settings.__set__(self, data)
+        if "on_off" in data:
+            self.on_off = data["on_off"]
+            self.parameter_changed.emit("on_off", data["on_off"])
+        if "current_percentage" in data:
+            self.current_percentage = data["current_percentage"]
+            self.parameter_changed.emit(
+                "current_percentage", data["current_percentage"]
+            )
+        if "offset_current" in data:
+            self.offset_current = data["offset_current"]
+            self.parameter_changed.emit("offset_current", data["offset_current"])
+        if "sweep_max" in data:
+            self.sweep_max = data["sweep_max"]
+            self.parameter_changed.emit("sweep_max", data["sweep_max"])
+        if "sweep_min" in data:
+            self.sweep_min = data["sweep_min"]
+            self.parameter_changed.emit("sweep_min", data["sweep_min"])
+        if "sweep_freq" in data:
+            self.sweep_freq = data["sweep_freq"]
+            self.parameter_changed.emit("sweep_freq", data["sweep_freq"])

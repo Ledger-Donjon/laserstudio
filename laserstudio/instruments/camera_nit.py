@@ -1,14 +1,15 @@
 from .camera import CameraInstrument
-from typing import Optional, cast
+from typing import cast, Any
 import numpy
+
 
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
         try:
-            from pynit import PyNIT  # Lazy load the module # type: ignore
+            from pynit import PyNIT  # Lazy load the module
         except ImportError:
             raise ImportError(
                 "The pynit module is required to use the NIT."
@@ -27,8 +28,8 @@ class CameraNITInstrument(CameraInstrument):
         objective = cast(float, config.get("objective", 5.0))
         self.select_objective(objective)
 
-    def capture_image(self) -> Optional[numpy.ndarray]:
-        width, height, _ , data = self.pynit.get_last_image()
+    def capture_image(self) -> numpy.ndarray | None:
+        width, height, _, data = self.pynit.get_last_image()
         if data is None:
             return None
         # get_last_image returns Tuple always 'L' for the 'mode'
@@ -45,8 +46,8 @@ class CameraNITInstrument(CameraInstrument):
         :rtype: tuple[float, float]
         """
         return (
-            self.pynit.gain_controller.get_low() * 64,
-            self.pynit.gain_controller.get_high() * 64,
+            float(self.pynit.gain_controller.get_low() * 64),
+            float(self.pynit.gain_controller.get_high() * 64),
         )
 
     @gain.setter
@@ -66,16 +67,17 @@ class CameraNITInstrument(CameraInstrument):
             raise ValueError("Low bound out of range!")
         if (high < 0) or (high > 0xFFFF):
             raise ValueError("High bound out of range!")
-        self.pynit.gain_controller.set_range(low / 64, high / 64)
+        self.pynit.gain_controller.set_range(low / 64.0, high / 64.0)
 
-    def gain_autoset(self) -> tuple[int, int]:
+    def gain_autoset(self) -> tuple[float, float]:
         """
         Automatically sets the camera gain based on the current scene.
 
         :return: A tuple containing the low and high bounds of the calculated gain.
-        :rtype: tuple[int, int]
+        :rtype: tuple[float, float]
         """
-        return self.pynit.gain_autoset()
+        low, high = self.pynit.gain_autoset()
+        return float(low), float(high)
 
     @property
     def shade_correction(self) -> bytes:
@@ -151,15 +153,14 @@ class CameraNITInstrument(CameraInstrument):
         self.pynit.reset_counter()
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         settings = CameraInstrument.settings.__get__(self)
         settings["averaging"] = self.averaging
         settings["gain"] = list(self.gain)
         return settings
 
-
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import and apply settings."""
         # Call the parent class settings setter
         CameraInstrument.settings.__set__(self, data)
@@ -173,9 +174,7 @@ class CameraNITInstrument(CameraInstrument):
             self.averaging_restart()
         if "averaging" in data:
             self.averaging = data["averaging"]
-            self.parameter_changed.emit("averaging",  data["averaging"])
+            self.parameter_changed.emit("averaging", data["averaging"])
         if "gain" in data and isinstance(gain := data["gain"], list) and len(gain) == 2:
             self.gain = tuple(gain)
             self.parameter_changed.emit("gain", gain)
-
-

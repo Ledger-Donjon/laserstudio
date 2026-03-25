@@ -1,6 +1,6 @@
 from .camera import CameraInstrument
 from .rest_instrument import RestInstrument
-from typing import Optional, Literal, cast
+from typing import Literal, cast, Any
 import io
 from PIL import Image
 
@@ -8,7 +8,7 @@ from PIL import Image
 class CameraRESTInstrument(RestInstrument, CameraInstrument):
     """Class to implement REST cameras"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         """
         :param config: YAML configuration object
         """
@@ -16,7 +16,9 @@ class CameraRESTInstrument(RestInstrument, CameraInstrument):
         CameraInstrument.__init__(self, config)
         self.api_command = cast(str, config.get("api_command", "images/camera"))
 
-    def get_last_image(self) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
+    def get_last_image(
+        self,
+    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], bytes | None]:
         try:
             response = self.get()
         except Exception:

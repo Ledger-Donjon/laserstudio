@@ -1,6 +1,8 @@
 from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsItemGroup, QGraphicsEllipseItem, QGraphicsPathItem
-from PyQt6.QtGui import QPen, QColor, QPainterPath, QColorConstants
+from PyQt6.QtGui import QPen, QColor, QPainterPath
+from ..utils.colors import LedgerColors
+import logging
 
 
 class ScanPath(QGraphicsItemGroup):
@@ -11,6 +13,7 @@ class ScanPath(QGraphicsItemGroup):
         self.__path: list[QPointF] = []
         self.__diameter = diameter
         self.__hist_size = hist_size
+        self.__color: QColor = LedgerColors.SafetyOrange.value
 
     @property
     def path(self) -> list[QPointF]:
@@ -46,6 +49,16 @@ class ScanPath(QGraphicsItemGroup):
         self.__hist_size = value
         self.__rebuild()
 
+    @property
+    def color(self) -> QColor:
+        """Color of the scan path"""
+        return self.__color
+
+    @color.setter
+    def color(self, value: QColor):
+        self.__color = value
+        self.__rebuild()
+
     def set(self, path: list[QPointF], hist_size: int, diameter: float):
         """Sets all attributes and rebuild the graphic object at once."""
         self.__hist_size = hist_size
@@ -57,9 +70,10 @@ class ScanPath(QGraphicsItemGroup):
         for i in self.childItems():
             i.setParentItem(None)
 
-        red = QColorConstants.Red
-        red_t = QColor(red)
-        red_t.setAlpha(100)
+        color = self.color
+        color_t = QColor(color)
+        logging.getLogger("laserstudio").debug(f"Scan path color: {color.name()}")
+        color_t.setAlpha(100)
 
         # Add circles for all points in the path.
         for i, point in enumerate(self.__path):
@@ -67,7 +81,7 @@ class ScanPath(QGraphicsItemGroup):
             item = QGraphicsEllipseItem(-radius, -radius, radius * 2, radius * 2)
             item.setPos(point)
             # Change the color for all next points
-            pen = QPen(red_t if i >= self.__hist_size else red)
+            pen = QPen(color_t if i >= self.__hist_size else color)
             pen.setCosmetic(True)
             item.setPen(pen)
             self.addToGroup(item)
@@ -82,7 +96,7 @@ class ScanPath(QGraphicsItemGroup):
             else:
                 painter_path.lineTo(point)
         item = QGraphicsPathItem(painter_path)
-        pen = QPen(red)
+        pen = QPen(color)
         pen.setCosmetic(True)
         item.setPen(pen)
         self.addToGroup(item)
@@ -95,7 +109,7 @@ class ScanPath(QGraphicsItemGroup):
             else:
                 painter_path.lineTo(point)
         item = QGraphicsPathItem(painter_path)
-        pen = QPen(red_t)
+        pen = QPen(color_t)
         pen.setCosmetic(True)
         item.setPen(pen)
         self.addToGroup(item)

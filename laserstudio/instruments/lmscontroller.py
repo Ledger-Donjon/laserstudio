@@ -1,15 +1,17 @@
+from __future__ import annotations
 from pylmscontroller import LMSController, MotorState, ControlMode
+from typing import cast
 from .shutter import ShutterInstrument
 from .light import LightInstrument
 from .list_serials import get_serial_device
-from typing import cast
+from ..utils.yaml_types import Config
 
 
 _shared_device: dict[str, LMSController] = {}
 
 
 class LMSControllerInstrument(ShutterInstrument, LightInstrument):
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         ShutterInstrument.__init__(self, config)
         LightInstrument.__init__(self, config)
 

@@ -1,6 +1,11 @@
-from pystages import Stage, Vector
+from __future__ import annotations
+
+from typing import cast, TYPE_CHECKING
+from pystages import Stage
 from .rest_instrument import RestInstrument
-from typing import cast
+
+if TYPE_CHECKING:
+    from .stage import Vector
 
 
 class StageRest(RestInstrument, Stage):
@@ -21,7 +26,9 @@ class StageRest(RestInstrument, Stage):
     @property
     def position(self) -> Vector:
         position = self.get().json().get("pos", [])
-        return Vector(*position)
+        from .stage import Vector as LSVector
+
+        return LSVector(*position)
 
     @position.setter
     def position(self, value: Vector):

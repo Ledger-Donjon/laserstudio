@@ -1,13 +1,12 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
-    QToolBar,
-    QPushButton,
-)
+from PyQt6.QtGui import QIcon, QColorConstants
+from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy, QComboBox
 from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
-from ...widgets.return_line_edit import ReturnSpinBox
+from ...widgets.return_line_edit import ReturnSpinBox, ReturnDoubleSpinBox
+from ...utils.colors import LedgerColors
+from ...utils.util import create_color_qicon
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -21,13 +20,29 @@ class ScanToolBar(QToolBar):
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
 
-        # Activate scan-zone definition mode
-        w = ColoredPushButton(":/icons/region.svg", parent=self)
+        # Activate scan-zone definition modes
+        w = ColoredPushButton(":/icons/region_rect.svg", parent=self)
         w.setToolTip("Define scanning regions. Hold Shift key to remove zone.")
         w.setIconSize(QSize(24, 24))
         w.setCheckable(True)
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.ZONE)
+        self.addWidget(w)
+
+        w = ColoredPushButton(":/icons/region_tilted.svg", parent=self)
+        w.setToolTip("Define scanning regions (tilted rectangle)")
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        group.addButton(w)
+        group.setId(w, laser_studio.viewer.Mode.ZONE_TILTED)
+        self.addWidget(w)
+
+        w = ColoredPushButton(":/icons/region_poly.svg", parent=self)
+        w.setToolTip("Define scanning regions (polygon)")
+        w.setIconSize(QSize(24, 24))
+        w.setCheckable(True)
+        group.addButton(w)
+        group.setId(w, laser_studio.viewer.Mode.ZONE_POLY)
         self.addWidget(w)
 
         # Go-to-next position button
@@ -49,6 +64,30 @@ class ScanToolBar(QToolBar):
         w.toggled.connect(lambda v: laser_studio.__setattr__("scanning_enabled", v))
         self.addWidget(w)
 
+        # Color drop down menu
+        w = self.color_combobox = QComboBox()
+        w.setToolTip("Select the color of the scan path")
+        w.setIconSize(QSize(24, 24))
+        for color in LedgerColors:
+            w.addItem(create_color_qicon(color), None, color.value)
+        for color in [
+            QColorConstants.Red,
+            QColorConstants.Green,
+            QColorConstants.Blue,
+            QColorConstants.Yellow,
+            QColorConstants.Magenta,
+            QColorConstants.Cyan,
+            QColorConstants.Black,
+            QColorConstants.White,
+        ]:
+            w.addItem(create_color_qicon(color), None, color)
+        w.currentIndexChanged.connect(
+            lambda _: laser_studio.viewer.scan_geometry.__setattr__(
+                "color", self.color_combobox.currentData()
+            )
+        )
+        self.addWidget(w)
+
         # Density
         w = self.density = ReturnSpinBox()
         w.setToolTip(
@@ -57,10 +96,29 @@ class ScanToolBar(QToolBar):
         w.setMinimum(1)
         w.setMaximum(1000)
         w.setValue(laser_studio.viewer.scan_geometry.scan_path_generator.density)
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         w.returnPressed.connect(
             lambda: laser_studio.viewer.scan_geometry.__setattr__(
                 "density", self.density.value()
             )
         )
         w.reset()
+        self.addWidget(w)
+
+        # Size of markers
+        w = self.size_sp = ReturnDoubleSpinBox()
+        w.setSuffix("\xa0µm")
+        w.setToolTip("Size of points in the scan path")
+        w.setMinimum(0.1)
+        w.setDecimals(1)
+        w.setSingleStep(1.0)
+        w.setMaximum(2000.0)
+        w.setValue(laser_studio.viewer.default_marker_size)
+        w.reset()
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        w.returnPressed.connect(
+            lambda: laser_studio.viewer.scan_geometry.__setattr__(
+                "diameter", self.size_sp.value()
+            )
+        )
         self.addWidget(w)

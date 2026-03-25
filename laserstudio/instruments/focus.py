@@ -27,7 +27,7 @@ class FocusSearchSettings:
             1000 µm, for safety purpose. Search will occur in the range
             [z - span / 2, z + span / 2].
         :param steps: Number of search steps. Must be greater or equal to 2.
-        :param avg: Image averaging setting. Must be greater or equal to 1.
+        :param averaging: Image averaging setting. Must be greater or equal to 1.
         :multi_peaks: If True, peak detection is performed, and the peak with
             the higher Z value is considered as the correct focus. This is used
             to distinguish the silicon transistors from the silicon surface. If
@@ -41,7 +41,7 @@ class FocusSearchSettings:
         assert averaging >= 1, "Image averaging must be greater or equal to 1"
         self.span = span
         self.steps = steps
-        self.avg = averaging
+        self.averaging = averaging
         self.multi_peaks = multi_peaks
         self.best_is_highest_z = best_is_highest_z
 
@@ -115,7 +115,7 @@ class FocusThread(QThread):
         z_mid = (pos := stage.position).z
         z_min, z_max = self.z_range(z_mid, settings)
         z_step = (z_max - z_min) / (settings.steps - 1)
-        self.__camera.image_averaging = settings.avg
+        self.__camera.image_averaging = settings.averaging
         best_z = None
         best_std_dev = None
         tab = []
@@ -126,7 +126,7 @@ class FocusThread(QThread):
         print(
             f"Focus search at {pos.xy}: "
             f"{z_min:.2f} to {z_max:.2f} with {settings.steps} steps, "
-            f"averaging {settings.avg} images"
+            f"averaging {settings.averaging} images"
         )
         for i in range(settings.steps):
             z = (z_step * i) + z_min
@@ -139,12 +139,17 @@ class FocusThread(QThread):
                 self.__camera.clear_averaged_images()
                 while self.__camera.average_count < self.__camera.image_averaging:
                     QCoreApplication.processEvents()
+                    if self.isInterruptionRequested():
+                        break
             std_dev = self.__camera.laplacian_std_dev
             tab.append((z, std_dev))
             self.new_point.emit(z, std_dev)
             if (best_std_dev is None) or (std_dev > best_std_dev):
                 best_std_dev = std_dev
                 best_z = z
+
+            if self.isInterruptionRequested():
+                break
 
         tab = numpy.array(tab)
         peaks = None
@@ -174,7 +179,7 @@ class FocusThread(QThread):
         Perform focus research, with first coarse settings, and then eventually with fine
         settings.
         """
-        avg_prev = self.__camera.image_averaging
+        averaging_prev = self.__camera.image_averaging
         if self.__positions is None:
             self.best_z, self.tab_coarse, self.peaks_coarse = self.run_search(
                 self.__coarse
@@ -186,13 +191,15 @@ class FocusThread(QThread):
         else:
             self.best_positions = []
             for position in self.__positions:
+                if self.isInterruptionRequested():
+                    break
                 self.__stage.move_to(position, wait=True)
                 best_z, _, _ = self.run_search(self.__coarse)
-                if self.__fine is not None:
+                if self.__fine is not None and not self.isInterruptionRequested():
                     best_z, _, _ = self.run_search(self.__fine)
                 self.best_positions.append(Vector(position.x, position.y, best_z))
 
-        self.__camera.image_averaging = avg_prev  # Restore setting
+        self.__camera.image_averaging = averaging_prev  # Restore setting
 
 
 class FocusInstrument(Instrument):
@@ -219,7 +226,7 @@ class FocusInstrument(Instrument):
         self.fine_focus_settings: Optional[FocusSearchSettings] = None
         self.coarse_focus_settings: Optional[FocusSearchSettings] = None
 
-        # Magic focus settings
+        # Magic focus parameters configuration
         if "fine" in config:
             self.fine_focus_settings = FocusSearchSettings(**config["fine"])
         if "coarse" in config:
@@ -287,7 +294,7 @@ class FocusInstrument(Instrument):
             res["tab_fine"] = str(t.tab_fine)
         return res
 
-    def parse_parameters(self, parameters: dict):
+    def parse_magicfocus_parameters(self, parameters: dict):
         if "coarse" in parameters:
             coarse_focus_settings = FocusSearchSettings(**parameters["coarse"])
         else:
@@ -303,7 +310,7 @@ class FocusInstrument(Instrument):
         coarse: Optional[FocusSearchSettings] = None,
         fine: Optional[FocusSearchSettings] = None,
         parameters: Optional[dict] = None,
-    ):
+    ) -> FocusThread:
         """
         Estimates automatically the correct focus by moving the stage and analysing the
         resulting camera image. This is executed in a thread.
@@ -314,7 +321,7 @@ class FocusInstrument(Instrument):
             return self.focus_thread
 
         if parameters is not None:
-            coarse, fine = self.parse_parameters(parameters)
+            coarse, fine = self.parse_magicfocus_parameters(parameters)
 
         if coarse is None:
             coarse = self.coarse_focus_settings or FocusSearchSettings(
@@ -352,7 +359,7 @@ class FocusInstrument(Instrument):
         print(f"{self.focus_thread.tab_fine=}")
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         points = self.autofocus_helper.registered_points
@@ -363,7 +370,7 @@ class FocusInstrument(Instrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         points = data.get("autofocus_points", [])

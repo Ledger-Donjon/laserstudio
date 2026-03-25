@@ -1,18 +1,18 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from ...instruments.camera_raptor import (
     CameraRaptorInstrument,
     RaptorCameraControlReg0,
     RaptorCameraControlReg1,
 )
-from .cameratoolbar import CameraToolBar
+from .cameradockwidget import CameraDockWidget
 from PyQt6.QtWidgets import (
-    QWidget,
     QVBoxLayout,
     QCheckBox,
-    QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
-    QComboBox,
+    QGridLayout,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -22,31 +22,41 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
-class CameraRaptorToolBar(CameraToolBar):
-    def __init__(self, laser_studio: "LaserStudio"):
+class CameraRaptorDockWidget(CameraDockWidget):
+    def __init__(self, laser_studio: LaserStudio):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
         super().__init__(laser_studio)
-        self.setWindowTitle("Raptor Camera parameters")
+
         self.setObjectName("toolbar-camera-raptor")  # For settings save and restore
         self.camera = laser_studio.instruments.camera
 
-        self.setAllowedAreas(
-            Qt.ToolBarArea.LeftToolBarArea
-            | Qt.ToolBarArea.RightToolBarArea
-            | Qt.ToolBarArea.BottomToolBarArea
-        )
-        self.setFloatable(True)
+        self.setWindowTitle("Raptor Camera Parameters")
 
-        w = QWidget()
-        self.addWidget(w)
+        if self.camera.label:
+            self.setWindowTitle(self.windowTitle() + " - " + self.camera.label)
+
+        self.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea
+            | Qt.DockWidgetArea.RightDockWidgetArea
+            | Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+
+        parentwidget = self.widget()
+        assert parentwidget is not None
+        grid = parentwidget.layout()
+        assert isinstance(grid, QGridLayout)
+
+        col = grid.columnCount()
+        row = grid.rowCount()
+
         vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
 
         # Button to set the Gain Mode
         w = QCheckBox("High Gain")
         w.setToolTip("Get the camera to use high gain mode")
-        w.setCheckable(True)
         w.setChecked(self.camera.get_high_gain_enabled())
         w.toggled.connect(self.camera.set_high_gain_enabled)
         vbox.addWidget(w)
@@ -55,7 +65,6 @@ class CameraRaptorToolBar(CameraToolBar):
         # Checkbox to activate ALC
         w = QCheckBox("ALC")
         w.setToolTip("Get the camera to use ALC mode")
-        w.setCheckable(True)
         w.setChecked(reg_0.__contains__(RaptorCameraControlReg0.ALC_ENABLED))
         w.toggled.connect(self.camera.set_alc_enabled)
         vbox.addWidget(w)
@@ -64,16 +73,15 @@ class CameraRaptorToolBar(CameraToolBar):
         # Checkbox to activate AGMC
         w = QCheckBox("AGMC")
         w.setToolTip("Enable the camera's Automatic Gain Mode Control")
-        w.setCheckable(True)
         w.setChecked(reg_1.__contains__(RaptorCameraControlReg1.AGMC_ENABLED))
         w.toggled.connect(self.camera.set_agmc_enabled)
         vbox.addWidget(w)
         vbox.addStretch()
 
-        w = QWidget()
-        self.addWidget(w)
         vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
+
         # Set the exposure time
         self.exposure_time_sb = w = QDoubleSpinBox()
         w.setToolTip("Set the camera's exposure time")
@@ -94,19 +102,19 @@ class CameraRaptorToolBar(CameraToolBar):
         w.valueChanged.connect(self.camera.set_digital_gain_db)
         vbox.addWidget(w)
 
-        # Magnification selector.
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        hbox.addWidget(QLabel("Objective:"))
-        w = self.mag_combobox = QComboBox()
+        w = self.obj_combobox
+        w.blockSignals(True)
+        w.clear()
+        selected_index: int | None = None
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
-        w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.mag_changed)
-        hbox.addWidget(w)
+            if float(x) == self.camera.objective:
+                selected_index = w.count() - 1
+        w.blockSignals(False)
+
+        if selected_index is not None:
+            w.setCurrentIndex(selected_index)
 
         # Show last image number
         self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")
@@ -115,10 +123,9 @@ class CameraRaptorToolBar(CameraToolBar):
 
         vbox.addStretch()
 
-        w = QWidget()
-        self.addWidget(w)
         vbox = QVBoxLayout()
-        w.setLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
 
         # Checkbox to activate the FAN
         w = QCheckBox("Fan")
@@ -174,11 +181,3 @@ class CameraRaptorToolBar(CameraToolBar):
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
             )
         )
-
-    def mag_changed(self):
-        """
-        Called when the magnification is changed in the UI.
-        """
-        self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
-        assert self.laser_studio.viewer.stage_sight is not None
-        self.laser_studio.viewer.stage_sight.update_size()

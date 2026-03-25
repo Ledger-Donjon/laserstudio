@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-from typing import Union, cast
+from typing import cast, Any
 import serial.tools.list_ports
 import serial
 
@@ -7,21 +7,25 @@ import serial
 class ChecksumError(Exception):
     """Thrown if a communication checksum error is detected."""
 
-    pass
-
 
 class ProtocolError(Exception):
     """Thrown if an unexpected response from the device is received."""
 
-    pass
-
 
 class ConnectionFailure(Exception):
-    pass
+    """Thrown if a connection to the device cannot be established."""
 
 
 class DeviceSearchError(Exception):
-    def __init__(self, sn=None, vid_pid=None, location=None, dev=None):
+    """Thrown if a device is not found with the given criteria."""
+
+    def __init__(
+        self,
+        sn: str | None = None,
+        vid_pid: tuple[int, int] | None = None,
+        location: str | None = None,
+        dev: str | None = None,
+    ):
         self.sn = sn
         if vid_pid is not None and vid_pid[0] is not None:
             self.vid_pid = vid_pid
@@ -31,7 +35,7 @@ class DeviceSearchError(Exception):
         self.dev = dev
 
     def __str__(self) -> str:
-        desc = []
+        desc: list[str] = []
         if self.sn:
             desc += [f"sn {self.sn}"]
         if self.vid_pid:
@@ -44,14 +48,22 @@ class DeviceSearchError(Exception):
 
 
 class DeviceNotFoundError(DeviceSearchError):
-    pass
+    """Thrown if no device is found with the given criteria."""
+
+    def __str__(self) -> str:
+        return (
+            f"Error: No device found with the following criteria: {super().__str__()}"
+        )
 
 
 class MultipleDeviceFound(DeviceSearchError):
-    pass
+    """Thrown if multiple devices are found with the given criteria."""
+
+    def __str__(self) -> str:
+        return f"Error: Multiple devices found with the following criteria: {super().__str__()}"
 
 
-def get_serial_device(config: Union[str, dict]):
+def get_serial_device(config: str | dict[str, Any]) -> str:
     """
     Find serial device path given a configuration.
     :param config: Configuration from YAML file.
@@ -65,7 +77,7 @@ def get_serial_device(config: Union[str, dict]):
                 return config
         raise DeviceNotFoundError(dev=config)
     elif isinstance(config, dict):
-        possible_matches = []
+        possible_matches: list[str] = []
         sn = None
         vid, pid = None, None
         location = None
@@ -75,7 +87,8 @@ def get_serial_device(config: Union[str, dict]):
                 sn = cast(str, config["sn"])
                 match_sn = (sn == port.serial_number) or (port.device.endswith(sn))
             if "vid" in config and "pid" in config:
-                vid, pid = cast(str, config["vid"]), cast(str, config["pid"])
+                vid = cast(str, config["vid"])
+                pid = cast(str, config["pid"])
                 match_vid_pid = (vid == f"{port.vid or 0:04X}") and (
                     pid == f"{port.pid or 0:04X}"
                 )

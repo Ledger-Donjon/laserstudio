@@ -1,7 +1,10 @@
 # Client API library to interact with laserstudio via a REST API.
 # Unlike laserstudio, this library does not require PyQt being installed
 # (this is why it is separated from the laserstudio server code).
-from typing import Optional, Union, Tuple, List, Dict
+from __future__ import annotations
+
+from typing import Any
+from numpy.typing import NDArray
 import requests
 from PIL import Image
 import io
@@ -17,7 +20,7 @@ class LSAPI:
     commands.
     """
 
-    def __init__(self, host="localhost", port: Optional[int] = None):
+    def __init__(self, host: str = "localhost", port: int | None = None):
         """
         Creates a new REST session to Laser Studio, through a TCP connection.
 
@@ -37,7 +40,11 @@ class LSAPI:
         self.session.close()
 
     def send(
-        self, command: str, params: Optional[dict] = None, is_put=False, is_delete=False
+        self,
+        command: str,
+        params: dict[str, Any] | None = None,
+        is_put: bool = False,
+        is_delete: bool = False,
     ) -> requests.Response:
         """
         Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
@@ -59,17 +66,19 @@ class LSAPI:
             else:
                 return self.session.post(url, json=params)
 
-    def go_next(self) -> dict:
+    def go_next(self) -> dict[str, Any]:
         """Jump to next scan position.
 
         :return: A dictionary giving the details about the go_next"""
-        return self.send("motion/go_next", {}).json()
+        response = self.send("motion/go_next", {})
+        result: dict[str, Any] = response.json()
+        return result
 
     def autofocus(
         self,
-        register: Union[bool, Tuple[float, float, float]] = False,
+        register: bool | tuple[float, float, float] = False,
         get_points: bool = False,
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Autofocus the camera.
 
@@ -89,7 +98,7 @@ class LSAPI:
         #         "motion/autofocus", params={"new_point": list(register)}
         #     ).json()
 
-    def magicfocus(self, parameters: Optional[dict] = None):
+    def magicfocus(self, parameters: dict[str, Any] | None = None):
         """
         Perform a magic focus, or get its state (if no parameters are given).
         """
@@ -97,54 +106,67 @@ class LSAPI:
             return self.send("motion/magicfocus", params=parameters).json()
         return self.send("motion/magicfocus").json()
 
-    def markers(self) -> List[Dict[str, Union[int, Tuple[float, float]]]]:
+    def markers(self) -> list[dict[str, int | tuple[float, float]]]:
         """
         Get the list of markers in the scene.
 
         :return: A list of dictionaries, each containing the marker's id, position and RGBA color.
         """
-        return self.send("annotation/markers").json()
+        markers: list[dict[str, int | tuple[float, float]]] = self.send(
+            "annotation/markers"
+        ).json()
+        return markers
 
     def marker(
         self,
-        color: Union[Tuple[float, float, float], Tuple[float, float, float, float]] = (
+        color: tuple[float, float, float] | tuple[float, float, float, float] = (
             0.0,
             0.0,
             0.0,
         ),
-        positions: Optional[
-            Union[List[Tuple[float, float]], Tuple[float, float]]
-        ] = None,
+        positions: list[tuple[float, float]] | tuple[float, float] | None = None,
+        label: str | None = None,
+        visible: bool = True,
     ):
         """
-        Add a colored marker in the view at a specific position.
+        Add colored marker(s) in the view at a specific position(s), with an optional label.
 
         :param color: (red, green, blue) or (red, green, blue, alpha) tuple or
             list. Each color channel is in [0, 1].
-        :param positions: the position of the marker, as a tuple. If None,
-            the position is retrieved from the stage's current position.
+        :param label: the label of the marker(s), as a string.
+        :param positions: the position of the marker(s), as a tuple or a list of tuples.
+            If None, the position is retrieved from the stage's current position.
+        :param visible: if False, the marker(s) are created but not displayed (setVisible(False)).
         """
         assert len(color) in (3, 4)
 
-        params: Dict[str, list] = {"color": list(color)}
+        params: dict[str, list[float] | str | list[list[float]] | bool] = {
+            "color": list(color),
+            "visible": visible,
+        }
+        if label is not None:
+            params["label"] = label
         if positions is not None:
             if isinstance(positions, tuple):
                 list_positions = [list(positions)]
             else:
                 list_positions = [list(position) for position in positions]
             params["pos"] = list_positions
-        return self.send("annotation/add_marker", params, is_put=True).json()
+        return self.send("annotation/add_markers", params, is_put=True).json()
 
-    def go_to(self, index: int) -> List[float]:
+    def go_to(self, index: int) -> list[float]:
         """
         Jump to saved position, referenced by a memory point index.
 
         :param index: The index of the memory point, in the configuration file.
         :return: The final stage position
         """
-        return self.send(f"motion/go_to_memory_point/{index}", is_put=True).json()
+        pos: list[float] = self.send(
+            f"motion/go_to_memory_point/{index}", is_put=True
+        ).json()
+        return pos
 
-    def camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def camera(self, path: str | None = None) -> Image.Image | None:
         """
         Returns the raw image of the camera.
 
@@ -159,8 +181,9 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/camera", {"path": path})
+            return None
 
-    def accumulated_image(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+    def accumulated_image(self, path: str | None) -> NDArray[Any] | None:
         """
         Get the camera accumulator's data, as a numpy array.
         """
@@ -169,27 +192,32 @@ class LSAPI:
             response = self.send("images/camera/accumulator")
             c = response.content
             if type(c) is bytes:
-                frame = numpy.load(c)
+                frame: NDArray[Any] = numpy.load(c)
                 return frame
             # This should not happen
             return None
         else:
             # We request for the data to be saved on the host machine at given path
             response = self.send("images/camera/accumulator", {"path": path})
-            return numpy.load(response.text.strip().strip('"'))
+            frame = numpy.load(response.text.strip().strip('"'))
+            return frame
 
-    def averaging(self, reset=False) -> Optional[int]:
+    def averaging(self, reset: bool = False) -> int | None:
         """
         Get the number of images accumulated in the camera's accumulator.
 
         :param reset: If True, reset the accumulator.
         :return: The number of images accumulated in the camera's accumulator.
         """
-        return self.send("images/camera/averaging", is_delete=reset).json()
+        response = self.send("images/camera/averaging", is_delete=reset)
+        if response.status_code == 200:
+            averaging: int = response.json()
+            return averaging
+        return None
 
     def reference_image(
-        self, num: Optional[int] = None, unset: bool = False, set: bool = False
-    ) -> Optional[numpy.ndarray]:
+        self, num: int | None = None, unset: bool = False, set: bool = False
+    ) -> NDArray[Any] | None:
         """
         Get and/or set the reference image for the camera.
         """
@@ -198,8 +226,9 @@ class LSAPI:
             {} if set else None,
             is_delete=unset,
         )
+        return None
 
-    def screenshot(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def screenshot(self, path: str | None = None) -> Image.Image | None:
         """
         Takes a screenshot of the current view of laser studio's scene.
 
@@ -214,27 +243,34 @@ class LSAPI:
         else:
             # In this case, the actual returned thing is a one-pixel image placeholder
             self.send("images/screenshot", {"path": path})
+            return None
 
-    def position(self) -> List[float]:
+    def position(self) -> list[float]:
         res = self.send("motion/position")
-        return res.json()["pos"]
+        pos: list[float] = res.json()["pos"]
+        return pos
 
-    def go_to_position(self, pos: List[float] = []) -> List[float]:
+    def go_to_position(self, pos: list[float] = []) -> list[float]:
         """
         Requests the main stage to move to position the current focused object to given coordinates.
         This waits for the stage to end of move, returns the final coordinates of the stage.
-        These coordinates may be different from the requested one (if the focused element has a delta).
+        Final coordinates may be different from the requested one.
+
+        Note that position is a list of elements, that may be different from the number of axes of the stage.
+        If the number of elements is less than the number of axes, the missing elements (axes) are not moved.
+        If the number of elements is greater than the number of axes, the extra elements are ignored.
 
         :param pos: the position to reach.
         :return: the final coordinates of the stage.
         """
         params = {"pos": pos}
         res = self.send("motion/position", params, is_put=True)
-        return res.json()
+        pos = res.json()
+        return pos
 
     def instrument_settings(
-        self, label: str, settings: Optional[dict] = None
-    ) -> Optional[dict]:
+        self, label: str, settings: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """
         Retrieve or update the settings of a specific instrument.
         This method interacts with the API to either fetch the current settings
@@ -247,35 +283,12 @@ class LSAPI:
         :return: The response from the API containing the instrument's settings,
                  or None if the operation fails.
         """
-        return self.send(f"instruments/{label}/settings", settings, is_put=True).json()
+        settings = self.send(
+            f"instruments/{label}/settings", settings, is_put=True
+        ).json()
+        return settings
 
-    # def laser(
-    #     self,
-    #     num: int = 1,
-    #     active: Optional[bool] = None,
-    #     power: Optional[float] = None,
-    #     offset_current: Optional[float] = None,
-    # ) -> dict:
-    #     """
-    #     Controls the laser's state.
-
-    #     :param num: The index of the laser to control (starting from 1).
-    #     :param active: Sets the activation's state of the laser.
-    #     :param power: Sets the current power (in %).
-    #     :param offset_current: Sets the offset current of the laser (in mA).
-    #     :return: The actual settings values read back from the laser instrument.
-    #     """
-    #     return self.send(
-    #         f"instruments/laser/{num}",
-    #         {
-    #             "active": active,
-    #             "power": power,
-    #             "offset_current": offset_current,
-    #         },
-    #         is_put=True,
-    #     ).json()
-
-    def set_instrument_settings(self, label: str, settings: dict):
+    def set_instrument_settings(self, label: str, settings: dict[str, Any]):
         """
         Set the settings of a specific instrument.
         This method interacts with the API to update the settings of an instrument

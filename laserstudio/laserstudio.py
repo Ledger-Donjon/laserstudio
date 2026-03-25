@@ -1,10 +1,22 @@
 #!/usr/bin/python3
+import os
+import logging
+import yaml
+from PIL import Image, ImageQt
+import numpy
+from collections.abc import Sequence
+from typing import Any, cast
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication
-from PyQt6.QtWidgets import QMainWindow, QButtonGroup
-from typing import Optional, Any
-
-from .widgets.viewer import Viewer, IdMarker
+from PyQt6.QtGui import (
+    QColor,
+    QShortcut,
+    QKeySequence,
+    QGuiApplication,
+    QCloseEvent,
+    QColorConstants,
+)
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QLabel
+from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
     PDMInstrument,
@@ -18,36 +30,38 @@ from .widgets.toolbars import (
     PictureToolBar,
     ZoomToolBar,
     ScanToolBar,
-    StageToolBar,
-    CameraToolBar,
-    CameraImageAdjustmentToolBar,
+    StageDockWidget,
+    CameraDockWidget,
+    CameraImageAdjustementDockWidget,
     MainToolBar,
     MarkersToolBar,
-    PDMToolBar,
-    LaserDriverToolBar,
-    CameraNITToolBar,
-    CameraRaptorToolBar,
-    PhotoEmissionToolBar,
-    LightToolBar,
+    PDMDockWidget,
+    LaserDriverDockWidget,
+    CameraNITDockWidget,
+    CameraRaptorDockWidget,
+    PhotoEmissionDockWidget,
+    LightDockWidget,
     FocusToolBar,
 )
-import yaml
 from .restserver.server import RestProxy
-from PIL import Image, ImageQt
-import numpy
+from .utils.yaml_types import Config
 
 
 class LaserStudio(QMainWindow):
-    def __init__(self, config: Optional[dict]):
+    """
+    Laser Studio main class and main window.
+    """
+
+    def __init__(self, config_file: Config | None):
         """
-        Laser Studio main window.
+        Initialize the Laser Studio main window.
 
         :param config: Optional configuration dictionary.
+            If None, an empty configuration is used.
         """
         super().__init__()
 
-        if config is None:
-            config = {}
+        config: Config = {} if config_file is None else config_file
 
         # Configuration file
         self.config = config
@@ -76,8 +90,22 @@ class LaserStudio(QMainWindow):
 
         # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(self)
-        group.idClicked.connect(lambda mode: self.viewer.select_mode(mode, True))
+
+        def id_clicked(id: int):
+            self.viewer.select_mode(Viewer.Mode(id), True)
+
+        group.idClicked.connect(id_clicked)
+
         self.viewer.mode_changed.connect(self.update_buttons_mode)
+
+        self.mode_indicator = QLabel()
+        self.mode_indicator.setObjectName("active-mode")
+        self.mode_indicator.setToolTip("Active viewer mode")
+        self.mode_indicator.setProperty("modeActive", False)
+        status_bar = self.statusBar()
+        if status_bar is not None:
+            status_bar.addPermanentWidget(self.mode_indicator)
+        self.update_mode_indicator(int(self.viewer.mode))
 
         # ToolBar: Main
         toolbar = MainToolBar(self)
@@ -94,12 +122,15 @@ class LaserStudio(QMainWindow):
         # ToolBar: Markers
         toolbar = MarkersToolBar(self.viewer)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-        self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar.markers_list_toolbar)
+        # Dock widget: Markers list
+        self.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget
+        )
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
-            toolbar = StageToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            dockwidget = StageDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockwidget)
 
         # ToolBar: Focusing
         if (
@@ -115,45 +146,55 @@ class LaserStudio(QMainWindow):
             )
             self.addToolBar(toolbar)
 
+            self.addDockWidget(
+                Qt.DockWidgetArea.RightDockWidgetArea,
+                toolbar.magic_focus_dockwidget,
+            )
+            self.tabifyDockWidget(
+                toolbar.magic_focus_dockwidget,
+                toolbar.magic_focus_settings_dockwidget,
+            )
+
         # ToolBar: Scanning zone definition and usage
         toolbar = ScanToolBar(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # ToolBar: Camera Image control
+        # Dock widget: Camera Image control
         if self.instruments.camera is not None:
             if isinstance(self.instruments.camera, CameraRaptorInstrument):
-                toolbar = CameraRaptorToolBar(self)
+                dockwidget = CameraRaptorDockWidget(self)
             else:
-                toolbar = CameraToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
-            self.addToolBar(
-                Qt.ToolBarArea.BottomToolBarArea, CameraImageAdjustmentToolBar(self)
+                dockwidget = CameraDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dockwidget)
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea,
+                CameraImageAdjustementDockWidget(self),
             )
 
-            self.photoemission_toolbar = PhotoEmissionToolBar(self)
-            self.addToolBar(
-                Qt.ToolBarArea.BottomToolBarArea, self.photoemission_toolbar
+            self.photoemission_dockwidget = PhotoEmissionDockWidget(self)
+            self.addDockWidget(
+                Qt.DockWidgetArea.BottomDockWidgetArea, self.photoemission_dockwidget
             )
 
-        # ToolBar: NIT Camera Image control
+        # Dock widget: NIT Camera Image control extra panel
         if isinstance(self.instruments.camera, CameraNITInstrument):
-            toolbar = CameraNITToolBar(self)
-            self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+            dockwidget = CameraNITDockWidget(self)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dockwidget)
 
-        # Laser toolbars
+        # Dock widgets: Lasers
         for i, laser in enumerate(self.instruments.lasers):
             if isinstance(laser, PDMInstrument):
-                toolbar = PDMToolBar(laser, i)
+                dockwidget = PDMDockWidget(laser, i)
             elif isinstance(laser, LaserDriverInstrument):
-                toolbar = LaserDriverToolBar(laser, i)
+                dockwidget = LaserDriverDockWidget(laser, i)
             else:
                 continue
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockwidget)
 
-        # Light toolbar
+        # Dock widget: Light
         if isinstance(self.instruments.light, LightInstrument):
-            toolbar = LightToolBar(self.instruments.light)
-            self.addToolBar(Qt.ToolBarArea.RightToolBarArea, toolbar)
+            dockwidget = LightDockWidget(self.instruments.light)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockwidget)
 
         # Instantiate proxy for REST command reception
         self.rest_proxy = RestProxy(self, config.get("restserver", {}))
@@ -163,8 +204,10 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.NONE))
         shortcut = QShortcut(Qt.Key.Key_R, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.ZONE))
-        # shortcut = QShortcut(Qt.Key_T, self)
-        # shortcut.activated.connect(self.zone_rot_mode)
+        shortcut = QShortcut(Qt.Key.Key_T, self)
+        shortcut.activated.connect(
+            lambda: self.viewer.select_mode(Viewer.Mode.ZONE_TILTED)
+        )
         shortcut = QShortcut(Qt.Key.Key_M, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
@@ -209,15 +252,17 @@ class LaserStudio(QMainWindow):
         )
         shortcut.activated.connect(self.handle_go_next)
 
-        # Restore docks are previous session
-        geometry = self.settings.value("geometry")
-        if geometry is not None:
-            self.restoreGeometry(geometry)
-        window_state = self.settings.value("window-state")
-        if window_state is not None:
-            self.restoreState(window_state)
+        logging.getLogger("laserstudio").debug("LaserStudio initialized")
 
-    def closeEvent(self, a0):
+        # # Restore docks are previous session
+        # geometry = self.settings.value("geometry")
+        # if geometry is not None:
+        #     self.restoreGeometry(geometry)
+        # window_state = self.settings.value("window-state")
+        # if window_state is not None:
+        #     self.restoreState(window_state)
+
+    def closeEvent(self, a0: QCloseEvent | None):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
@@ -227,17 +272,17 @@ class LaserStudio(QMainWindow):
                 w.close()
         super().closeEvent(a0)
 
-    def handle_go_next(self) -> dict:
+    def handle_go_next(self) -> Config:
         """Go Next operation.
         Triggers the instruments to perform changes to go to next step of scan.
         Triggers the viewer to perform changes to go to next step of scan.
         """
-        v = {}
+        v: Config = {}
         v.update(self.instruments.go_next())
         v.update(self.viewer.go_next())
         return v
 
-    def handle_screenshot(self, path: Optional[str] = None) -> Image.Image:
+    def handle_screenshot(self, path: str | None = None) -> Image.Image:
         """
         Handle a Screenshot API to get the image of the viewer as currently displayed in laser studio.
         Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
@@ -254,7 +299,7 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(pixmap)
 
-    def handle_camera(self, path: Optional[str] = None) -> Optional[Image.Image]:
+    def handle_camera(self, path: str | None = None) -> Image.Image | None:
         """
         Handle a Camera API request to get the image of the camera associated to the main Stage.
         Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
@@ -296,7 +341,7 @@ class LaserStudio(QMainWindow):
         # Return the number of averaged images
         return camera.number_of_averaged_images
 
-    def handle_camera_accumulator(self, path: Optional[str]) -> Optional[numpy.ndarray]:
+    def handle_camera_accumulator(self, path: str | None) -> numpy.ndarray | None:
         """
         Handle a Camera API request to get the accumulated image of the camera.
         Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
@@ -323,7 +368,7 @@ class LaserStudio(QMainWindow):
             return numpy.array([])
         return frame
 
-    def handle_camera_reference(self, dotake: Optional[bool], refname: Optional[str]):
+    def handle_camera_reference(self, dotake: bool | None, refname: str | None):
         """
         Handles camera reference image operations.
 
@@ -347,12 +392,12 @@ class LaserStudio(QMainWindow):
             camera.current_reference_image = refname
         if dotake is not None:
             camera.take_reference_image(dotake)
-        self.photoemission_toolbar.update_ref_image_controls()
+        self.photoemission_dockwidget.update_ref_image_controls()
         return camera.current_reference_image
 
     def handle_instrument_settings(
-        self, label: str, settings: Optional[dict]
-    ) -> Optional[dict]:
+        self, label: str, settings: Config | None
+    ) -> Config | None:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -372,42 +417,57 @@ class LaserStudio(QMainWindow):
             return {"settings": inst.settings}
         return None
 
-    def handle_position(self, pos: Optional[list[float]]) -> dict:
+    def handle_position(self, pos: Sequence[float] | None) -> dict[str, Any]:
         if self.instruments.stage is None:
             return {"pos": []}
+        stage = self.instruments.stage
         if pos is not None:
-            self.instruments.stage.move_to(Vector(*pos), wait=True)
-        return {"pos": self.instruments.stage.position.data}
+            if not isinstance(pos, (list, tuple)):
+                current_pos = [float(v) for v in stage.position.data]
+                return {
+                    "error": "Invalid position: expected a list of coordinates",
+                    "pos": current_pos,
+                }
+            num_axis = stage.num_axis
+            if len(pos) > num_axis:
+                current_pos = [float(v) for v in stage.position.data]
+                return {
+                    "error": "Too many coordinates for stage axes",
+                    "pos": current_pos,
+                }
+            if len(pos) < num_axis:
+                target = [float(v) for v in stage.position.data]
+                for i, value in enumerate(pos):
+                    target[i] = value
+                pos = target
+            stage.move_to(Vector(*pos), wait=True)
+        return {"pos": [float(v) for v in stage.position.data]}
 
-    def handle_markers(self) -> list[dict]:
+    def handle_markers(self) -> list[Config]:
         """Handle a Markers API request to get the list of markers."""
 
-        return [
-            {
-                "id": marker.id if isinstance(marker, IdMarker) else -1,
-                "pos": [marker.pos().x(), marker.pos().y()],
-                "color": [
-                    marker.qfillcolor.redF(),
-                    marker.qfillcolor.greenF(),
-                    marker.qfillcolor.blueF(),
-                    marker.qfillcolor.alphaF(),
-                ],
-            }
-            for marker in self.viewer.markers
-        ]
+        return [marker.to_dict() for marker in self.viewer.markers]
 
     def handle_add_markers(
-        self, positions: Optional[list[list[float]]], color: Optional[list[float]]
-    ) -> dict:
-        """Add a marker.
+        self,
+        positions: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
+        visible: bool | None = True,
+    ) -> Config:
+        """Add marker(s).
 
-        :param pos: The requested position(s) of the marker(s)
+        :param positions: The requested position(s) of the marker(s).
         :param color: The requested color of the marker(s). Defined as a list of 3 floats from 0.0 to 1.0 (RGB)
             or 4 floats from 0.0 to 1.0 (RGBA).
+        :param label: The requested label of the marker(s).
+        :param visible: If False, marker(s) are created but not displayed (setVisible(False)).
         :return: A dictionary containing the information about the markers' final position(s), and identifier(s)
         """
+        if visible is None:
+            visible = True
         if color is None:
-            qcolor = Qt.GlobalColor.red
+            qcolor = QColorConstants.Red
         else:
             if len(color) == 3:
                 color.append(1.0)
@@ -423,17 +483,18 @@ class LaserStudio(QMainWindow):
             )
 
         if positions is None:
-            markers = [self.viewer.add_marker(None, color=qcolor)]
+            markers = [
+                self.viewer.add_marker(None, color=qcolor, label=label, visible=visible)
+            ]
         else:
             markers = [
-                self.viewer.add_marker((pos[0], pos[1]), color=qcolor)
+                self.viewer.add_marker(
+                    (pos[0], pos[1]), color=qcolor, label=label, visible=visible
+                )
                 for pos in positions
             ]
 
-        description = [
-            {"id": marker.id, "pos": [marker.pos().x(), marker.pos().y()]}
-            for marker in markers
-        ]
+        description = [marker.to_dict() for marker in markers]
         if len(description) == 1:
             return description[0]
         return {"markers": description}
@@ -448,7 +509,7 @@ class LaserStudio(QMainWindow):
         if self.instruments.stage is None or index not in range(
             len(self.instruments.stage.mem_points)
         ):
-            return {"pos": []}
+            return {"pos": list[float]()}
 
         point = self.instruments.stage.mem_points[index]
 
@@ -457,11 +518,38 @@ class LaserStudio(QMainWindow):
 
     def update_buttons_mode(self, id: int):
         """Updates the button group according to the selected Viewer mode"""
+        self.update_mode_indicator(id)
         if id == self.viewer_buttons_group.checkedId():
             return
         for b in self.viewer_buttons_group.buttons():
             if id == self.viewer_buttons_group.id(b):
                 b.setChecked(True)
+
+    def update_mode_indicator(self, id: int):
+        """Update the mode indicator label."""
+        try:
+            mode = Viewer.Mode(id)
+        except ValueError:
+            mode = Viewer.Mode.NONE
+        self.mode_indicator.setText(self._mode_label(mode))
+        self.mode_indicator.setProperty("modeActive", mode != Viewer.Mode.NONE)
+        style = self.mode_indicator.style()
+        if style is not None:
+            style.unpolish(self.mode_indicator)
+            style.polish(self.mode_indicator)
+        self.mode_indicator.update()
+
+    def _mode_label(self, mode: Viewer.Mode) -> str:
+        labels = {
+            Viewer.Mode.NONE: "Mode: None (Esc)",
+            Viewer.Mode.STAGE: "Mode: Move (M)",
+            Viewer.Mode.ZONE: "Mode: Zone (R)",
+            Viewer.Mode.ZONE_TILTED: "Mode: Tilted Zone (T)",
+            Viewer.Mode.ZONE_POLY: "Mode: Poly Zone",
+            Viewer.Mode.PIN: "Mode: Pin (P)",
+            Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
+        }
+        return labels.get(mode, f"Mode: {mode.name}")
 
     def save_settings(self):
         """
@@ -484,7 +572,18 @@ class LaserStudio(QMainWindow):
         data["probes"] = [probe.settings for probe in self.instruments.probes]
 
         # Lasers
-        data["lasers"] = [laser.settings for laser in self.instruments.lasers]
+        lasers_settings = list[dict[str, Any]]()
+        for laser in self.instruments.lasers:
+            laser_settings = laser.settings
+            if laser_settings.get("on_off", False):
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk to be set on during setting restoration, "
+                    "the parameter 'on_off' is not saved in the settings file."
+                )
+            _ = laser_settings.pop("on_off", None)
+            lasers_settings.append(laser_settings)
+        data["lasers"] = lasers_settings
 
         # Focus
         if self.instruments.focus_helper is not None:
@@ -493,13 +592,23 @@ class LaserStudio(QMainWindow):
         # Viewer
         data["viewer"] = self.viewer.settings
 
+        # Stage
+        if self.instruments.stage is not None:
+            data["stage"] = self.instruments.stage.settings
+
         yaml.dump(data, open("settings.yaml", "w"))
 
     def reload_settings(self):
         """
         Restore settings in the settings.yaml file.
         """
-        data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        try:
+            data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
+        except FileNotFoundError:
+            logging.getLogger("laserstudio").warning(
+                "Settings file not found in directory " + os.getcwd()
+            )
+            return
         # Camera settings (maybe missing from settings)
         camera = data.get("camera")
         if (self.instruments.camera is not None) and (camera is not None):
@@ -514,8 +623,9 @@ class LaserStudio(QMainWindow):
         if (self.instruments.light is not None) and (lighting is not None):
             self.instruments.light.settings = lighting
 
-        # Scanning geometr
+        # Scanning geometry
         geometry = data.get("scangeometry")
+        logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {geometry}...")
         if geometry is not None:
             self.viewer.scan_geometry.settings = geometry
 
@@ -527,6 +637,13 @@ class LaserStudio(QMainWindow):
         # Lasers
         lasers = data.get("lasers", [])
         for pdata, laser in zip(lasers, self.instruments.lasers):
+            if "on_off" in pdata:
+                logging.getLogger("laserstudio").warning(
+                    f"Laser {laser.label} is currently on. "
+                    "To prevent any risk during settings restoration, "
+                    "the parameter 'on_off' is ignored from the settings."
+                )
+            _ = pdata.pop("on_off", None)
             laser.settings = pdata
 
         # Focus
@@ -538,3 +655,14 @@ class LaserStudio(QMainWindow):
         viewer = data.get("viewer")
         if viewer is not None:
             self.viewer.settings = viewer
+
+        # Stage
+        stage = data.get("stage")
+        if self.instruments.stage is not None and stage is not None:
+            self.instruments.stage.settings = stage
+
+    def set_log_level(self, level: int):
+        """
+        Set the log level of the logger "laserstudio".
+        """
+        logging.getLogger("laserstudio").setLevel(level)

@@ -1,8 +1,13 @@
+from __future__ import annotations
 from PyQt6.QtWidgets import (
+    QGraphicsPolygonItem,
     QGraphicsView,
     QGraphicsScene,
     QFileDialog,
     QGraphicsPixmapItem,
+    QGraphicsLineItem,
+    QWidget,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 from PyQt6.QtGui import (
@@ -12,13 +17,19 @@ from PyQt6.QtGui import (
     QMouseEvent,
     QKeyEvent,
     QGuiApplication,
-    QPalette,
     QPainter,
     QPixmap,
+    QPolygonF,
     QTransform,
+    QPen,
+    QColor,
 )
 from enum import Enum, auto
-from typing import Optional, Union
+from typing import Any
+from shapely import Polygon
+import logging
+import json
+import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -26,11 +37,11 @@ from .stagesight import (
     ProbeInstrument,
     LaserInstrument,
 )
-import logging
-from .scangeometry import ScanGeometry
-import numpy as np
-from ..instruments.stage import MoveFor
 from .marker import IdMarker, Marker
+from .scangeometry import ScanGeometry
+from ..instruments.stage import MoveFor
+from ..utils.yaml_types import Config
+from ..utils.colors import LedgerColors
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -46,7 +57,10 @@ class Viewer(QGraphicsView):
         NONE = auto()
         STAGE = auto()
         ZONE = auto()
+        ZONE_TILTED = auto()
+        ZONE_POLY = auto()
         PIN = auto()
+        OFFSET_ORIGIN = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -55,7 +69,7 @@ class Viewer(QGraphicsView):
     # Signal emitted when the follow stage sight option changed
     follow_stage_sight_changed = pyqtSignal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
 
         # # Align objects to the center
@@ -87,7 +101,7 @@ class Viewer(QGraphicsView):
         self.scale(1, -1)
 
         # By default, there is no StageSight
-        self.stage_sight: Optional[StageSight] = None
+        self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
         # Scanning geometry object and its representative item in the view.
@@ -102,35 +116,66 @@ class Viewer(QGraphicsView):
         # Augment the scene rect to a very big size.
         self.setSceneRect(-1e6, -1e6, 2e6, 2e6)
 
-        self._default_highlight_color = QGuiApplication.palette().color(
-            QPalette.ColorRole.Highlight
-        )
-
         # Background picture
         self.__picture_item = None
         self.background_picture_path = None
 
         # Pin points for background picture
-        self.pins = []
+        self.pins: list[tuple[tuple[float, float], tuple[float, float]]] = []
+        # PIN Markers
+        self.pin_markers = [
+            Marker(color=LedgerColors.SerenityPurple.value),
+            Marker(color=LedgerColors.SerenityPurple.value),
+            Marker(color=LedgerColors.SerenityPurple.value),
+        ]
+        for m in self.pin_markers:
+            m.setZValue(4)
+            self.__scene.addItem(m)
+            m.hide()
 
         # Markers
-        self.__markers: list[Marker] = []
-        self.default_marker_size = 30.0
+        self.__markers: set[IdMarker] = set()
+        self.__markers_by_label_by_color: dict[str | None, dict[str, set[IdMarker]]] = {
+            None: {}
+        }
+
+        self.default_marker_size = 20.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
             vp.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
+        # Polygon for zone creation
+        self.zone_poly = QPolygonF()
+        self.zone_poly_item = QGraphicsPolygonItem(self.zone_poly)
+        self.zone_poly_item.setZValue(2)
+        self.__scene.addItem(self.zone_poly_item)
+
+        # Offset origin line
+        self.offset_origin_line = QGraphicsLineItem()
+        self.offset_origin_line.setZValue(10)
+        pen = QPen(QColorConstants.White)
+        pen.setCosmetic(True)
+        self.offset_origin_line.setPen(pen)
+        self.__scene.addItem(self.offset_origin_line)
+        self.offset_origin_line.hide()
+
         self.setMouseTracking(True)
 
     @property
-    def markers(self) -> list[Marker]:
-        return self.__markers
+    def markers(self) -> list[IdMarker]:
+        return list(self.__markers)
+
+    @property
+    def markers_by_label_by_color(self) -> dict[str | None, dict[str, set[IdMarker]]]:
+        return self.__markers_by_label_by_color
 
     def marker_size(self, value: float):
         self.default_marker_size = value
-        for m in self.__markers:
+        self.setUpdatesEnabled(False)
+        for m in self.markers:
             m.size = value
+        self.setUpdatesEnabled(True)
 
     @property
     def follow_stage_sight(self) -> bool:
@@ -160,9 +205,12 @@ class Viewer(QGraphicsView):
             self._follow_stage_sight = value
             self.follow_stage_sight_changed.emit(value)
 
-    def reset_camera(self):
+    def reset_camera(self, item: QGraphicsPixmapItem | None = None):
         """Resets the camera to show all elements of the scene"""
-        all_elements_rect = self.__scene.itemsBoundingRect()
+        if item is not None:
+            all_elements_rect = item.sceneTransform().mapRect(item.boundingRect())
+        else:
+            all_elements_rect = self.__scene.itemsBoundingRect()
         viewport = self.viewport()
         viewport_size = (
             viewport.size() if viewport is not None else all_elements_rect.size()
@@ -173,6 +221,12 @@ class Viewer(QGraphicsView):
             all_elements_rect.center(),
             min(w_ratio, h_ratio),
         )
+
+    def reset_camera_to_stage_sight(self):
+        """Resets the camera to show the stage sight"""
+        if self.stage_sight is None:
+            return
+        self.reset_camera(self.stage_sight.image)
 
     def __place_picture_item(self, at_stage_sight: bool = False):
         item = self.__picture_item
@@ -221,10 +275,17 @@ class Viewer(QGraphicsView):
             self.__picture_item = None
             self.background_picture_path = None
 
-    def load_picture(self, picture_path: Optional[str] = None):
+    def load_picture(self, picture_path: str | None = None):
         """Requests loading a backgound picture from the user"""
-        filename = (
-            QFileDialog.getOpenFileName(self, "Open picture")[0]
+        filename: str | None = (
+            # Make the file dialog visible and on top
+            QFileDialog.getOpenFileName(
+                self,
+                "Open picture",
+                "",
+                "Images (*.png *.jpg *.jpeg)",
+                options=QFileDialog.Option.DontUseNativeDialog,
+            )[0]
             if picture_path is None
             else picture_path
         )
@@ -240,8 +301,8 @@ class Viewer(QGraphicsView):
 
     def add_stage_sight(
         self,
-        stage: Optional[StageInstrument],
-        camera: Optional[CameraInstrument],
+        stage: StageInstrument | None,
+        camera: CameraInstrument | None,
         probes: list[ProbeInstrument] = [],
     ):
         """Instantiate a stage sight associated with given stage.
@@ -264,23 +325,24 @@ class Viewer(QGraphicsView):
     def mode(self, new_mode: Mode):
         self.__mode = new_mode
         self.__update_drag_mode()
-        self.__update_highlight_color()
+        self.__update_selection_color()
         logging.getLogger("laserstudio").debug(f"Viewer mode selection: {new_mode}")
         self.mode_changed.emit(int(new_mode))
 
-    def select_mode(self, mode: Union[Mode, int], toggle: bool = False):
+    def select_mode(self, mode: Mode | int, toggle: bool = False):
         """Selects the Viewer's mode. If toogle is set to true,
         the function behaves as 'toggling',
         meaning that the mode is reset to NONE if it is reselected."""
-        if isinstance(mode, int):
-            mode = Viewer.Mode(mode)
 
         if toggle and self.mode == mode:
             mode = Viewer.Mode.NONE
 
-        self.mode = mode
+        self.zone_poly.clear()
+        self.zone_poly_item.setPolygon(self.zone_poly)
 
-    def go_next(self):
+        self.mode = Viewer.Mode(mode)
+
+    def go_next(self) -> Config:
         """Actions to perform when Laser Studio receive a Go Next command.
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
@@ -295,23 +357,31 @@ class Viewer(QGraphicsView):
                 self.stage_sight.move_to(QPointF(*next_point))
         return result
 
-    def __update_highlight_color(self, has_shift: Optional[bool] = None):
+    def __update_selection_color(
+        self, has_shift: bool | None = None, is_valid: bool = True
+    ):
         """Convenience function to change the current Application Palette to modify
         the highlight color. It permits to the Zone creation tool to have green / red
         colors
         """
-        if self.mode != Viewer.Mode.ZONE:
-            color = self._default_highlight_color
-        else:
-            if has_shift is None:
-                has_shift = (
-                    Qt.KeyboardModifier.ShiftModifier
-                    in QGuiApplication.queryKeyboardModifiers()
-                )
-            color = QColorConstants.Red if has_shift else QColorConstants.Green
-        p = QGuiApplication.palette()
-        p.setColor(QPalette.ColorRole.Highlight, color)
-        QGuiApplication.setPalette(p)
+        if has_shift is None:
+            has_shift = (
+                Qt.KeyboardModifier.ShiftModifier
+                in QGuiApplication.queryKeyboardModifiers()
+            )
+        color = ("red" if has_shift else "green") if is_valid else "orange"
+        self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
+        c = (
+            (QColorConstants.Red if has_shift else QColorConstants.Green)
+            if is_valid
+            else QColorConstants.DarkYellow
+        )
+        pen = QPen(c)
+        if isinstance(c, QColor):
+            c.setAlpha(64)
+        pen.setCosmetic(True)
+        self.zone_poly_item.setPen(pen)
+        self.zone_poly_item.setBrush(QBrush(c))
 
     def __update_drag_mode(self):
         if self.mode == Viewer.Mode.ZONE:
@@ -356,7 +426,7 @@ class Viewer(QGraphicsView):
         self.zoom = 1.0
 
     # User interactions
-    def wheelEvent(self, event: Optional[QWheelEvent]):
+    def wheelEvent(self, event: QWheelEvent | None):
         """
         Handle mouse wheel events to manage zoom.
         """
@@ -389,13 +459,27 @@ class Viewer(QGraphicsView):
         self.cam_pos_zoom = pos, zoom
         event.accept()
 
-    def mousePressEvent(self, event: Optional[QMouseEvent]):
+    def mousePressEvent(self, event: QMouseEvent | None):
         """
         Called when mouse button is pressed.
         In case of Mode being STAGE, triggers a move of the stage's StageSight.
+        In case of Mode being PIN, triggers a pin of the background picture.
+        In case of Mode being ZONE_POLY, triggers a polygon shaped zone creation.
+        In case of Mode being ZONE_TILTED, triggers a tilted rectangle shaped zone creation.
+        In case of Mode being OFFSET_ORIGIN, triggers a line to be drawn from the current position to the mouse position.
         """
         if event is None:
             return
+
+        # We want to catch a right-click on a marker
+        if event.button() == Qt.MouseButton.RightButton:
+            item = self.itemAt(event.pos())
+            while item is not None:
+                if isinstance(item, Marker):
+                    super().mousePressEvent(event)
+                    return
+                item = item.parentItem()
+
         if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
@@ -409,6 +493,32 @@ class Viewer(QGraphicsView):
             if self.mode == Viewer.Mode.PIN:
                 self.pin(scene_pos.x(), scene_pos.y())
 
+            elif self.mode == Viewer.Mode.ZONE_TILTED:
+                self.zone_poly.append(scene_pos)
+                if self.zone_poly.count() == 3:
+                    fourth_point = scene_pos - (self.zone_poly[1] - self.zone_poly[0])
+                    self.zone_poly.append(fourth_point)
+                    if self.is_valid_zone:
+                        modifiers = QGuiApplication.queryKeyboardModifiers()
+                        if Qt.KeyboardModifier.ShiftModifier in modifiers:
+                            self.scan_geometry.remove(self.zone_poly)
+                        else:
+                            self.scan_geometry.add(self.zone_poly)
+                        self.zone_poly.clear()
+                        self.zone_poly_item.setPolygon(self.zone_poly)
+                    else:
+                        self.zone_poly.remove(self.zone_poly.count() - 1)
+
+            elif self.mode == Viewer.Mode.ZONE_POLY:
+                self.zone_poly.append(scene_pos)
+                self.zone_poly_item.setPolygon(self.zone_poly)
+
+            elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+                self.offset_origin_line.setLine(
+                    scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y()
+                )
+                self.offset_origin_line.show()
+
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
             # Disable the StageSight tracking
@@ -416,6 +526,7 @@ class Viewer(QGraphicsView):
 
             # Scroll gesture mode
             self.setDragMode(Viewer.DragMode.ScrollHandDrag)
+
             # Transform as left press button event,
             # to make the scroll by dragging actually effective.
             event = QMouseEvent(
@@ -429,22 +540,65 @@ class Viewer(QGraphicsView):
 
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: Optional[QMouseEvent]):
+    @property
+    def is_valid_zone(self) -> bool:
+        """
+        Check if the zone is valid.
+        """
+        if self.zone_poly.count() < 3:
+            return False
+        points = [(p.x(), p.y()) for p in self.zone_poly]
+        shapely_poly = Polygon(points)
+        return shapely_poly.is_valid
+
+    def mouseMoveEvent(self, event: QMouseEvent | None):
         """
         Called when mouse moves.
         """
+        is_valid = True
         if event is not None:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
             self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
-        if self.mode == Viewer.Mode.ZONE:
+
+            if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
+                # Check if mouse button is pressed
+                if Qt.MouseButton.LeftButton not in event.buttons():
+                    self.zone_poly.remove(self.zone_poly.count() - 1)
+                self.zone_poly.append(scene_pos)
+                self.zone_poly_item.setPolygon(self.zone_poly)
+                is_valid = self.is_valid_zone
+
+            elif self.mode == Viewer.Mode.ZONE_TILTED:
+                if (nb_pts := self.zone_poly.count()) == 1:
+                    full_poly = QPolygonF(self.zone_poly)
+                    full_poly.append(scene_pos)
+                    self.zone_poly_item.setPolygon(full_poly)
+                elif nb_pts == 2:
+                    fourth_point = scene_pos - (self.zone_poly[1] - self.zone_poly[0])
+                    full_poly = QPolygonF(self.zone_poly)
+                    full_poly.append(scene_pos)
+                    full_poly.append(fourth_point)
+                    self.zone_poly_item.setPolygon(full_poly)
+
+            elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+                p1 = self.offset_origin_line.line().p1()
+                self.offset_origin_line.setLine(
+                    p1.x(), p1.y(), scene_pos.x(), scene_pos.y()
+                )
+
+        if self.mode in [
+            Viewer.Mode.ZONE,
+            Viewer.Mode.ZONE_POLY,
+            Viewer.Mode.ZONE_TILTED,
+        ]:
             # In Zone Mode, a release of the Shift key makes the highlight
             # color to be changed to red (remove)
-            self.__update_highlight_color()
+            self.__update_selection_color(is_valid=is_valid)
 
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: Optional[QMouseEvent]):
+    def mouseReleaseEvent(self, event: QMouseEvent | None):
         """
         Called when mouse button is released.
         Used to get out the panning, when Right button is released.
@@ -470,23 +624,50 @@ class Viewer(QGraphicsView):
                 self.scan_geometry.remove(zone)
             else:
                 self.scan_geometry.add(zone)
+
+        elif self.mode == Viewer.Mode.OFFSET_ORIGIN and is_left:
+            line = self.offset_origin_line.line()
+            offset_p = line.p2() - line.p1()
+            offset = [offset_p.x(), offset_p.y()]
+            logging.getLogger("laserstudio").debug(f"Offset origin line: {offset}")
+            if self.stage_sight is not None and self.stage_sight.stage is not None:
+                for i in range(len(offset)):
+                    self.stage_sight.stage.offset_origin[i] += offset[i]
+            self.offset_origin_line.hide()
+
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event: Optional[QKeyEvent]):
+    def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.mode == Viewer.Mode.ZONE_POLY:
+                self.zone_poly.append(self.mapToScene(event.pos()))
+                modifiers = QGuiApplication.queryKeyboardModifiers()
+                if Qt.KeyboardModifier.ShiftModifier in modifiers:
+                    self.scan_geometry.remove(self.zone_poly)
+                else:
+                    self.scan_geometry.add(self.zone_poly)
+                self.zone_poly_item.setPolygon(QPolygonF())
+                self.zone_poly.clear()
+
+        return super().mouseDoubleClickEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent | None):
         """
         Called when a keyboard button is pressed.
         """
+        if self.mode == Viewer.Mode.ZONE_POLY or self.mode == Viewer.Mode.ZONE:
+            self.__update_selection_color(is_valid=True)
         super().keyPressEvent(event)
-        if event is None:
-            return
 
-    def keyReleaseEvent(self, event: Optional[QKeyEvent]):
+    def keyReleaseEvent(self, event: QKeyEvent | None):
         """
         Called when a keyboard button is released.
         """
+        if self.mode == Viewer.Mode.ZONE_POLY or self.mode == Viewer.Mode.ZONE:
+            self.__update_selection_color(is_valid=True)
         super().keyReleaseEvent(event)
-        if event is None:
-            return
 
     def pin(self, x: float, y: float):
         """
@@ -508,7 +689,8 @@ class Viewer(QGraphicsView):
             )
         stage_pos = stage_pos.x(), stage_pos.y()
 
-        if len(self.pins) == 0:
+        n = len(self.pins)
+        if n == 0:
             # We are pinning the first point.
             # Apply simple translation as first step
             tx = stage_pos[0] - x
@@ -522,8 +704,20 @@ class Viewer(QGraphicsView):
         # If we remove the translation code above, the algorithm will still
         # work.
         pix_pos = pic.sceneTransform().inverted()[0].map(x, y)
+        pix_pos = (
+            pix_pos[0] if pix_pos[0] is not None else 0.0,
+            pix_pos[1] if pix_pos[1] is not None else 0.0,
+        )
+
+        # Show the marker
+        self.pin_markers[n].setPos(x, y)
+        for m in self.pin_markers[: n + 1]:
+            m.show()
+        for m in self.pin_markers[n + 1 :]:
+            m.hide()
 
         self.pins.append((stage_pos, pix_pos))
+
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
             # Time to recalculate the picture transformation matrix!
@@ -622,7 +816,7 @@ class Viewer(QGraphicsView):
         return probe_position
 
     def point_for_desired_move(
-        self, point: Union[QPointF, tuple[float, float]]
+        self, point: QPointF | tuple[float, float]
     ) -> tuple[float, float]:
         """
         Gives the actual stage's destination according to desired element
@@ -661,44 +855,89 @@ class Viewer(QGraphicsView):
         )
 
     def add_marker(
-        self, position: Optional[tuple[float, float]] = None, color=QColorConstants.Red
+        self,
+        position: None | tuple[float, float] = None,
+        color: QColor
+        | Qt.GlobalColor
+        | int
+        | list[float]
+        | LedgerColors = QColorConstants.Red,
+        label: str | None = None,
+        visible: bool = True,
     ) -> IdMarker:
         """
-        Add a marker at a specific position, or at current observed position
+        Add a marker at a specific position, or at current observed position.
+
+        :param position: The position of the marker. If None, the position is retrieved from the stage's current position.
+        :param color: The color of the marker.
+        :param label: The label of the marker.
+        :param visible: If False, the marker is created but not displayed (setVisible(False)).
+        :return: The added marker.
         """
-        marker = IdMarker(color=color)
-        self.__markers.append(marker)
-        assert (s := self.scene()) is not None
-        s.addItem(marker)
+        # Creation of the marker
         if position is None:
             p = self.focused_element_position()
             position = p.x(), p.y()
-        marker.setPos(*position)
-        marker.setZValue(2)
+
+        marker = IdMarker(viewer=self, color=color, label=label, position=position)
+        marker.setVisible(visible)
         marker.size = self.default_marker_size
-        marker.update_tooltip()
+
+        # Adding to the model
+        self.__markers.add(marker)
+        if label not in self.__markers_by_label_by_color:
+            self.__markers_by_label_by_color[label] = {marker.color_name: set([marker])}
+        elif marker.color_name not in self.__markers_by_label_by_color[label]:
+            self.__markers_by_label_by_color[label][marker.color_name] = set([marker])
+        else:
+            self.__markers_by_label_by_color[label][marker.color_name].add(marker)
+
+        # Adding to the view
+        self.__scene.addItem(marker)
+
         return marker
 
     def clear_markers(self):
         """Removes all markers."""
         for marker in self.__markers:
             self.__scene.removeItem(marker)
+            marker.viewer = None
         self.__markers.clear()
+        self.__markers_by_label_by_color.clear()
+
+    def remove_marker(self, marker: IdMarker):
+        """Remove a specific marker from the scene."""
+        self.__scene.removeItem(marker)
+        self.__markers.remove(marker)
+        self.__markers_by_label_by_color[marker.label][marker.color_name].remove(marker)
+        if len(self.__markers_by_label_by_color[marker.label][marker.color_name]) == 0:
+            del self.__markers_by_label_by_color[marker.label][marker.color_name]
+        if len(self.__markers_by_label_by_color[marker.label]) == 0:
+            del self.__markers_by_label_by_color[marker.label]
+        logging.getLogger("laserstudio").debug(
+            f"Markers by label by color: {self.__markers_by_label_by_color}"
+        )
+        logging.getLogger("laserstudio").debug(f"Markers: {self.__markers}")
+        logging.getLogger("laserstudio").info(f"Marker {marker} removed")
+        marker.viewer = None
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
-        data = {}
+        data: dict[str, Any] = {}
         data["marker_size"] = self.default_marker_size
 
         if self.background_picture_path is not None:
             data["background_picture_path"] = self.background_picture_path
         if (pic := self.__picture_item) is not None:
             data["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+            data["background_picture_transform_pins"] = [
+                [m.pos().x(), m.pos().y()] for m in self.pin_markers
+            ]
         return data
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
         if (marker_size := data.get("marker_size")) is not None:
             self.marker_size(marker_size)
@@ -708,3 +947,50 @@ class Viewer(QGraphicsView):
                 pic := self.__picture_item
             ) is not None:
                 pic.setTransform(yaml_to_qtransform(transform))
+            if (pins := data.get("background_picture_transform_pins")) is not None:
+                for i, pin in enumerate(pins):
+                    self.pin_markers[i].setPos(pin[0], pin[1])
+                    self.pin_markers[i].show()
+
+    def load_markers(self, file_path: str, interactive: bool = False):
+        """Load markers from a file."""
+        with open(file_path, "r") as f:
+            try:
+                markers: list[dict[str, Any]] = json.load(f)
+            except json.JSONDecodeError:
+                QMessageBox.critical(
+                    self,
+                    "Error loading markers",
+                    "The file contains invalid JSON.",
+                )
+                return
+        if interactive:
+            # Ask for confirmation
+            if not QMessageBox.information(
+                self,
+                f"{len(markers)} markers loaded",
+                f"{len(markers)} markers are ready to be added. Do you want to proceed?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            ):
+                return
+
+        self.setUpdatesEnabled(False)
+        try:
+            for marker in markers:
+                color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
+                color = QColor(
+                    int(color[0] * 255),
+                    int(color[1] * 255),
+                    int(color[2] * 255),
+                    int(color[3] * 255),
+                )
+                label = marker.get("label", None)
+                visible = not marker.get("hidden", False)
+                self.add_marker(marker["pos"], color, label=label, visible=visible)
+        finally:
+            self.setUpdatesEnabled(True)
+
+    def save_markers(self, file_path: str):
+        """Save markers to a file."""
+        with open(file_path, "w") as f:
+            json.dump([marker.to_dict() for marker in self.markers], f)

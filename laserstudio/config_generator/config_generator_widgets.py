@@ -22,13 +22,13 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QRegularExpressionValidator
 from jsonschema import validate, ValidationError
-from typing import Optional, Union
+from typing import Any
 from serial.tools.list_ports import comports
 from serial.tools.list_ports_common import ListPortInfo
 
 
 class FileSelector(QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.setLayout(hbox := QHBoxLayout())
         hbox.setContentsMargins(0, 0, 0, 0)
@@ -39,16 +39,22 @@ class FileSelector(QWidget):
         self.pb.clicked.connect(self.select_file)
 
     def select_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Select file", "", "All Files (*)")
+        file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select file",
+            "",
+            "All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
         if file:
             self.le.setText(file)
 
-    def text(self):
+    def text(self) -> str:
         return self.le.text()
 
 
 class DeviceSelector(QComboBox):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.populate()
         self.setEditable(True)
@@ -68,7 +74,7 @@ class DeviceSelector(QComboBox):
             r = f"{p.device} [sn: {p.serial_number} | info: {p.usb_info()}]"
             self.addItem(r, p)
 
-    def dev_path(self) -> Optional[str]:
+    def dev_path(self) -> str | None:
         selected = self.currentData()
         if type(selected) is ListPortInfo:
             return selected.device
@@ -86,15 +92,14 @@ class AnyOf:
     The AnyOf widget is compound on the given title of the option to select (via the checkbox) and the widget permitting to enter the value.
     """
 
-    def __init__(self, schema, required_keys: list[str] = []) -> None:
+    def __init__(self, schema: dict[str, Any], required_keys: list[str] = []) -> None:
         self.cb = QCheckBox(schema.get("title"))
         self.schema_widget = SchemaWidget(
             schema, make_flat=True, required_keys=required_keys
         )
         self.schema_widget.setEnabled(False)
-        self.cb.checkStateChanged.connect(
-            lambda state: setattr(self, "selected", state == Qt.CheckState.Checked)
-        )
+
+        self.cb.checkStateChanged.connect(self._on_check_state_changed)
 
     @property
     def selected(self):
@@ -106,9 +111,12 @@ class AnyOf:
         self.cb.setChecked(value)
         self.schema_widget.setEnabled(value)
 
+    def _on_check_state_changed(self, state: Qt.CheckState):
+        self.selected = state == Qt.CheckState.Checked
+
 
 class KeyLabel(QWidget):
-    def __init__(self, text: str, required=False):
+    def __init__(self, text: str, required: bool = False):
         """
         The KeyLabel is the widget to display the property of an object.
         It includes label for the property name.
@@ -163,12 +171,12 @@ class SchemaWidget(QGroupBox):
 
     def __init__(
         self,
-        schema: dict,
+        schema: dict[str, Any],
         key: str = "",
-        position: Optional[int] = None,
-        parent=None,
+        position: int | None = None,
+        parent: QWidget | None = None,
         required_keys: list[str] = [],
-        make_flat=False,
+        make_flat: bool = False,
     ):
         super().__init__(parent)
 
@@ -176,7 +184,7 @@ class SchemaWidget(QGroupBox):
         self.keylabel_widget = None
         self.value_widget = None
         self.key = key
-        self.hbox_plus_minus = None
+        self.hbox_plus_minus: QHBoxLayout | None = None
 
         self.schema = schema
         self._layout = QVBoxLayout()
@@ -263,11 +271,24 @@ class SchemaWidget(QGroupBox):
 
     def create_value_widget(
         self,
-    ) -> Union[QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QLineEdit, QWidget, None]:
+    ) -> QLabel | QSpinBox | QDoubleSpinBox | QCheckBox | QLineEdit | QWidget | None:
         schema = self.schema
         element_type = self.element_type
         element_subtype = schema.get("subtype")
 
+        value_widget: (
+            QWidget
+            | QLabel
+            | QSpinBox
+            | QDoubleSpinBox
+            | QCheckBox
+            | QLineEdit
+            | QWidget
+            | None
+        ) = None
+        w: (
+            QWidget | QLabel | QSpinBox | QDoubleSpinBox | QCheckBox | QLineEdit | None
+        ) = None
         if "const" in schema:
             value_widget = w = QLabel(str(schema["const"]))
         elif element_type == "integer" or element_type == "number":
@@ -290,14 +311,14 @@ class SchemaWidget(QGroupBox):
         elif element_type == "string":
             if element_subtype == "file":
                 value_widget = w = FileSelector()
-                line_edit = w.le
+                line_edit: QLineEdit | None = w.le
             elif element_subtype == "device":
                 value_widget = w = DeviceSelector()
                 line_edit = w.lineEdit()
-                assert line_edit is not None
             else:
                 value_widget = w = QLineEdit()
                 line_edit = w
+            assert line_edit is not None
             if "pattern" in schema:
                 line_edit.setValidator(
                     QRegularExpressionValidator(QRegularExpression(schema["pattern"]))
@@ -459,7 +480,7 @@ class SchemaWidget(QGroupBox):
             if b is not None:
                 b.setChecked(True)
 
-    def add_anyOf_widget(self):
+    def add_anyOf_widget(self) -> None:
         """The schema includes a 'anyOf' section, which permits to select one or more of the multiple configuration schemas.
         Note that at least one must be selected.
         A list of checkboxes is displayed to select the option(s), and the selected configuration option(s) widgets are enabled if selected.
@@ -505,8 +526,8 @@ class SchemaWidget(QGroupBox):
             anyOf_widget_selection.addStretch()
             self.anyOfs[0].selected = True
 
-    def add_properties_widgets(self):
-        properties = self.schema.get("properties", {})
+    def add_properties_widgets(self) -> None:
+        properties: dict[str, Any] = self.schema.get("properties", {})
         if type(properties) is not dict or len(properties) == 0:
             return
         properties_form = QFormLayout()
@@ -540,7 +561,7 @@ class SchemaWidget(QGroupBox):
             self._children.append(child)
 
     @property
-    def value(self):
+    def value(self) -> bool | str | int | float | list[Any] | dict[str, Any] | None:
         if not self.selected:
             return None
 
@@ -564,21 +585,25 @@ class SchemaWidget(QGroupBox):
             return None
 
     @property
-    def selected(self):
+    def selected(self) -> bool:
         if self.isCheckable():
             return self.isChecked()
         if self.keylabel_widget is not None:
-            return self.keylabel_widget.cb.isChecked()
+            assert isinstance(self.keylabel_widget.cb, QCheckBox)
+            is_checked = self.keylabel_widget.cb.isChecked()
+            return is_checked
         return True
 
-    def json(self):
+    def json(
+        self,
+    ) -> list[Any] | bool | str | int | float | list[Any] | dict[str, Any] | None:
         if self.schema.get("type") == "array":
             return [child.json() for child in self._children if child.selected]
 
         if (v := self.value) is not None:
             return v
 
-        result = {}
+        result: dict[str, Any] = {}
         for child in self._children:
             if not child.selected:
                 continue

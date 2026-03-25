@@ -1,9 +1,17 @@
 from PyQt6.QtCore import QTimer, QVariant, Qt
-from pypdm import ConnectionFailure, Link, PDM, SyncSource, DelayLineType, CurrentSource
+from pypdm import (
+    ConnectionFailure,
+    Link,
+    PDM,
+    SyncSource,
+    DelayLineType,
+    CurrentSource,
+    InterlockStatus,
+)
 from .list_serials import get_serial_device, DeviceSearchError
 import logging
 from .laser import LaserInstrument
-from typing import Optional, cast
+from typing import cast, Any
 
 
 class PDMInstrument(LaserInstrument):
@@ -11,14 +19,14 @@ class PDMInstrument(LaserInstrument):
 
     __PDM_LINKS = {}
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict[str, Any]):
         """
         :param config: YAML configuration object
         """
         super().__init__(config=config)
 
         # To refresh stage position in the view, in real-time
-        self.refresh_interval = cast(Optional[int], config.get("refresh_interval_ms"))
+        self._refresh_interval = cast(int | None, config.get("refresh_interval_ms"))
 
         device_type = config.get("type")
         dev = config.get("dev")
@@ -44,9 +52,9 @@ class PDMInstrument(LaserInstrument):
             )
             try:
                 link = Link(dev)
-                logging.getLogger("laserstudio").info("OK")
+                logging.getLogger("laserstudio").info("Connection to PDM OK")
             except ConnectionFailure:
-                logging.getLogger("laserstudio").info("Failed")
+                logging.getLogger("laserstudio").info("Connection to PDM failed")
                 raise
             PDMInstrument.__PDM_LINKS[dev] = link
         self.pdm = pdm = PDM(config["num"], link)
@@ -63,23 +71,78 @@ class PDMInstrument(LaserInstrument):
         logging.getLogger("laserstudio").debug("Finishing discussion with PDM")
 
         self._interlock_status = None
-        if self.refresh_interval is not None:
+        if self._refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
+                self._refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
             )
 
     @property
-    def interlock_status(self) -> bool:
+    def refresh_interval(self) -> int | None:
+        return self._refresh_interval
+
+    @refresh_interval.setter
+    def refresh_interval(self, value: int | None):
+        self._refresh_interval = value
+        if value is not None:
+            QTimer.singleShot(value, Qt.TimerType.CoarseTimer, self.refresh_pdm)
+
+    @property
+    def interlock_status(self) -> InterlockStatus:
         """Get the laser interlock status, emits a signal when it changes"""
         state = self.pdm.interlock_status
         if state != self._interlock_status:
             self._interlock_status = state
             self.parameter_changed.emit("interlock_status", QVariant(state))
-            if state is True:
-                # The interlock has been opened, it may have changed the state of the
-                # activation
-                _ = self.on_off
         return state
+
+    @property
+    def temperature(self) -> float:
+        return self.pdm.temperature
+
+    @property
+    def frequency(self) -> float:
+        return self.pdm.frequency
+
+    @frequency.setter
+    def frequency(self, value: float):
+        self.pdm.frequency = int(value)
+        self.pdm.apply()
+
+    @property
+    def delay(self) -> float:
+        return self.pdm.delay
+
+    @delay.setter
+    def delay(self, value: float):
+        self.pdm.delay = int(value)
+        self.pdm.apply()
+
+    @property
+    def pulse_width(self) -> float:
+        return self.pdm.pulse_width
+
+    @pulse_width.setter
+    def pulse_width(self, value: float):
+        self.pdm.pulse_width = int(value)
+        self.pdm.apply()
+
+    @property
+    def sync_source(self) -> SyncSource:
+        return self.pdm.sync_source
+
+    @sync_source.setter
+    def sync_source(self, value: SyncSource):
+        self.pdm.sync_source = value
+        self.pdm.apply()
+
+    @property
+    def delay_line_type(self) -> DelayLineType:
+        return self.pdm.delay_line_type
+
+    @delay_line_type.setter
+    def delay_line_type(self, value: DelayLineType):
+        self.pdm.delay_line_type = value
+        self.pdm.apply()
 
     @property
     def on_off(self) -> bool:
@@ -129,8 +192,50 @@ class PDMInstrument(LaserInstrument):
     def refresh_pdm(self):
         """Called regularly to get laser state which can change externally (interlock)"""
         _ = self.interlock_status
-
+        _ = self.on_off
         if self.refresh_interval is not None:
             QTimer.singleShot(
                 self.refresh_interval, Qt.TimerType.CoarseTimer, self.refresh_pdm
             )
+
+    @property
+    def settings(self):
+        """
+        Return a dict of settings for the PDM.
+        """
+        super_settings = super().settings
+        super_settings.update(
+            {
+                "interlock_status": "Open"
+                if self.interlock_status == InterlockStatus.OPEN
+                else "Closed",
+                "refresh_interval_ms": self.refresh_interval,
+                "delay_line_type": self.delay_line_type.name,
+                "pulse_width_ps": self.pulse_width,
+                "delay_ps": self.delay,
+            }
+        )
+        return super_settings
+
+    @settings.setter
+    def settings(self, data: dict[str, Any]):
+        """
+        Set the settings of the PDM.
+        """
+        LaserInstrument.settings.__set__(self, data)
+        if "refresh_interval_ms" in data:
+            self.refresh_interval = data["refresh_interval_ms"]
+            self.parameter_changed.emit(
+                "refresh_interval_ms", data["refresh_interval_ms"]
+            )
+        if "delay_line_type" in data:
+            self.delay_line_type = DelayLineType[data["delay_line_type"]]
+            self.parameter_changed.emit(
+                "delay_line_type", DelayLineType[data["delay_line_type"]]
+            )
+        if "pulse_width_ps" in data:
+            self.pulse_width = data["pulse_width_ps"]
+            self.parameter_changed.emit("pulse_width", data["pulse_width_ps"])
+        if "delay_ps" in data:
+            self.delay = data["delay_ps"]
+            self.parameter_changed.emit("delay", data["delay_ps"])

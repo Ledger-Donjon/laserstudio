@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import json
 from jsonschema import validate, ValidationError
-from typing import Any, Optional, Union
+from typing import Any, TYPE_CHECKING, cast
 
 try:
     from .ref_resolve import set_base_url, resolve_references
@@ -9,6 +11,13 @@ except ImportError:
         set_base_url,
         resolve_references,
     )
+
+if TYPE_CHECKING:
+    try:
+        from ..utils.yaml_types import ScalarType, Config
+    except ImportError:
+        from laserstudio.utils.yaml_types import ScalarType, Config
+
 
 import logging
 import sys
@@ -21,8 +30,8 @@ import os.path
 class ConfigGenerator:
     def __init__(
         self,
-        schema_uri="config.schema.json",
-        base_url="https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/",
+        schema_uri: str = "config.schema.json",
+        base_url: str = "https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/",
     ):
         self.schema_uri = schema_uri
         self.base_url = base_url
@@ -81,7 +90,7 @@ class ConfigGenerator:
         return ConfigGenerator.bold(ConfigGenerator.blue(name))
 
     @staticmethod
-    def fproperty(key: str, is_required=False) -> str:
+    def fproperty(key: str, is_required: bool = False) -> str:
         return ConfigGenerator.bold(
             ConfigGenerator.green(key)
             + (ConfigGenerator.red("*") if is_required else "")
@@ -90,22 +99,20 @@ class ConfigGenerator:
     def prompt_with_hint(
         self,
         key: str,
-        type: str,
-        hint: Optional[str],
-        is_array=False,
-        is_required=False,
-    ) -> Optional[
-        Union[list[Union[str, float, int, bool]], Union[str, float, int, bool]]
-    ]:
+        _type: str,
+        hint: str | None = None,
+        is_array: bool = False,
+        is_required: bool = False,
+    ) -> list[ScalarType] | ScalarType | None:
         if hint is None:
             hint = f"No description for property {ConfigGenerator.fproperty(key)} is available."
 
         if is_array:
-            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, give a list of {ConfigGenerator.finput(type)}s, with comma-separated values{ConfigGenerator.dim(' optional') if not is_required else ''}: "
+            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, give a list of {ConfigGenerator.finput(_type)}s, with comma-separated values{ConfigGenerator.dim(' optional') if not is_required else ''}: "
             x = ConfigGenerator.prompt(question, hint)
         else:
-            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if type == 'integer' else ''} {ConfigGenerator.finput(type)} value{ConfigGenerator.dim(' optional') if not is_required else ''}: "
-            if type == "boolean":
+            question = f"For property {ConfigGenerator.fproperty(key, is_required)}, enter a{'n' if _type == 'integer' else ''} {ConfigGenerator.finput(_type)} value{ConfigGenerator.dim(' optional') if not is_required else ''}: "
+            if _type == "boolean":
                 x = ConfigGenerator.prompt(
                     question, hint, ["true", "false"], allow_empty=not is_required
                 )
@@ -118,20 +125,20 @@ class ConfigGenerator:
                 self.logger.error(
                     f"Property {ConfigGenerator.fproperty(key, is_required)} is {ConfigGenerator.red('required')} and cannot be empty"
                 )
-                return self.prompt_with_hint(key, type, hint, is_array, is_required)
+                return self.prompt_with_hint(key, _type, hint, is_array, is_required)
 
             return None
 
         if is_array:
             # Convert all elements in the array, and check if they are valid
-            values: list[Union[str, float, int, bool]] = []
+            values: list[ScalarType] = []
             for i, x in enumerate(x.split(",")):
                 try:
-                    if type == "integer":
+                    if _type == "integer":
                         x = int(x)
-                    elif type == "number":
+                    elif _type == "number":
                         x = float(x)
-                    elif type == "boolean":
+                    elif _type == "boolean":
                         if x.lower() not in ["true", "false"]:
                             raise ValueError(f"{x} is an invalid boolean value")
                         x = x.lower() == "true"
@@ -141,15 +148,15 @@ class ConfigGenerator:
                     self.logger.error(
                         f"The {i + 1}th value for property {ConfigGenerator.fproperty(key)} is invalid: {e}"
                     )
-                    return self.prompt_with_hint(key, type, hint, is_array)
+                    return self.prompt_with_hint(key, _type, hint, is_array)
             return values
 
         try:
-            if type == "integer":
+            if _type == "integer":
                 x = int(x)
-            elif type == "number":
+            elif _type == "number":
                 x = float(x)
-            elif type == "boolean":
+            elif _type == "boolean":
                 if x.lower() not in ["true", "false"]:
                     raise ValueError(f"{x} is an invalid boolean value")
                 x = x.lower() == "true"
@@ -159,14 +166,13 @@ class ConfigGenerator:
             self.logger.error(
                 f"Invalid value for property {ConfigGenerator.fproperty(key)}: {e}"
             )
-            return self.prompt_with_hint(key, type, hint)
+            return self.prompt_with_hint(key, _type, hint)
 
     def prompt_key(
         self, key: str, key_type: str, hint: str, required: bool
-    ) -> Optional[Union[str, float, int, bool]]:
+    ) -> ScalarType | None:
         """
         Prompt the user to enter a value for a given key/property, with the given type and hint.
-        The function will recursively call itself if the user enters an invalid value.
 
         :param key: The name of the property.
         :param key_type: The type, which can be "string", "integer", "number", or "boolean".
@@ -177,12 +183,16 @@ class ConfigGenerator:
         if key_type not in ["string", "integer", "number", "boolean"]:
             raise ValueError(f"Unsupported schema type: {key_type}")
 
-        x = self.prompt_with_hint(key, key_type, hint, is_required=required)
+        x: list[ScalarType] | ScalarType | None = self.prompt_with_hint(
+            key, key_type, hint, is_array=False, is_required=required
+        )
 
         if x is None and not required:
             return None
 
-        assert type(x) is str or type(x) is bool or type(x) is int or type(x) is float
+        # Because this should never happen (`is_array` is False)
+        if isinstance(x, list):
+            return None
 
         return x
 
@@ -256,7 +266,7 @@ class ConfigGenerator:
 
     @staticmethod
     def prompt(
-        question: str, hint: str, answers: list[str] = [], allow_empty=False
+        question: str, hint: str, answers: list[str] = [], allow_empty: bool = False
     ) -> str:
         """
         Prompt the user with a question, and return the user's answer.
@@ -303,14 +313,14 @@ class ConfigGenerator:
 
     def generate_array_interactive(
         self, schema: dict[str, Any], key: str, required_keys: set[str]
-    ):
+    ) -> list[Config] | None:
         item_schema = schema.get("items", {})
         element_type = item_schema.get("type", "string")
         if element_type == "object":
-            name: Any | None = item_schema.get("title")
+            name: str | None = item_schema.get("title")
             if name is not None:
                 name = ConfigGenerator.finstrument(name)
-            result = []
+            result: list[Config] = []
             while True:
                 question = f"Do you want to instanciate a{'nother' if len(result) else ''} {name or ConfigGenerator.fproperty(key)}?"
                 hint = ConfigGenerator.describe_property(
@@ -324,31 +334,30 @@ class ConfigGenerator:
                 )
                 if subresult is None:
                     break
-                assert type(subresult) is dict
                 result.append(subresult)
             return result
 
         hint = ConfigGenerator.describe_property(schema, key, key in required_keys)
-        result = self.prompt_with_hint(
+        result_prompt: list[ScalarType] | ScalarType | None = self.prompt_with_hint(
             key, element_type, hint, is_array=True, is_required=key in required_keys
         )
 
+        print(f"Result prompt for array: {result_prompt}")
+
         # If the user does not provide any value, return None
-        if result is None:
+        if result_prompt is None or not isinstance(result_prompt, list):
             return None
 
-        assert type(result) is list
+        return cast(list[Config], result_prompt)
 
-        return result
-
-    # Function to generate JSON data interactively based on the schema
+    # Function to generate Serializable data interactively based on the schema
     def generate_json_interactive(
         self,
-        schema: Optional[dict[str, Any]] = None,
+        schema: dict[str, Any] | None = None,
         key: str = "",
         required_keys: set[str] = set(),
-        ask_user: Optional[bool] = None,
-    ):
+        ask_user: bool | None = None,
+    ) -> Config | None:
         if schema is None:
             schema = self.schema
 
@@ -389,7 +398,7 @@ class ConfigGenerator:
             if "n" == self.prompt(question, hint, ["y", "n"]):
                 return None
 
-        result = {}
+        result: dict[str, Any] = {}
 
         # Generate multiple schemas from the "allOf" list
         # Should not exist anymore, as the schema is "flattened" in ref_resolve.py
@@ -552,7 +561,7 @@ class ConfigGenerator:
             __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
             self.use_local = True
 
-    def load_schema(self, local=True):
+    def load_schema(self):
         # Fetch the JSON schema from the URL
         if self.use_local:
             __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -561,7 +570,7 @@ class ConfigGenerator:
         schema = resolve_references(self.schema_uri)
         self.logger.info("Schema loaded successfully")
         self.logger.debug(json.dumps(schema, indent=2))
-        self.schema = schema
+        self.schema: dict[str, Any] = schema
 
     @staticmethod
     def print_intro():
