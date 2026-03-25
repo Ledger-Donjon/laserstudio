@@ -97,7 +97,7 @@ class ScanToolBar(QToolBar):
         w.setMaximum(1000)
         w.setValue(laser_studio.viewer.scan_geometry.scan_path_generator.density)
         w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: laser_studio.viewer.scan_geometry.__setattr__(
                 "density", self.density.value()
             )
@@ -116,7 +116,7 @@ class ScanToolBar(QToolBar):
         w.setValue(laser_studio.viewer.default_marker_size)
         w.reset()
         w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: laser_studio.viewer.scan_geometry.__setattr__(
                 "diameter", self.size_sp.value()
             )

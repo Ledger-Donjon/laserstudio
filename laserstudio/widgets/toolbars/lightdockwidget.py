@@ -46,7 +46,8 @@ class LightDockWidget(QDockWidget):
         w.setCheckable(True)
         w.setChecked(self.light.light)
         w.setIconSize(QSize(24, 24))
-        w.toggled.connect(lambda b: self.light.__setattr__("light", b))
+
+        w.toggled.connect(self.toggle_light)
         hbox.addWidget(w)
 
         w = QSlider(Qt.Orientation.Horizontal, self)
@@ -54,9 +55,8 @@ class LightDockWidget(QDockWidget):
         w.setValue(int(self.light.intensity * 100))
         w.setToolTip("Intensity of the light")
         w.setSingleStep(10)
-        w.valueChanged.connect(
-            lambda v: self.light.__setattr__("intensity", float(v) / 100.0)
-        )
+
+        w.valueChanged.connect(self.set_intensity)
         hbox.addWidget(w)
 
         if type(light) is HayashiLRInstrument:
@@ -75,10 +75,16 @@ class LightDockWidget(QDockWidget):
             w.setIconSize(QSize(24, 24))
             w.toggled.connect(self.open_shutter)
             hbox.addWidget(w)
-            
+
         # Add stretch on last row
         vbox.addStretch()
 
-    def open_shutter(self, b):
+    def toggle_light(self, b: bool):
+        self.light.light = b
+
+    def set_intensity(self, v: int):
+        self.light.intensity = float(v) / 100.0
+
+    def open_shutter(self, b: bool):
         if type(self.light) is LMSControllerInstrument:
             self.light.open = b

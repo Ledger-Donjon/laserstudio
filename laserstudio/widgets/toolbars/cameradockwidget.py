@@ -265,7 +265,7 @@ class CameraDockWidget(QDockWidget):
         w.setValue(self.camera.refresh_interval)
         w.reset()
         w.setToolTip("Refresh interval")
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.camera.__setattr__(
                 "refresh_interval", self.refresh_interval.value()
             )

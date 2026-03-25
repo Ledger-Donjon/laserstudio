@@ -32,7 +32,7 @@ class ReturnDoubleSpinBox(QDoubleSpinBox):
         self.valueChanged.connect(le.highlight)
 
     @property
-    def returnPressed(self) -> pyqtBoundSignal:
+    def returnPressed2(self) -> pyqtBoundSignal:
         # To access easily to the returnPressed signal
         assert (le := self.lineEdit()) is not None
         return le.returnPressed
@@ -55,7 +55,7 @@ class ReturnSpinBox(QSpinBox):
         self.valueChanged.connect(le.highlight)
 
     @property
-    def returnPressed(self) -> pyqtBoundSignal:
+    def returnPressed2(self) -> pyqtBoundSignal:
         # To access easily to the returnPressed signal
         assert (le := self.lineEdit()) is not None
         return le.returnPressed

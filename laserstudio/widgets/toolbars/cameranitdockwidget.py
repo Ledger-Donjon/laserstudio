@@ -60,12 +60,12 @@ class CameraNITDockWidget(QDockWidget):
         w = self.hist_low_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
-        w.returnPressed.connect(self.gain_changed)
+        w.returnPressed2.connect(self.gain_changed)
         hbox.addWidget(w)
         w = self.hist_high_input = ReturnDoubleSpinBox()
         w.setMinimum(0)
         w.setMaximum(0xFFFF)
-        w.returnPressed.connect(self.gain_changed)
+        w.returnPressed2.connect(self.gain_changed)
         hbox.addWidget(w)
         # Button to trigger the NIT camera gain
         # Checkbox to activate/deactivate the timer
@@ -90,7 +90,7 @@ class CameraNITDockWidget(QDockWidget):
         w.setMinimum(1)
         w.setMaximum(255)
         w.reset()
-        w.returnPressed.connect(self.averaging_changed)
+        w.returnPressed2.connect(self.averaging_changed)
         hbox.addWidget(w)
 
         # Magnification selector.

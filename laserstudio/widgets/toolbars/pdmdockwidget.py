@@ -77,7 +77,7 @@ class PDMDockWidget(QDockWidget):
         w.setMaximum(100.0)
         w.setSuffix("%")
         w.setValue(0)
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.laser.__setattr__(
                 "current_percentage", self.pulse_power_input.value()
             )
@@ -129,7 +129,7 @@ class PDMDockWidget(QDockWidget):
         w.setDecimals(3)
         w.setSuffix("\xa0mA")
         w.setValue(0)
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.laser.__setattr__(
                 "offset_current", self.offset_current_input.value()
             )
@@ -218,7 +218,7 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(0)
         w.setMaximum(1275000)
         w.setSuffix("\xa0ps")
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.laser.__setattr__(
                 "pulse_width", self.pulse_width_input.value()
             )
@@ -232,7 +232,7 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(0)
         w.setMaximum(15000)
         w.setSuffix("\xa0ps")
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.laser.__setattr__("delay", self.delay_input.value())
         )
         grid.addWidget(w, row, 1)
@@ -277,7 +277,7 @@ class PDMDockWidget(QDockWidget):
         w.setMinimum(1)
         w.setMaximum(250 * 10**6)  # 250 MHz
         w.setSuffix("\xa0Hz")
-        w.returnPressed.connect(
+        w.returnPressed2.connect(
             lambda: self.laser.__setattr__("frequency", self.frequency_input.value())
         )
         advanced_layout.addWidget(w, adv_row, 1)

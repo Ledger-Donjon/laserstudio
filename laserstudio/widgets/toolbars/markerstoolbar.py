@@ -99,7 +99,9 @@ class MarkersToolBar(QToolBar):
         self.marker_size_sp.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding
         )
-        w.returnPressed.connect(lambda: viewer.marker_size(self.marker_size_sp.value()))
+        w.returnPressed2.connect(
+            lambda: viewer.marker_size(self.marker_size_sp.value())
+        )
         self.addWidget(self.marker_size_sp)
 
         # Dock widget: Markers' List
