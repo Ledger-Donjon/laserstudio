@@ -1,9 +1,13 @@
 #!/usr/bin/python3
+
+from __future__ import annotations
+
 import os
 import logging
 import yaml
 from PIL import Image, ImageQt
 import numpy
+from numpy.typing import NDArray
 from collections.abc import Sequence
 from typing import Any
 from PyQt6.QtCore import Qt, QKeyCombination, QSettings
@@ -15,7 +19,7 @@ from PyQt6.QtGui import (
     QCloseEvent,
     QColorConstants,
 )
-from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QLabel
+from PyQt6.QtWidgets import QMainWindow, QButtonGroup, QLabel, QToolBar, QDockWidget
 from .widgets.viewer import Viewer
 from .instruments.instruments import (
     Instruments,
@@ -108,7 +112,7 @@ class LaserStudio(QMainWindow):
         self.update_mode_indicator(int(self.viewer.mode))
 
         # ToolBar: Main
-        toolbar = MainToolBar(self)
+        toolbar: QToolBar = MainToolBar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
 
         # ToolBar: Background picture
@@ -129,7 +133,7 @@ class LaserStudio(QMainWindow):
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
-            dockwidget = StageDockWidget(self)
+            dockwidget: QDockWidget = StageDockWidget(self)
             self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dockwidget)
 
         # ToolBar: Focusing
@@ -197,7 +201,12 @@ class LaserStudio(QMainWindow):
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dockwidget)
 
         # Instantiate proxy for REST command reception
-        self.rest_proxy = RestProxy(self, config.get("restserver", {}))
+        rest_config = config.get("restserver", {})
+        if isinstance(rest_config, dict):
+            self.rest_proxy = RestProxy(
+                self,
+                rest_config,
+            )
 
         # Create shortcuts
         shortcut = QShortcut(Qt.Key.Key_Escape, self)
@@ -341,7 +350,7 @@ class LaserStudio(QMainWindow):
         # Return the number of averaged images
         return camera.number_of_averaged_images
 
-    def handle_camera_accumulator(self, path: str | None) -> numpy.ndarray | None:
+    def handle_camera_accumulator(self, path: str | None) -> NDArray[Any] | None:
         """
         Handle a Camera API request to get the accumulated image of the camera.
         Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
@@ -494,10 +503,9 @@ class LaserStudio(QMainWindow):
                 for pos in positions
             ]
 
-        description = [marker.to_dict() for marker in markers]
-        if len(description) == 1:
-            return description[0]
-        return {"markers": description}
+        if len(markers) == 1:
+            return markers[0].to_dict()
+        return {"markers": [marker.to_dict() for marker in markers]}
 
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
@@ -551,7 +559,7 @@ class LaserStudio(QMainWindow):
         }
         return labels.get(mode, f"Mode: {mode.name}")
 
-    def save_settings(self):
+    def save_settings(self) -> None:
         """
         Save some settings in the settings.yaml file.
         """
