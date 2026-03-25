@@ -277,18 +277,17 @@ class Viewer(QGraphicsView):
 
     def load_picture(self, picture_path: str | None = None):
         """Requests loading a backgound picture from the user"""
-        filename: str | None = (
-            # Make the file dialog visible and on top
-            QFileDialog.getOpenFileName(
+        if picture_path is not None and len(picture_path):
+            filename = picture_path
+        else:
+            filename = QFileDialog.getOpenFileName(
                 self,
                 "Open picture",
                 "",
                 "Images (*.png *.jpg *.jpeg)",
                 options=QFileDialog.Option.DontUseNativeDialog,
             )[0]
-            if picture_path is None
-            else picture_path
-        )
+
         if len(filename):
             # Remove previous picture if defined
             self.clear_picture()
@@ -347,14 +346,15 @@ class Viewer(QGraphicsView):
         Retrieve the next point position from Scan Geometry
         Inform the StageSight to go to the retrieved position
         """
-        result = {}
+        result: Config = {}
         if self.scan_geometry:
-            next_point = self.scan_geometry.next_point()
-            if next_point is not None and self.stage_sight is not None:
+            next_point_tuple = self.scan_geometry.next_point()
+            if next_point_tuple is not None and self.stage_sight is not None:
+                next_point = list(next_point_tuple)
                 result = {"next_point_geometry": next_point}
-                next_point = self.point_for_desired_move(next_point)
-                result["next_point_applied"] = next_point
-                self.stage_sight.move_to(QPointF(*next_point))
+                next_point_tuple = self.point_for_desired_move(next_point_tuple)
+                result["next_point_applied"] = list(next_point)
+            self.stage_sight.move_to(Vector(*next_point))
         return result
 
     def __update_selection_color(
@@ -485,8 +485,9 @@ class Viewer(QGraphicsView):
             scene_pos = self.mapToScene(event.pos())
 
             if self.mode == Viewer.Mode.STAGE and self.stage_sight is not None:
-                scene_pos = self.point_for_desired_move((scene_pos.x(), scene_pos.y()))
-                self.stage_sight.move_to(QPointF(*scene_pos))
+                position = (scene_pos.x(), scene_pos.y())
+                position = self.point_for_desired_move(position)
+                self.stage_sight.move_to(QPointF(*position))
                 event.accept()
                 return
 
