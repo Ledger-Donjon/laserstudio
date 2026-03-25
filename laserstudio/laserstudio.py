@@ -254,13 +254,13 @@ class LaserStudio(QMainWindow):
 
         logging.getLogger("laserstudio").debug("LaserStudio initialized")
 
-        # # Restore docks are previous session
-        # geometry = self.settings.value("geometry")
-        # if geometry is not None:
-        #     self.restoreGeometry(geometry)
-        # window_state = self.settings.value("window-state")
-        # if window_state is not None:
-        #     self.restoreState(window_state)
+        # Restore docks are previous session
+        geometry = self.settings.value("geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+        window_state = self.settings.value("window-state")
+        if window_state is not None:
+            self.restoreState(window_state)
 
     def closeEvent(self, a0: QCloseEvent | None):
         """Saves user settings before closing the application."""
