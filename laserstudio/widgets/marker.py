@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 from PyQt6.QtWidgets import (
     QInputDialog,
     QGraphicsItem,
@@ -11,10 +12,9 @@ from PyQt6.QtWidgets import (
     QMenu,
 )
 from PyQt6.QtGui import QPen, QColor, QColorConstants
+from PyQt6.QtCore import Qt, QPointF, QPoint
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-from PyQt6.QtCore import Qt, QPointF, QPoint
-from typing import TYPE_CHECKING, Any
 from ..utils.colors import LedgerColors
 from ..utils.util import create_color_qicon
 from ..utils.yaml_types import Config
@@ -70,14 +70,15 @@ class Marker(QGraphicsItemGroup):
             fillcolor = QColor(fillcolor)
 
         self.__size: float = 10.0
-        self.__color = color
-        self.__fillcolor = fillcolor
+        self.__color: QColor | Qt.GlobalColor | int = color
+        self.__fillcolor: QColor | Qt.GlobalColor | int = fillcolor
         self.__label = label
-        item = self._ellipse = QGraphicsEllipseItem()
-        item.setBrush(fillcolor)
+        self._ellipse = QGraphicsEllipseItem()
+        ellipse: QGraphicsEllipseItem = self._ellipse
+        ellipse.setBrush(fillcolor)
         pen = self.__pen = QPen(self.__color)
         pen.setCosmetic(True)
-        item.setPen(pen)
+        ellipse.setPen(pen)
         self.addToGroup(self._ellipse)
         item = self.__line1 = QGraphicsLineItem(0, 0, 0, 0)
         item.setPen(pen)
@@ -298,7 +299,8 @@ class IdMarker(Marker):
         super().__init__(
             parent, viewer=viewer, color=color, fillcolor=color, label=label
         )
-        self.setPos(QPointF(*position))
+        if position is not None:
+            self.setPos(QPointF(*position))
         self.setZValue(2)
         self._label = label
 
@@ -342,23 +344,26 @@ class IdMarker(Marker):
         menu.addAction("Change label...", self.set_label)
         # Submenu for setting the color of the marker
         color_menu = QMenu("Change color", menu)
-        for color in LedgerColors:
-            color_menu.addAction(
-                create_color_qicon(color),
-                color.name,
-                lambda c=color: self.set_color(c.value),
-            )
-        color_menu.addSeparator()
-        for color, name in [
+
+        colors = [(lc.value, lc.name) for lc in LedgerColors] + [
             (QColorConstants.Red, "Red"),
             (QColorConstants.Green, "Green"),
             (QColorConstants.Blue, "Blue"),
             (QColorConstants.Yellow, "Yellow"),
             (QColorConstants.Magenta, "Magenta"),
             (QColorConstants.Cyan, "Cyan"),
-        ]:
+        ]
+        for color, name in colors:
+
+            def on_pick(
+                _checked: bool = False, *, c: QColor | Qt.GlobalColor | int = color
+            ) -> None:
+                self.set_color(c)
+
             color_menu.addAction(
-                create_color_qicon(color), name, lambda c=color: self.set_color(c)
+                create_color_qicon(color),
+                name,
+                on_pick,
             )
         menu.addMenu(color_menu)
         # menu.addAction("Remove marker", self.remove)
