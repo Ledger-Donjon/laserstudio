@@ -52,9 +52,9 @@ class PDMInstrument(LaserInstrument):
             )
             try:
                 link = Link(dev)
-                logging.getLogger("laserstudio").info("OK")
+                logging.getLogger("laserstudio").info("Connection to PDM OK")
             except ConnectionFailure:
-                logging.getLogger("laserstudio").info("Failed")
+                logging.getLogger("laserstudio").info("Connection to PDM failed")
                 raise
             PDMInstrument.__PDM_LINKS[dev] = link
         self.pdm = pdm = PDM(config["num"], link)

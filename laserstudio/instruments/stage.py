@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from typing import cast, Any
 from enum import Enum, auto
@@ -7,7 +8,7 @@ from pystages import (
     Corvus,
     CNCRouter,
     Stage,
-    Vector,
+    Vector as PystagesVector,
     Autofocus,
     Tic,
     TicDirection,
@@ -18,7 +19,7 @@ from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
 from .instrument import Instrument
-from copy import deepcopy
+from ..utils.yaml_types import Config
 
 __all__ = [
     "StageInstrument",
@@ -33,17 +34,76 @@ __all__ = [
     "SMC100",
     "PI",
     "Stage",
-    "Vector",
-    "Autofocus",
-    "Tic",
-    "TicDirection",
     "StageRest",
     "StageDummy",
     "get_serial_device",
     "DeviceSearchError",
     "Instrument",
-    "MoveFor",
 ]
+
+
+class Vector(PystagesVector):
+    """Vector class for stage instrument.
+
+    Provides typed accessors over the base pystages.Vector.
+    """
+
+    data: list[float]
+
+    @property
+    def x(self) -> float:
+        if len(self.data) < 1:
+            return float("nan")
+        return self.data[0]
+
+    @x.setter
+    def x(self, value: float):
+        self.data[0] = value
+
+    @property
+    def y(self) -> float:
+        if len(self.data) < 2:
+            return float("nan")
+        return self.data[1]
+
+    @y.setter
+    def y(self, value: float):
+        self.data[1] = value
+
+    @property
+    def z(self) -> float:
+        if len(self.data) < 3:
+            return float("nan")
+        return self.data[2]
+
+    @z.setter
+    def z(self, value: float):
+        self.data[2] = value
+
+    @property
+    def w(self) -> float:
+        if len(self.data) < 4:
+            return float("nan")
+        return self.data[3]
+
+    @w.setter
+    def w(self, value: float):
+        self.data[3] = value
+
+    @property
+    def xy(self) -> Vector:
+        return Vector(self.x, self.y)
+
+    @xy.setter
+    def xy(self, value: Vector):
+        self.x = value.x
+        self.y = value.y
+
+    def __getitem__(self, key: int) -> float:
+        return self.data[key]
+
+    def __setitem__(self, key: int, value: float):
+        self.data[key] = value
 
 
 class MoveFor(object):
@@ -166,7 +226,9 @@ class StageInstrument(Instrument):
 
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
+                self.refresh_interval,
+                Qt.TimerType.CoarseTimer,
+                self.__autorefresh_stage,
             )
 
         # Unit factor to apply in order to get coordinates in micrometers
@@ -179,7 +241,7 @@ class StageInstrument(Instrument):
                 f"Unit factor {factors} is a single value, it will be repeated for all axes."
             )
             factors = [float(factors)] * len(position)
-        
+
         if len(factors) != len(position):
             logging.getLogger("laserstudio").warning(
                 f"Unit factors {factors} has an inconsistent length from the number of axes ({len(position)}). Please check your configuration file"
@@ -189,23 +251,22 @@ class StageInstrument(Instrument):
                     "No unit factors provided. 1.0 will be repeated for all axes."
                 )
                 factors = [1.0] * len(position)
-            
+
             if len(factors) < len(position):
                 last_value = factors[-1]
                 logging.getLogger("laserstudio").warning(
                     f"Last value ({last_value}) will be repeated to the number of axes."
                 )
                 factors = factors + [last_value] * (len(position) - len(factors))
-            
+
             if len(factors) > len(position):
                 # Truncate array if there is too much values for the number of axes
                 logging.getLogger("laserstudio").warning(
-                    f"Values will be truncated to the number of axes"
+                    "Values will be truncated to the number of axes"
                 )
                 factors = factors[: len(position)]
-                
-        self.unit_factors: list[float] = factors
 
+        self.unit_factors: list[float] = factors
 
         # Offset origin
         self.offset_origin: list[float] = cast(
@@ -231,12 +292,12 @@ class StageInstrument(Instrument):
         :return: Get the position of the stage
         """
         self.mutex.lock()
-        position = deepcopy(self.stage.position)
+        position = Vector(*[float(v) for v in self.stage.position.data])
         self.mutex.unlock()
 
         # Apply shearing transformation
-        x = float(position.x)
-        y = float(position.y)
+        x = position.x
+        y = position.y
 
         position.x = x - self.shear[0] * y
         position.y = y - self.shear[1] * x
@@ -275,7 +336,9 @@ class StageInstrument(Instrument):
             )
         if self.refresh_interval is not None:
             QTimer.singleShot(
-                self.refresh_interval, Qt.TimerType.CoarseTimer, self.__autorefresh_stage
+                self.refresh_interval,
+                Qt.TimerType.CoarseTimer,
+                self.__autorefresh_stage,
             )
 
     def move_relative(self, displacement: Vector, wait: bool, backlash: bool = False):
@@ -307,19 +370,25 @@ class StageInstrument(Instrument):
         """
         # Make sure about the dimension of the position vector
         if len(position) > self.num_axis:
-            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored.")
-            position = Vector(*position.data[:self.num_axis])
+            logging.getLogger("laserstudio").warning(
+                f"Position dimension {len(position)} is greater than the number of axes {self.num_axis}. Extra axes will be ignored."
+            )
+            position = Vector(*position.data[: self.num_axis])
         elif len(position) < self.num_axis:
-            logging.getLogger("laserstudio").warning(f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position.")
+            logging.getLogger("laserstudio").warning(
+                f"Position dimension {len(position)} is less than the number of axes {self.num_axis}. Missing axes will be set to their current position."
+            )
             current_position = self.position
-            extra_positions = [current_position[i] for i in range(len(position), self.num_axis)]
+            extra_positions = [
+                current_position[i] for i in range(len(position), self.num_axis)
+            ]
             position = Vector(*(position.data + extra_positions))
 
         logging.getLogger("laserstudio").debug(f"Moving to {position}...")
         if self.guardrail_enabled:
             displacement = self.position - position
-            for i, displacement in enumerate(displacement.data):
-                if abs(displacement) > self.guardrail:
+            for i, displacement_i in enumerate(displacement.data):
+                if abs(displacement_i) > self.guardrail:
                     logging.getLogger("laserstudio").error(
                         f"Do not move!! One axis ({i}) moves further than {self.guardrail}\xa0µm: {displacement}\xa0µm"
                     )
@@ -351,11 +420,11 @@ class StageInstrument(Instrument):
 
         self.mutex.lock()
         if backlash and len(self.backlashes) == len(position):
-            backlash = Vector(*self.backlashes)
+            backlashes = Vector(*self.backlashes)
             # Apply unit factors
-            for i in range(len(backlash)):
-                backlash[i] = backlash[i] / factors[i]
-            self.stage.move_to(result - backlash, wait=True)
+            for i in range(len(backlashes)):
+                backlashes[i] = backlashes[i] / factors[i]
+            self.stage.move_to(result - backlashes, wait=True)
         self.stage.move_to(result, wait=wait)
         if isinstance(self.stage, Corvus):
             self.stage.enable_joystick()
@@ -388,7 +457,7 @@ class StageInstrument(Instrument):
             )
 
     @property
-    def settings(self):
+    def settings(self) -> Config:
         """
         Return a dict of settings for the stage.
         """
@@ -398,7 +467,7 @@ class StageInstrument(Instrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """
         Set the settings of the stage.
         """

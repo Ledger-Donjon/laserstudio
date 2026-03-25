@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from ...instruments.camera_raptor import (
     CameraRaptorInstrument,
@@ -8,10 +10,8 @@ from .cameradockwidget import CameraDockWidget
 from PyQt6.QtWidgets import (
     QVBoxLayout,
     QCheckBox,
-    QHBoxLayout,
     QLabel,
     QDoubleSpinBox,
-    QComboBox,
     QGridLayout,
 )
 from PyQt6.QtCore import Qt
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class CameraRaptorDockWidget(CameraDockWidget):
-    def __init__(self, laser_studio: "LaserStudio"):
+    def __init__(self, laser_studio: LaserStudio):
         assert isinstance(laser_studio.instruments.camera, CameraRaptorInstrument)
 
         super().__init__(laser_studio)
@@ -80,6 +80,8 @@ class CameraRaptorDockWidget(CameraDockWidget):
 
         vbox = QVBoxLayout()
         grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
+
         # Set the exposure time
         self.exposure_time_sb = w = QDoubleSpinBox()
         w.setToolTip("Set the camera's exposure time")
@@ -100,19 +102,19 @@ class CameraRaptorDockWidget(CameraDockWidget):
         w.valueChanged.connect(self.camera.set_digital_gain_db)
         vbox.addWidget(w)
 
-        # Magnification selector.
-        hbox = QHBoxLayout()
-        vbox.addLayout(hbox)
-        hbox.addWidget(QLabel("Objective:"))
-        w = self.mag_combobox = QComboBox()
+        w = self.obj_combobox
+        w.blockSignals(True)
+        w.clear()
+        selected_index: int | None = None
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
             w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
-        w.setStyleSheet("QListView::item {height:24px;}")
-        w.currentIndexChanged.connect(self.mag_changed)
-        hbox.addWidget(w)
+            if float(x) == self.camera.objective:
+                selected_index = w.count() - 1
+        w.blockSignals(False)
+
+        if selected_index is not None:
+            w.setCurrentIndex(selected_index)
 
         # Show last image number
         self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")
@@ -122,7 +124,8 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addStretch()
 
         vbox = QVBoxLayout()
-        hbox.addLayout(vbox)
+        grid.addLayout(vbox, 0, col, row, 1)
+        col += 1
 
         # Checkbox to activate the FAN
         w = QCheckBox("Fan")
@@ -178,11 +181,3 @@ class CameraRaptorDockWidget(CameraDockWidget):
                 self.gain_sb.setValue(self.camera.get_digital_gain_db()),
             )
         )
-
-    def mag_changed(self):
-        """
-        Called when the magnification is changed in the UI.
-        """
-        self.camera.select_objective(float(self.mag_combobox.currentText().split()[0]))
-        assert self.laser_studio.viewer.stage_sight is not None
-        self.laser_studio.viewer.stage_sight.update_size()

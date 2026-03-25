@@ -1,13 +1,10 @@
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
-    QToolBar,
-    QPushButton,
-)
+from PyQt6.QtWidgets import QToolBar, QPushButton, QSizePolicy
 from ...utils.util import colored_image
 from ..coloredbutton import ColoredPushButton
-from ...widgets.return_line_edit import ReturnSpinBox
+from ...widgets.return_line_edit import ReturnSpinBox, ReturnDoubleSpinBox
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -73,10 +70,29 @@ class ScanToolBar(QToolBar):
         w.setMinimum(1)
         w.setMaximum(1000)
         w.setValue(laser_studio.viewer.scan_geometry.scan_path_generator.density)
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         w.returnPressed.connect(
             lambda: laser_studio.viewer.scan_geometry.__setattr__(
                 "density", self.density.value()
             )
         )
         w.reset()
+        self.addWidget(w)
+
+        # Size of markers
+        w = self.size_sp = ReturnDoubleSpinBox()
+        w.setSuffix("\xa0µm")
+        w.setToolTip("Size of points in the scan path")
+        w.setMinimum(0.1)
+        w.setDecimals(1)
+        w.setSingleStep(1.0)
+        w.setMaximum(2000.0)
+        w.setValue(laser_studio.viewer.default_marker_size)
+        w.reset()
+        w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        w.returnPressed.connect(
+            lambda: laser_studio.viewer.scan_geometry.__setattr__(
+                "diameter", self.size_sp.value()
+            )
+        )
         self.addWidget(w)

@@ -138,7 +138,7 @@ class Viewer(QGraphicsView):
             None: {}
         }
 
-        self.default_marker_size = 30.0
+        self.default_marker_size = 20.0
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
@@ -467,6 +467,8 @@ class Viewer(QGraphicsView):
         """
         if event is None:
             return
+
+        # We want to catch a right-click on a marker
         if event.button() == Qt.MouseButton.RightButton:
             item = self.itemAt(event.pos())
             while item is not None:
@@ -474,6 +476,7 @@ class Viewer(QGraphicsView):
                     super().mousePressEvent(event)
                     return
                 item = item.parentItem()
+
         if event.button() == Qt.MouseButton.LeftButton:
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
@@ -520,6 +523,7 @@ class Viewer(QGraphicsView):
 
             # Scroll gesture mode
             self.setDragMode(Viewer.DragMode.ScrollHandDrag)
+
             # Transform as left press button event,
             # to make the scroll by dragging actually effective.
             event = QMouseEvent(
@@ -618,7 +622,7 @@ class Viewer(QGraphicsView):
             else:
                 self.scan_geometry.add(zone)
 
-        elif self.mode == Viewer.Mode.OFFSET_ORIGIN:
+        elif self.mode == Viewer.Mode.OFFSET_ORIGIN and is_left:
             line = self.offset_origin_line.line()
             offset_p = line.p2() - line.p1()
             offset = [offset_p.x(), offset_p.y()]

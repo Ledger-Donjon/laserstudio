@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from PyQt6.QtWidgets import (
     QInputDialog,
     QGraphicsItem,
@@ -13,7 +14,7 @@ from PyQt6.QtGui import QPen, QColor, QColorConstants
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
 from PyQt6.QtCore import Qt, QPointF, QPoint
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from ..utils.colors import LedgerColors
 from ..utils.util import create_color_qicon
 
@@ -230,22 +231,37 @@ class Marker(QGraphicsItemGroup):
 
 
 class ProbeMarker(Marker):
-    def __init__(self, probe: ProbeInstrument, parent: Optional["StageSight"] = None):
+    def __init__(self, probe: ProbeInstrument, parent: StageSight | None = None):
         super().__init__(parent)
         self.stage_sight = parent
+        if self.stage_sight is not None and self.stage_sight.camera is not None:
+            self.stage_sight.camera.parameter_changed.connect(
+                self.__camera_parameter_changed
+            )
         self.probe = probe
         probe.offset_pos_changed.connect(self.update_pos)
+        probe.spot_size_changed.connect(self.update_size)
         self.color = (
             QColorConstants.Red
             if isinstance(self.probe, LaserInstrument)
             else QColorConstants.Blue
         )
+        self.update_size()
         self.update_pos()
+
+    def __camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective":
+            self.update_pos()
+            self.update_size()
 
     def update_pos(self):
         """Update position and color."""
         if (pos := self.probe.offset_pos) is not None:
             if self.stage_sight is not None:
+                if self.stage_sight.camera is not None:
+                    magnification = self.stage_sight.camera.objective
+                    pos = (pos[0] / magnification, pos[1] / magnification)
+
                 self.setPos(
                     self.stage_sight.mapFromItem(self.stage_sight.image_group, *pos)
                 )
@@ -254,6 +270,11 @@ class ProbeMarker(Marker):
             self.setVisible(True)
         else:
             self.setVisible(False)
+
+    def update_size(self):
+        """Update the size of the marker,
+        according to the spot size of the probe/spot and the current objective of the camera."""
+        self.size = self.probe.spot_size_um
 
 
 class IdMarker(Marker):

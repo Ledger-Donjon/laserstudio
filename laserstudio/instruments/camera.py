@@ -1,7 +1,8 @@
 import os
 import logging
-from typing import Optional, Literal, cast, Any
+from typing import Literal, cast, Any
 import numpy
+from numpy.typing import NDArray
 import cv2
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt
 from PyQt6.QtGui import QImage, QTransform
@@ -42,19 +43,15 @@ class CameraInstrument(Instrument):
             list[float], config.get("pixel_size_in_um", [1.0, 1.0])
         )
 
-        # Objective
-        self.objective = cast(float, config.get("objective", 1.0))
-        self.select_objective(self.objective)
-
         # Correction matrix
-        self.correction_matrix: Optional[QTransform] = None
+        self.correction_matrix: QTransform | None = None
 
         # Shutter
         shutter = config.get("shutter")
-        self.shutter: Optional[ShutterInstrument] = None
-        if type(shutter) is dict and shutter.get("enable", True):
+        self.shutter: ShutterInstrument | None = None
+        if isinstance(shutter, dict) and shutter.get("enable", True):
             try:
-                if (device_type := shutter.get("type")) == "TIC":
+                if (device_type := cast(str, shutter.get("type"))) == "TIC":
                     self.shutter = TicShutterInstrument(shutter)
                 else:
                     logging.getLogger("laserstudio").error(
@@ -65,16 +62,16 @@ class CameraInstrument(Instrument):
                     f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
                 )
 
-        # Whtie and black levels adjustment
+        # White and black levels adjustment
         self.black_level = 0.0
         self.white_level = 1.0
 
         # Image averaging
-        self._last_frame_accumulator: Optional[numpy.ndarray] = None
+        self._last_frame_accumulator: NDArray[Any] | None = None
         # The number of images to average
         self._image_averaging = 1
         # The number of images that have been averaged
-        self.number_of_averaged_images = 0
+        self.number_of_averaged_images: int = 0
 
         self._last_neg = None
         self._last_pos = numpy.zeros((self.width, self.height), dtype=numpy.uint8)
@@ -83,18 +80,21 @@ class CameraInstrument(Instrument):
         # When the number of images to average is hit, and a new frame is retrieved,
         # the oldest one is removed from the accumulator and the new one is added.
         self.windowed_averaging = True
-        self._last_frames: list[numpy.ndarray] = []
+        self._last_frames: list[NDArray[Any]] = []
 
         # Reference image feature
-        self.reference_image_accumulators: dict[str, numpy.ndarray] = {}
+        self.reference_image_accumulators: dict[str, NDArray[Any]] = {}
         self.current_reference_image = "Reference 0"
         self.show_negative_values = True
 
         # The value of a white pixel
         self.white_value = 2**8 - 1
 
+        # Objective
+        self.objective = cast(float, config.get("objective", 1.0))
+
     @property
-    def reference_image_accumulator(self) -> Optional[numpy.ndarray]:
+    def reference_image_accumulator(self) -> NDArray[Any] | None:
         """
         Returns the current reference image.
 
@@ -103,7 +103,7 @@ class CameraInstrument(Instrument):
         return self.reference_image_accumulators.get(self.current_reference_image)
 
     @reference_image_accumulator.setter
-    def reference_image_accumulator(self, value: Optional[numpy.ndarray]):
+    def reference_image_accumulator(self, value: NDArray[Any] | None):
         if (
             value is None
             and self.current_reference_image in self.reference_image_accumulators
@@ -114,7 +114,7 @@ class CameraInstrument(Instrument):
         # Do nothing...
 
     @property
-    def last_frame_accumulator(self) -> Optional[numpy.ndarray]:
+    def last_frame_accumulator(self) -> NDArray[Any] | None:
         """
         Returns the last frame accumulator. See accumulate_frame, and image_averaging for more details.
 
@@ -129,11 +129,33 @@ class CameraInstrument(Instrument):
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
 
-        :param factor: The magnifying factor of the objective (5x, 10x, 20x, 50x...)
+        :param factor: The magnifying factor of the objective (1x, 5x, 10x, 20x, 50x...)
         """
         self.objective = factor
-        self.width_um = self.width * self.pixel_size_in_um[0] / factor
-        self.height_um = self.height * self.pixel_size_in_um[1] / factor
+        logging.getLogger("laserstudio").debug(
+            f"Camera's objective changed to {factor}x"
+        )
+        logging.getLogger("laserstudio").debug(
+            f"Camera's width: {self.width}px, height: {self.height}px"
+        )
+        logging.getLogger("laserstudio").debug(
+            f"Image's dimension {self.width_um}\xa0µm; {self.height_um}\xa0µm (considering the objective)"
+        )
+        self.parameter_changed.emit("objective", factor)
+
+    @property
+    def width_um(self) -> float:
+        """
+        Returns the width in micrometers, considering the objective.
+        """
+        return self.width * self.pixel_size_in_um[0] / self.objective
+
+    @property
+    def height_um(self) -> float:
+        """
+        Returns the height in micrometers, considering the objective.
+        """
+        return self.height * self.pixel_size_in_um[1] / self.objective
 
     def get_last_qimage(self) -> QImage:
         """
@@ -163,7 +185,7 @@ class CameraInstrument(Instrument):
             im = Image.frombytes(mode=mode, data=data, size=size)
         return im
 
-    def capture_image(self) -> Optional[numpy.ndarray]:
+    def capture_image(self) -> NDArray[Any] | None:
         """
         To be overridden by the subclasses or CameraInstrument
 
@@ -173,7 +195,7 @@ class CameraInstrument(Instrument):
 
     def get_last_image(
         self,
-    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], Optional[bytes]]:
+    ) -> tuple[int, int, Literal["L", "I;16", "RGB"], bytes | None]:
         """
         Capture an image and construct a Gray, 16bit Gray or RGB byte array.
 
@@ -232,7 +254,7 @@ class CameraInstrument(Instrument):
         self._last_frame_accumulator = None
         self.number_of_averaged_images = 0
 
-    def accumulate_frame(self, new_frame: numpy.ndarray):
+    def accumulate_frame(self, new_frame: NDArray[Any]):
         """
         Accumulates the given frame and removes the oldest one
           if windowed averaging is active.
@@ -277,7 +299,7 @@ class CameraInstrument(Instrument):
         """
         return self.number_of_averaged_images
 
-    def apply_levels(self, image: numpy.ndarray) -> numpy.ndarray:
+    def apply_levels(self, image: NDArray[Any]) -> NDArray[Any]:
         """
         Apply the black and white levels to the image before displaying it.
 
@@ -295,7 +317,7 @@ class CameraInstrument(Instrument):
         )
         return image.clip(min=0).astype(type_)
 
-    def compute_histogram(self, frame: numpy.ndarray, width: int = -1):
+    def compute_histogram(self, frame: NDArray[Any], width: int = -1):
         """
         Computes the histogram of the given frame.
 
@@ -313,7 +335,7 @@ class CameraInstrument(Instrument):
             range=(0, numpy.iinfo(frame.dtype).max),
         )
 
-    def histogram_to_string(self, hist: numpy.ndarray, nlines=2):
+    def histogram_to_string(self, hist: NDArray[Any], nlines: int = 2) -> list[str]:
         """
         Returns the histogram as a string representation.
 
@@ -323,7 +345,7 @@ class CameraInstrument(Instrument):
         """
         bar = " ▁▂▃▄▅▆▇█"
         hist = nlines * (hist / max(hist)) * (len(bar) - 1)
-        hists = []
+        hists: list[str] = []
         for i in range(nlines):
             offset = i * len(bar)
             val = [int(i) - offset for i in hist]
@@ -349,7 +371,7 @@ class CameraInstrument(Instrument):
 
     def show_histogram_terminal(
         self,
-        frame: Optional[numpy.ndarray] = None,
+        frame: NDArray[Any] | None = None,
         nlines: int = 5,
         nbins: int = 0,
     ):
@@ -397,7 +419,7 @@ class CameraInstrument(Instrument):
 
     def substract_reference_image(
         self,
-    ) -> tuple[numpy.ndarray, Optional[numpy.ndarray]]:
+    ) -> tuple[NDArray[Any], NDArray[Any] | None]:
         """
         Substract the reference_image_accumulator from the current accumulator
 
@@ -424,7 +446,7 @@ class CameraInstrument(Instrument):
         return self._last_pos, self._last_neg
 
     @property
-    def last_frame(self) -> numpy.ndarray:
+    def last_frame(self) -> NDArray[Any]:
         """
         Return the frame that should be analysed or displayed.
 
@@ -435,8 +457,8 @@ class CameraInstrument(Instrument):
         return self.construct_display_image(pos, neg)
 
     def construct_display_image(
-        self, pos: numpy.ndarray, neg: Optional[numpy.ndarray] = None
-    ) -> numpy.ndarray:
+        self, pos: NDArray[Any], neg: NDArray[Any] | None = None
+    ) -> NDArray[Any]:
         """
         Construct the display image from the positive and negative images.
 
@@ -528,7 +550,6 @@ class CameraInstrument(Instrument):
             )
         if "objective" in data:
             self.select_objective(data["objective"])
-            self.parameter_changed.emit("objective", data["objective"])
 
     @property
     def laplacian_std_dev(self) -> float:
@@ -537,8 +558,7 @@ class CameraInstrument(Instrument):
 
         :return: The standard deviation of the Laplacian operator on the last image.
         """
-        if (last_frame := self.last_frame) is None:
-            return 0.0
+        last_frame = self.last_frame
         # KSIZE (3): Aperture size used to compute the
         #   second-derivative filters. See getDerivKernels for details.
         #   The size must be positive and odd.

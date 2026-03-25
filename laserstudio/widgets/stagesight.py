@@ -1,3 +1,6 @@
+import logging
+from enum import Enum, auto
+from typing import Any
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
@@ -19,15 +22,12 @@ from PyQt6.QtCore import (
     QPointF,
     QObject,
 )
-
-from laserstudio.utils.colors import LedgerColors
+from .marker import ProbeMarker
 from ..instruments.stage import StageInstrument, Vector
 from ..instruments.camera import CameraInstrument
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-import logging
-from .marker import ProbeMarker
-from enum import Enum, auto
+from ..utils.colors import LedgerColors
 
 
 class StageSightViewer(QGraphicsView):
@@ -132,7 +132,14 @@ class StageSight(QGraphicsItemGroup):
 
         # Associate the CameraInstrument
         self.camera = camera
+        self._pause_update = False
+        self._new_image_connected = False
+        self._in_pixels: bool = False
         self.update_size()
+        if camera is not None:
+            camera.new_image.connect(self.set_image)
+            camera.parameter_changed.connect(self.camera_parameter_changed)
+            self._new_image_connected = True
 
         # Create Markers for probes
         self._probe_markers: list[ProbeMarker] = []
@@ -141,12 +148,26 @@ class StageSight(QGraphicsItemGroup):
             self.addToGroup(marker)
             self._probe_markers.append(marker)
 
-    def update_size(self):
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "objective":
+            self.update_size()
+
+    def update_size(self, in_pixels: bool | None = None):
         """Update the size of the StageSight according to the camera."""
+        if in_pixels is None:
+            in_pixels = self._in_pixels
+        self._in_pixels = in_pixels
         if self.camera is not None:
             self._pause_update = False
-            self.camera.new_image.connect(self.set_image)
-            self.__update_size(QSizeF(self.camera.width_um, self.camera.height_um))
+            if in_pixels:
+                w, h = self.camera.width, self.camera.height
+            else:
+                w, h = self.camera.width_um, self.camera.height_um
+            unit = "px" if in_pixels else "µm"
+            logging.getLogger("laserstudio").debug(
+                f"Camera width: {w}\xa0{unit}, height: {h}\xa0{unit}"
+            )
+            self.__update_size(QSizeF(w, h))
         else:
             self.__update_size(QSizeF(500.0, 500.0))
 
@@ -159,12 +180,15 @@ class StageSight(QGraphicsItemGroup):
     def pause_image_update(self, value: bool):
         if self.camera is None:
             return
-        if self._pause_update != value:
-            if value:
-                self.camera.new_image.disconnect(self.set_image)
-            else:
-                self.camera.new_image.connect(self.set_image)
         self._pause_update = value
+        if value:
+            if self._new_image_connected:
+                self.camera.new_image.disconnect(self.set_image)
+                self._new_image_connected = False
+        else:
+            if not self._new_image_connected:
+                self.camera.new_image.connect(self.set_image)
+                self._new_image_connected = True
 
     def _update_pen(self):
         if self.camera is None:

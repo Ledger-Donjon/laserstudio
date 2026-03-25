@@ -23,16 +23,6 @@ class CameraUSBInstrument(CameraInstrument):
             config.get("height", self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         )
 
-        self.width_um = self.width * self.pixel_size_in_um[0]
-        self.height_um = self.height * self.pixel_size_in_um[1]
-
-        logging.getLogger("laserstudio").info(
-            f"Camera's resolution {self.width}px; {self.height}px"
-        )
-        logging.getLogger("laserstudio").info(
-            f"Image's dimension {self.width_um}\xa0µm; {self.height_um}\xa0µm (without considering any magnifier)"
-        )
-
     def __del__(self):
         self.__video_capture.release()
 
