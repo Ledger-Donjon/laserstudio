@@ -10,6 +10,7 @@ from PIL import Image, ImageQt
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 from .instrument import Instrument
 from .shutter import ShutterInstrument, TicShutterInstrument
+from ..utils.yaml_types import Config
 
 
 class CameraInstrument(Instrument):
@@ -511,7 +512,7 @@ class CameraInstrument(Instrument):
         return stacked.reshape(self.width, self.height, 3)
 
     @property
-    def settings(self) -> dict[str, Any]:
+    def settings(self) -> Config:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         if self.correction_matrix is not None:
@@ -526,7 +527,7 @@ class CameraInstrument(Instrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         if "transform" in data:

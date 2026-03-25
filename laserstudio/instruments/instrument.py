@@ -1,5 +1,6 @@
 from typing import Any
 from PyQt6.QtCore import QObject, pyqtSignal, QVariant
+from ..utils.yaml_types import Config
 
 
 class Instrument(QObject):
@@ -11,7 +12,7 @@ class Instrument(QObject):
         self.label: str | None = config.get("label")
 
     @property
-    def settings(self) -> dict[str, Any]:
+    def settings(self) -> Config:
         """Export settings to a dict for yaml serialization."""
         # Label is not actually a setting but more an identifier
         if self.label is not None:
@@ -20,7 +21,7 @@ class Instrument(QObject):
             return {}
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """Import settings from a dict."""
         if data.get("label") != self.label:
             print(

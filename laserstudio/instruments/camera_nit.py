@@ -1,12 +1,15 @@
-from .camera import CameraInstrument
+from __future__ import annotations
 from typing import cast, Any
-import numpy
+from numpy import frombuffer, resize, uint8
+from numpy.typing import NDArray
+from .camera import CameraInstrument
+from ..utils.yaml_types import Config
 
 
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         super().__init__(config)
         try:
             from pynit import PyNIT  # Lazy load the module
@@ -28,13 +31,13 @@ class CameraNITInstrument(CameraInstrument):
         objective = cast(float, config.get("objective", 5.0))
         self.select_objective(objective)
 
-    def capture_image(self) -> numpy.ndarray | None:
+    def capture_image(self) -> NDArray[Any] | None:
         width, height, _, data = self.pynit.get_last_image()
         if data is None:
             return None
         # get_last_image returns Tuple always 'L' for the 'mode'
-        frame = numpy.frombuffer(data, dtype=numpy.uint8)
-        frame = numpy.resize(frame, width * height)
+        frame = frombuffer(data, dtype=uint8)
+        frame = resize(frame, width * height)
         return frame
 
     @property
@@ -153,7 +156,7 @@ class CameraNITInstrument(CameraInstrument):
         self.pynit.reset_counter()
 
     @property
-    def settings(self) -> dict[str, Any]:
+    def settings(self) -> Config:
         settings = CameraInstrument.settings.__get__(self)
         settings["averaging"] = self.averaging
         settings["gain"] = list(self.gain)
