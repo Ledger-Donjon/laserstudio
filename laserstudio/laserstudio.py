@@ -275,9 +275,11 @@ class LaserStudio(QMainWindow):
         """Saves user settings before closing the application."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("window-state", self.saveState())
-        # Close all other windows of the application
+        # Close all other windows of the application (allWindows() are QWindow;
+        # compare to this widget's native window, not self which is a QWidget).
+        main_window = self.windowHandle()
         for w in QGuiApplication.allWindows():
-            if w != self:
+            if w is not main_window:
                 w.close()
         super().closeEvent(a0)
 
