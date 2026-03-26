@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import cast, Any
-from numpy import frombuffer, resize, uint8
+from numpy import frombuffer, resize, uint8, zeros, float32
 from numpy.typing import NDArray
 from .camera import CameraInstrument
 from ..utils.yaml_types import Config
@@ -20,12 +20,14 @@ class CameraNITInstrument(CameraInstrument):
                 " Note that this repository is private to Ledger's Donjon organization."
             )
 
-        self.pynit = PyNIT(
-            nuc_filepath=config.get(
-                "nuc_filepath", "./nuc/25mhz/NUCFactory_2000us.yml"
-            ),
-            bpr_filepath=config.get("bpr_filepath", "./nuc/25mhz/BPM.yml"),
-        )
+        nuc_filepath = config.get("nuc_filepath", "./nuc/25mhz/NUCFactory_2000us.yml")
+        bpr_filepath = config.get("bpr_filepath", "./nuc/25mhz/BPM.yml")
+        if not isinstance(nuc_filepath, str):
+            raise ValueError("nuc_filepath must be a string")
+        if not isinstance(bpr_filepath, str):
+            raise ValueError("bpr_filepath must be a string")
+
+        self.pynit = PyNIT(nuc_filepath, bpr_filepath)
 
         # Objective
         objective = cast(float, config.get("objective", 5.0))
@@ -83,19 +85,21 @@ class CameraNITInstrument(CameraInstrument):
         return float(low), float(high)
 
     @property
-    def shade_correction(self) -> bytes:
+    def shade_correction(self) -> NDArray[float32]:
         """
         Retrieve the shade correction image.
 
         :return: The shade correction image.
-        :rtype: bytes
         """
-        return self.pynit.get_shade_correction()
+        data = self.pynit.get_shade_correction()
+        if data is None:
+            return zeros((self.width, self.height), dtype=float32)
+        return data
 
     @shade_correction.setter
-    def shade_correction(self, data: bytes):
+    def shade_correction(self, data: NDArray[float32]):
         """Set shade correction image."""
-        return self.pynit.set_shade_correction(data)
+        self.pynit.set_shade_correction(data)
 
     def shade_correct(self):
         """Use last captured image as base image for shading correction."""
@@ -157,16 +161,16 @@ class CameraNITInstrument(CameraInstrument):
 
     @property
     def settings(self) -> Config:
-        settings = CameraInstrument.settings.__get__(self)
+        settings: Config = CameraInstrument.settings.__get__(self)
         settings["averaging"] = self.averaging
         settings["gain"] = list(self.gain)
         return settings
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """Import and apply settings."""
         # Call the parent class settings setter
-        CameraInstrument.settings.__set__(self, data)
+        CameraInstrument.settings.__set__(self, data)  # type: ignore[attr-defined]
 
         if "gain_autoset" in data:
             self.gain_autoset()
@@ -175,9 +179,15 @@ class CameraNITInstrument(CameraInstrument):
             self.parameter_changed.emit("counter", self.counter)
         if "averaging_restart" in data:
             self.averaging_restart()
-        if "averaging" in data:
-            self.averaging = data["averaging"]
-            self.parameter_changed.emit("averaging", data["averaging"])
-        if "gain" in data and isinstance(gain := data["gain"], list) and len(gain) == 2:
-            self.gain = tuple(gain)
+        if "averaging" in data and isinstance(averaging := data["averaging"], int):
+            self.averaging = averaging
+            self.parameter_changed.emit("averaging", averaging)
+        if (
+            "gain" in data
+            and isinstance(gain := data["gain"], list)
+            and len(gain) == 2
+            and isinstance(gain[0], (int, float))
+            and isinstance(gain[1], (int, float))
+        ):
+            self.gain = (float(gain[0]), float(gain[1]))
             self.parameter_changed.emit("gain", gain)

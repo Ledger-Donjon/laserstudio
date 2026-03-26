@@ -1,11 +1,14 @@
-from PyQt6.QtCore import QThread, pyqtSignal
+from __future__ import annotations
+
+from PyQt6.QtCore import QThread, pyqtSignal, QCoreApplication
+from pystages import Autofocus
+from typing import Any, TYPE_CHECKING
+import scipy.signal
+import numpy
+from numpy.typing import NDArray
 from .stage import StageInstrument, Vector
 from .instrument import Instrument
-import scipy.signal
-from typing import Optional, Any, TYPE_CHECKING
-import numpy
-from PyQt6.QtCore import QCoreApplication
-from pystages import Autofocus
+from ..utils.yaml_types import Config
 
 if TYPE_CHECKING:
     from .camera import CameraInstrument
@@ -57,11 +60,11 @@ class FocusThread(QThread):
 
     def __init__(
         self,
-        camera: "CameraInstrument",
+        camera: CameraInstrument,
         stage: StageInstrument,
         coarse: FocusSearchSettings,
-        fine: Optional[FocusSearchSettings] = None,
-        positions: Optional[list[Vector]] = None,
+        fine: FocusSearchSettings | None = None,
+        positions: list[Vector] | None = None,
         objective: float = 1.0,
     ):
         """
@@ -90,8 +93,8 @@ class FocusThread(QThread):
 
     def z_range(
         self,
-        z_mid: Optional[float] = None,
-        settings: Optional[FocusSearchSettings] = None,
+        z_mid: float | None = None,
+        settings: FocusSearchSettings | None = None,
     ) -> tuple[float, float]:
         """
         Return the Z range of the focus search.
@@ -105,7 +108,9 @@ class FocusThread(QThread):
             z_mid + (settings.span / 2.0) / self.objective,
         )
 
-    def run_search(self, settings: FocusSearchSettings):
+    def run_search(
+        self, settings: FocusSearchSettings
+    ) -> tuple[float | None, NDArray[Any], list[tuple[float, float]] | None]:
         """
         Start a research given some search settings.
 
@@ -118,7 +123,7 @@ class FocusThread(QThread):
         self.__camera.image_averaging = settings.averaging
         best_z = None
         best_std_dev = None
-        tab = []
+        tab: list[tuple[float, float]] = []
 
         z_backlash = stage.backlashes[2] if stage.backlashes else 0.0
         stage.move_to(Vector(pos.x, pos.y, z_min - z_backlash), wait=True)
@@ -151,15 +156,15 @@ class FocusThread(QThread):
             if self.isInterruptionRequested():
                 break
 
-        tab = numpy.array(tab)
+        tab_array: NDArray[Any] = numpy.array(tab)
         peaks = None
 
         if settings.multi_peaks:
-            amplitude = max(tab[:, 1]) - min(tab[:, 1])
+            amplitude = max(tab_array[:, 1]) - min(tab_array[:, 1])
             peak_indexes = scipy.signal.find_peaks(
-                tab[:, 1], prominence=amplitude * 0.1
+                tab_array[:, 1], prominence=amplitude * 0.1
             )[0]
-            peaks = list(tab[i] for i in peak_indexes)
+            peaks = list(tab_array[i] for i in peak_indexes)
             if len(peaks) == 0:
                 best_z = z_mid
             else:
@@ -172,7 +177,7 @@ class FocusThread(QThread):
             stage.move_to(Vector(pos.x, pos.y, best_z - z_backlash), wait=True)
             stage.move_to(Vector(pos.x, pos.y, best_z), wait=True)
 
-        return (best_z, tab, peaks)
+        return (best_z, tab_array, peaks)
 
     def run(self):
         """
@@ -359,7 +364,7 @@ class FocusInstrument(Instrument):
         print(f"{self.focus_thread.tab_fine=}")
 
     @property
-    def settings(self) -> dict[str, Any]:
+    def settings(self) -> Config:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         points = self.autofocus_helper.registered_points
@@ -370,7 +375,7 @@ class FocusInstrument(Instrument):
         return settings
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         points = data.get("autofocus_points", [])

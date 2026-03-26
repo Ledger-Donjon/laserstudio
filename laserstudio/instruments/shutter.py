@@ -1,5 +1,6 @@
 from .stage import Tic, TicDirection, Vector
 from .instrument import Instrument
+from ..utils.yaml_types import Config
 
 
 class ShutterInstrument(Instrument):
@@ -8,7 +9,7 @@ class ShutterInstrument(Instrument):
     the view of a camera or a light source.
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         """
         Initialize the shutter instrument.
         The shutter is considered open by default.
@@ -33,7 +34,7 @@ class ShutterInstrument(Instrument):
         self.__open = value
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> Config:
         """
         The settings of the shutter instrument include the open state.
         """
@@ -42,12 +43,12 @@ class ShutterInstrument(Instrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: Config):
         """
         Set the settings of the shutter instrument.
         """
-        Instrument.settings.__set__(self, data)
-        if "open" in data:
+        Instrument.settings.__set__(self, data)  # type: ignore[attr-defined]
+        if "open" in data and isinstance(data["open"], bool):
             self.open = data["open"]
             self.parameter_changed.emit("open", data["open"])
 
@@ -57,7 +58,7 @@ class TicShutterInstrument(ShutterInstrument):
     A shutter instrument that uses a Tic stage to open and close.
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         super().__init__(config=config)
         self.tic = Tic()
         self.tic.exit_safe_start()
@@ -70,7 +71,7 @@ class TicShutterInstrument(ShutterInstrument):
 
     @open.setter
     def open(self, value: bool):
-        ShutterInstrument.open.__set__(self, value)
+        ShutterInstrument.open.__set__(self, value)  # type: ignore[attr-defined]
         if value != self.__open:
             self.tic.position = Vector({False: -106, True: 0}[value])
         self.__open = value

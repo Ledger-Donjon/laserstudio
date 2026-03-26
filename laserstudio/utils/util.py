@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import Any
+import yaml
 import os
 from PyQt6.QtGui import (
     QTransform,
@@ -10,11 +13,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
-from typing import Any
-from .colors import LedgerColors
-import yaml
 from PyQt6.QtCharts import QChartView
-from typing import Optional
+from .colors import LedgerColors
+from ..utils.yaml_types import Config
 
 __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -31,20 +32,23 @@ def resource_path(path: str) -> str:
     return os.path.join(__dirname, path[2:])
 
 
-def qtransform_to_yaml(transform: QTransform) -> dict[str, float]:
+def qtransform_to_yaml(transform: QTransform) -> Config:
     """:return: Dict for yaml serialization from a QTransform."""
-    result: dict[str, float] = {}
+    result: Config = {}
     for i in range(1, 4):
         for j in range(1, 4):
             result[f"m{i}{j}"] = transform.__getattribute__(f"m{i}{j}")()
     return result
 
 
-def yaml_to_qtransform(dict: dict[str, float]) -> QTransform:
+def yaml_to_qtransform(dict: Config) -> QTransform:
     items: list[float] = []
     for i in range(1, 4):
         for j in range(1, 4):
-            items.append(float(dict[f"m{i}{j}"]))
+            value = dict[f"m{i}{j}"]
+            if not isinstance(value, (float, int)):
+                raise ValueError(f"Value {value} is not a float or int")
+            items.append(float(value))
     return QTransform(*items)
 
 
@@ -92,14 +96,14 @@ def save_configuration_file(config: dict[str, Any]):
 
 
 class ChartViewWithVMarker(QChartView):
-    _x: Optional[float] = None
+    _x: float | None = None
 
     @property
     def vmarker(self):
         return self._x
 
     @vmarker.setter
-    def vmarker(self, x: Optional[float]):
+    def vmarker(self, x: float | None):
         self._x = x
         self.update()
 

@@ -1,3 +1,13 @@
+from __future__ import annotations
+import logging
+import numpy
+from numpy.typing import NDArray
+import math
+from datetime import date
+from enum import Enum, IntFlag
+from serial.serialutil import SerialException
+from typing import NamedTuple, cast, Any
+from PyQt6.QtCore import pyqtSignal
 from .camera_usb import CameraUSBInstrument
 from .list_serials import (
     get_serial_device,
@@ -5,14 +15,7 @@ from .list_serials import (
     serial,
     ConnectionFailure,
 )
-from serial.serialutil import SerialException
-import logging
-from typing import NamedTuple, cast, Any
-from enum import Enum, IntFlag
-import numpy
-import math
-from PyQt6.QtCore import pyqtSignal
-from datetime import date
+from ..utils.yaml_types import Config
 
 
 class RaptorCameraGainTrigger(IntFlag):
@@ -160,7 +163,7 @@ class RaptorCommand(bytes, Enum):
 class CameraRaptorInstrument(CameraUSBInstrument):
     """Class to implement the Raptor cameras"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         super().__init__(config)
 
         dev = config.get("dev")
@@ -169,6 +172,11 @@ class CameraRaptorInstrument(CameraUSBInstrument):
                 "In configuration file, 'dev' is mandatory for type 'Raptor'"
             )
             raise
+
+        if not (isinstance(dev, dict) or isinstance(dev, str)):
+            raise ValueError(
+                "In configuration file, 'dev' must be a string or a configuration object"
+            )
 
         try:
             dev = get_serial_device(dev)
@@ -187,7 +195,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
 
         self.last_frame_number = 0
 
-        self.manufacturers_data = None
+        self.manufacturers_data: RaptorManufacturersData | None = None
 
         # Objective on this camera is 10x by default
         objective = cast(float, config.get("objective", 10.0))
@@ -201,17 +209,17 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         command: RaptorCommand,
         data: bytes = b"",
         expected_bytes: int = 0,
-        checksum=False,
+        checksum: bool = False,
     ) -> bytes:
         """
         The check sum byte should be the result of the Exclusive OR of all bytes in the Host command packet including the ETX byte.
         """
         whole_command = command.value + data + RaptorErrorCode.ETX.value
         if checksum:
-            checksum = 0
+            _checksum = 0
             for byte in whole_command:
-                checksum ^= byte
-            whole_command += checksum.to_bytes(1, "big")
+                _checksum ^= byte
+            whole_command += _checksum.to_bytes(1, "big")
 
         # print(f"RAPTOR > {whole_command.hex()}")
         self.serial.write(whole_command)
@@ -491,7 +499,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
 
     def capture_image(self):
         ret, frame = self.vc.read()
-        if not ret or frame is None:
+        if not ret:
             return None
         assert type(frame) is numpy.ndarray
         # Each value is repeated three times...
@@ -509,7 +517,9 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         frame = numpy.resize(frame, self.width * self.height)
         return frame
 
-    def construct_display_image(self, pos, neg=None):
+    def construct_display_image(
+        self, pos: NDArray[Any], neg: NDArray[Any] | None = None
+    ) -> NDArray[Any]:
         # As we accumulated 16-bits images, we have to reduce it to 8-bits for display
         return super().construct_display_image(
             pos / 64.0, None if neg is None else neg / 64.0
@@ -532,7 +542,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
     def settings(self, data: dict[str, Any]):
         """Import and apply settings."""
         # Call the parent class settings setter
-        CameraUSBInstrument.settings.__set__(self, data)
+        CameraUSBInstrument.settings.__set__(self, data)  # type: ignore[attr-defined]
 
         if "alc_enabled" in data:
             self.set_alc_enabled(data["alc_enabled"])

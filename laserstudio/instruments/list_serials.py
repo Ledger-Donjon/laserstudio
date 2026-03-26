@@ -1,5 +1,7 @@
 #!/usr/bin/python3
-from typing import cast, Any
+from __future__ import annotations
+from typing import cast
+from ..utils.yaml_types import Config
 import serial.tools.list_ports
 import serial
 
@@ -63,7 +65,7 @@ class MultipleDeviceFound(DeviceSearchError):
         return f"Error: Multiple devices found with the following criteria: {super().__str__()}"
 
 
-def get_serial_device(config: str | dict[str, Any]) -> str:
+def get_serial_device(config: str | Config) -> str:
     """
     Find serial device path given a configuration.
     :param config: Configuration from YAML file.

@@ -48,7 +48,7 @@ class CameraInstrument(Instrument):
         self.correction_matrix: QTransform | None = None
 
         # Shutter
-        shutter = config.get("shutter")
+        shutter: Config | None = config.get("shutter")
         self.shutter: ShutterInstrument | None = None
         if isinstance(shutter, dict) and shutter.get("enable", True):
             try:
@@ -64,8 +64,8 @@ class CameraInstrument(Instrument):
                 )
 
         # White and black levels adjustment
-        self.black_level = 0.0
-        self.white_level = 1.0
+        self.black_level: float = 0.0
+        self.white_level: float = 1.0
 
         # Image averaging
         self._last_frame_accumulator: NDArray[Any] | None = None
@@ -229,7 +229,7 @@ class CameraInstrument(Instrument):
 
         # Construct a frame from substracted values
         frame = self.construct_display_image(pos, neg)
-        mode = "RGB" if frame.shape[-1] == 3 else "L"
+        mode: Literal["RGB", "L"] = "RGB" if frame.shape[-1] == 3 else "L"
         return self.width, self.height, mode, frame.tobytes()
 
     @property
@@ -509,7 +509,8 @@ class CameraInstrument(Instrument):
             ],
             axis=2,
         )
-        return stacked.reshape(self.width, self.height, 3)
+        reshaped: NDArray[Any] = stacked.reshape(self.width, self.height, 3)
+        return reshaped
 
     @property
     def settings(self) -> Config:
@@ -529,28 +530,33 @@ class CameraInstrument(Instrument):
     @settings.setter
     def settings(self, data: Config):
         """Import settings from a dict."""
-        Instrument.settings.__set__(self, data)
-        if "transform" in data:
+        Instrument.settings.__set__(self, data)  # type: ignore[attr-defined]
+        if "transform" in data and isinstance(data["transform"], dict):
             self.correction_matrix = yaml_to_qtransform(data["transform"])
-        if "white_level" in data:
-            self.white_level = data["white_level"]
+        if "white_level" in data and isinstance(data["white_level"], (float, int)):
+            self.white_level = float(data["white_level"])
             self.parameter_changed.emit("white_level", data["white_level"])
-        if "black_level" in data:
-            self.black_level = data["black_level"]
+        if "black_level" in data and isinstance(data["black_level"], (float, int)):
+            self.black_level = float(data["black_level"])
             self.parameter_changed.emit("black_level", data["black_level"])
-        if "shutter" in data and self.shutter is not None:
+        if (
+            "shutter" in data
+            and self.shutter is not None
+            and isinstance(data["shutter"], dict)
+        ):
             self.shutter.settings = data["shutter"]
-            self.parameter_changed.emit("shutter", data["shutter"])
-        if "image_averaging" in data:
+        if "image_averaging" in data and isinstance(data["image_averaging"], int):
             self.image_averaging = data["image_averaging"]
             self.parameter_changed.emit("image_averaging", data["image_averaging"])
-        if "windowed_averaging" in data:
+        if "windowed_averaging" in data and isinstance(
+            data["windowed_averaging"], bool
+        ):
             self.windowed_averaging = data["windowed_averaging"]
             self.parameter_changed.emit(
                 "windowed_averaging", data["windowed_averaging"]
             )
-        if "objective" in data:
-            self.select_objective(data["objective"])
+        if "objective" in data and isinstance(data["objective"], (float, int)):
+            self.select_objective(float(data["objective"]))
 
     @property
     def laplacian_std_dev(self) -> float:

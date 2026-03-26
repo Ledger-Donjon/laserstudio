@@ -1,11 +1,13 @@
-import logging
+from __future__ import annotations
+
+from ..utils.yaml_types import Config
 from .camera import CameraInstrument
 
 
 class CameraUSBInstrument(CameraInstrument):
     """Class to implement the USB cameras, using OpenCv"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """
@@ -14,21 +16,29 @@ class CameraUSBInstrument(CameraInstrument):
 
         self.cv2 = cv2
 
-        self.vc = self.__video_capture = cv2.VideoCapture(config.get("index", 0))
+        index = config.get("index", 0)
+        if not isinstance(index, int):
+            raise ValueError("index must be an integer in configuration file")
+        self.vc = self.__video_capture = cv2.VideoCapture(index)
 
-        self.width = int(
-            config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        width = config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        if not isinstance(width, int):
+            raise ValueError("width must be an integer in configuration file")
+        self.width = int(width)
+
+        height = config.get(
+            "height", self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         )
-        self.height = int(
-            config.get("height", self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        )
+        if not isinstance(height, int):
+            raise ValueError("height must be an integer in configuration file")
+        self.height = int(height)
 
     def __del__(self):
         self.__video_capture.release()
 
     def capture_image(self):
         ret, frame = self.__video_capture.read()
-        if not ret or frame is None:
+        if not ret:
             return None
         frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
         if frame.shape[2:] != (self.height, self.width):

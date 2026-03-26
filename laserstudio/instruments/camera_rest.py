@@ -1,14 +1,15 @@
+import io
+from typing import Literal, cast
+from PIL import Image
 from .camera import CameraInstrument
 from .rest_instrument import RestInstrument
-from typing import Literal, cast, Any
-import io
-from PIL import Image
+from ..utils.yaml_types import Config
 
 
 class CameraRESTInstrument(RestInstrument, CameraInstrument):
     """Class to implement REST cameras"""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """
