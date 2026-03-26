@@ -192,12 +192,7 @@ class Viewer(QGraphicsView):
             self.stage_sight.position_changed.disconnect()
 
         if value:
-            self.stage_sight.position_changed.connect(
-                lambda _: self.__setattr__(
-                    "cam_pos_zoom",
-                    (self.focused_element_position(), self.zoom),
-                )
-            )
+            self.stage_sight.position_changed.connect(self.__update_cam_pos_zoom)
             self.stage_sight.update_pos()
 
         # Emit the signal if necessary
@@ -347,14 +342,20 @@ class Viewer(QGraphicsView):
         Inform the StageSight to go to the retrieved position
         """
         result: Config = {}
-        if self.scan_geometry:
+
+        if self.scan_geometry and self.stage_sight is not None:
+            """Get position of the next point from the scan geometry"""
             next_point_tuple = self.scan_geometry.next_point()
-            if next_point_tuple is not None and self.stage_sight is not None:
+
+            if next_point_tuple is not None:
                 next_point = list(next_point_tuple)
                 result = {"next_point_geometry": next_point}
+
+                # Consider the focused element to compute stage's position
                 next_point_tuple = self.point_for_desired_move(next_point_tuple)
                 result["next_point_applied"] = list(next_point)
-            self.stage_sight.move_to(Vector(*next_point))
+
+                self.stage_sight.move_to(QPointF(*next_point_tuple))
         return result
 
     def __update_selection_color(
@@ -424,6 +425,10 @@ class Viewer(QGraphicsView):
     def zoom(self):
         """Resets the zoom"""
         self.zoom = 1.0
+
+    def __update_cam_pos_zoom(self):
+        """Recomputes the camera position according to focused element position and apply it"""
+        self.cam_pos_zoom = (self.focused_element_position(), self.zoom)
 
     # User interactions
     def wheelEvent(self, event: QWheelEvent | None):

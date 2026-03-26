@@ -11,6 +11,7 @@ from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from shapely.geometry.base import BaseGeometry
 from .scanpath import ScanPath
 from ..utils.scanning import ScanPathGenerator, EmptyGeometryError
+from ..utils.yaml_types import Config
 
 
 class ScanGeometry(QGraphicsItemGroup):
@@ -271,11 +272,11 @@ class ScanGeometry(QGraphicsItemGroup):
             assert False
 
     @property
-    def settings(self) -> dict[str, Any]:
+    def settings(self) -> Config:
         return __class__.shapely_to_yaml(self.__scan_geometry)
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {data}...")
         geoms = __class__.yaml_to_shapely(data)
         if isinstance(geoms, Polygon):
