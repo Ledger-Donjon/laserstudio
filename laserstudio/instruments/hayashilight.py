@@ -2,18 +2,22 @@ from hyshlr import HyshLR, NoDongleError, MultipleDongleError
 from .light import LightInstrument
 from .list_serials import get_serial_device
 import logging
+from ..utils.yaml_types import Config
 
 
 class HayashiLRInstrument(LightInstrument):
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         super().__init__(config=config)
-        self.label = config.get("label", "Hayashi Light")
+        self.label = str(config.get("label", "Hayashi Light"))
         dev = config.get("dev")
+
         if dev == "":
             dev = None
 
-        if dev is not None:
+        if isinstance(dev, dict) or isinstance(dev, str):
             dev = get_serial_device(dev)
+        else:
+            dev = None
 
         try:
             self.hyslr = HyshLR(dev)

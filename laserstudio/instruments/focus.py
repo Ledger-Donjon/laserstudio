@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QThread, pyqtSignal, QCoreApplication
-from pystages import Autofocus
-from typing import Any, TYPE_CHECKING
+import logging
 import scipy.signal
+from typing import Any, TYPE_CHECKING
 import numpy
 from numpy.typing import NDArray
+from pystages import Autofocus
+from PyQt6.QtCore import QThread, pyqtSignal, QCoreApplication
 from .stage import StageInstrument, Vector
 from .instrument import Instrument
 from ..utils.yaml_types import Config
@@ -17,34 +18,48 @@ if TYPE_CHECKING:
 class FocusSearchSettings:
     """Parameters for the focus search procedure."""
 
-    def __init__(
-        self,
-        span: float,
-        steps: int,
-        averaging: int,
-        multi_peaks: bool,
-        best_is_highest_z: bool = True,
-    ):
+    def __init__(self, config: Config = {}):
         """
-        :param span: Z search span, in micrometers. Maximum allowed value is
+        :param config: Configuration dictionary. If not provided, default settings are used.
+        The configuration dictionary must contain the following keys:
+        - span: Z search span, in micrometers. Maximum allowed value is
             1000 µm, for safety purpose. Search will occur in the range
             [z - span / 2, z + span / 2].
-        :param steps: Number of search steps. Must be greater or equal to 2.
-        :param averaging: Image averaging setting. Must be greater or equal to 1.
-        :multi_peaks: If True, peak detection is performed, and the peak with
+        - steps: Number of search steps. Must be greater or equal to 2.
+        - averaging: Image averaging setting. Must be greater or equal to 1.
+        - multi_peaks: If True, peak detection is performed, and the peak with
             the higher Z value is considered as the correct focus. This is used
             to distinguish the silicon transistors from the silicon surface. If
-            False, the position with the highest image standard deviation is
-            kept.
-        :best_is_hightest: If True, the best focus is the highest Z value. If False,
+            False, the position with the highest image standard deviation is kept.
+        - best_is_hightest: If True, the best focus is the highest Z value. If False,
             the best focus is the lowest Z value.
         """
-        assert span > 0, "Span must be positive"
-        assert steps >= 2, "Steps must be greater or equal to 2"
-        assert averaging >= 1, "Image averaging must be greater or equal to 1"
+        span = config.get("span", 4000.0)
+        steps = config.get("steps", 20)
+        averaging = config.get("averaging", 5)
+        multi_peaks = config.get("multi_peaks", True)
+        best_is_highest_z = config.get("best_is_highest_z", True)
+
+        if not isinstance(span, float):
+            raise ValueError("Span must be a float")
+        if not isinstance(steps, int):
+            raise ValueError("Steps must be an integer")
+        if not isinstance(averaging, int):
+            raise ValueError("Averaging must be an integer")
+        if not isinstance(multi_peaks, bool):
+            raise ValueError("Multi peaks must be a boolean")
+        if not isinstance(best_is_highest_z, bool):
+            raise ValueError("Best is highest z must be a boolean")
+        if span <= 0:
+            raise ValueError("Span must be positive")
+        if steps < 2:
+            raise ValueError("Steps must be greater or equal to 2")
+        if averaging < 1:
+            raise ValueError("Image averaging must be greater or equal to 1")
+
         self.span = span
-        self.steps = steps
-        self.averaging = averaging
+        self.steps = int(steps)
+        self.averaging = int(averaging)
         self.multi_peaks = multi_peaks
         self.best_is_highest_z = best_is_highest_z
 
@@ -73,8 +88,11 @@ class FocusThread(QThread):
         :param camera: Camera instrument for capturing images.
         :param stage: Stage instrument used to modify Z position. At the end of the
             procedure, stage is moved to the best found position.
+        :param coarse: Coarse focus search settings.
+        :param fine: Fine focus search settings (optional).
         :param positions: A list of positions to be scanned. If None, current
             position is used.
+        :param objective: Objective magnification of the setup.
         """
         super().__init__()
         self.__camera = camera
@@ -84,7 +102,7 @@ class FocusThread(QThread):
         self.__positions = positions
         self.z_mid = None
         self.best_z = None
-        self.best_positions = None
+        self.best_positions: list[Vector | None] | None = None
         self.tab_coarse = None
         self.peaks_coarse = None
         self.tab_fine = None
@@ -128,14 +146,16 @@ class FocusThread(QThread):
         z_backlash = stage.backlashes[2] if stage.backlashes else 0.0
         stage.move_to(Vector(pos.x, pos.y, z_min - z_backlash), wait=True)
 
-        print(
+        logging.getLogger("laserstudio").info(
             f"Focus search at {pos.xy}: "
             f"{z_min:.2f} to {z_max:.2f} with {settings.steps} steps, "
             f"averaging {settings.averaging} images"
         )
         for i in range(settings.steps):
             z = (z_step * i) + z_min
-            print(f"Step {i} / {settings.steps}: {z:.2f}")
+            logging.getLogger("laserstudio").info(
+                f"Step {i} / {settings.steps}: {z:.2f}"
+            )
             pos = stage.position
             stage.move_to(Vector(pos.x, pos.y, z), wait=True)
             # *3: There can be some pipelining in the image processing, there can
@@ -157,20 +177,28 @@ class FocusThread(QThread):
                 break
 
         tab_array: NDArray[Any] = numpy.array(tab)
-        peaks = None
+        peaks: list[tuple[float, float]] | None = None
 
         if settings.multi_peaks:
             amplitude = max(tab_array[:, 1]) - min(tab_array[:, 1])
+
             peak_indexes = scipy.signal.find_peaks(
                 tab_array[:, 1], prominence=amplitude * 0.1
             )[0]
-            peaks = list(tab_array[i] for i in peak_indexes)
-            if len(peaks) == 0:
+            if len(peak_indexes) == 0:
+                # There is no significant peak.
+                logging.getLogger("laserstudio").warning(
+                    "No significant peak found. This may be "
+                    "due to a autoexposure setting still activated or "
+                    "a number of averaged images too low."
+                )
                 best_z = z_mid
             else:
-                # We can get two peaks, one for the silicon surface, and another one
-                # for the transistors. This latest has a higher Z value, so we chose
-                # the peak with the highest Z.
+                peaks = [tab[i] for i in peak_indexes]
+                # We can get several peaks, (for instance, one when we observe
+                # the silicon surface, and another one when we observe the transistors)
+                # This latest is the one we are interested in, depending on the setup,
+                # we need to choose the highest or the lowest indice.
                 best_z = peaks[-1 if settings.best_is_highest_z else 0][0]
 
         if best_z is not None:
@@ -202,7 +230,11 @@ class FocusThread(QThread):
                 best_z, _, _ = self.run_search(self.__coarse)
                 if self.__fine is not None and not self.isInterruptionRequested():
                     best_z, _, _ = self.run_search(self.__fine)
-                self.best_positions.append(Vector(position.x, position.y, best_z))
+                self.best_positions.append(
+                    Vector(position.x, position.y, best_z)
+                    if best_z is not None
+                    else None
+                )
 
         self.__camera.image_averaging = averaging_prev  # Restore setting
 
@@ -214,7 +246,7 @@ class FocusInstrument(Instrument):
     """
 
     def __init__(
-        self, config: dict, camera: "CameraInstrument", stage: StageInstrument
+        self, config: Config, camera: CameraInstrument, stage: StageInstrument
     ):
         super().__init__(config)
         self.camera = camera
@@ -226,16 +258,16 @@ class FocusInstrument(Instrument):
         # Magic Focus
         # Set when a focus search is running, then cleared.
         # This is used to prevent launching two search threads at the same time.
-        self.focus_thread: Optional[FocusThread] = None
+        self.focus_thread: FocusThread | None = None
 
-        self.fine_focus_settings: Optional[FocusSearchSettings] = None
-        self.coarse_focus_settings: Optional[FocusSearchSettings] = None
+        self.fine_focus_settings: FocusSearchSettings | None = None
+        self.coarse_focus_settings: FocusSearchSettings | None = None
 
         # Magic focus parameters configuration
-        if "fine" in config:
-            self.fine_focus_settings = FocusSearchSettings(**config["fine"])
-        if "coarse" in config:
-            self.coarse_focus_settings = FocusSearchSettings(**config["coarse"])
+        if "fine" in config and isinstance(config["fine"], dict):
+            self.fine_focus_settings = FocusSearchSettings(config["fine"])
+        if "coarse" in config and isinstance(config["coarse"], dict):
+            self.coarse_focus_settings = FocusSearchSettings(config["coarse"])
 
     def clear(self):
         """
@@ -246,22 +278,26 @@ class FocusInstrument(Instrument):
             "autofocus_points", self.autofocus_helper.registered_points
         )
 
-    def register(self, position: Optional[tuple[float, float, float]] = None):
+    def register(self, position: tuple[float, float, float] | None = None):
         """
         Register a new focused point.
 
         :param position: Position to register.
         """
         if position is None:
-            position = tuple(self.stage.position.data)
+            stage_position = self.stage.position
+            if len(stage_position.data) < 3:
+                logging.getLogger("laserstudio").error(
+                    "Stage position has less than 3 dimensions"
+                )
+                return
+            position = tuple[float, float, float](stage_position.data[:3])
         self.autofocus_helper.register(position[0], position[1], position[2])
         self.parameter_changed.emit(
             "autofocus_points", self.autofocus_helper.registered_points
         )
 
     def autofocus(self, register_point: bool = False):
-        if self.stage is None:
-            return
         pos = self.stage.position
         if register_point:
             self.register((pos.x, pos.y, pos.z))
@@ -280,11 +316,7 @@ class FocusInstrument(Instrument):
         self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
 
     def magic_focus_state(self):
-        if (
-            self.stage is None
-            or self.camera is None
-            or (t := self.focus_thread) is None
-        ):
+        if (t := self.focus_thread) is None:
             return {"existing": False}
         res: dict[str, Any] = {
             "existing": True,
@@ -299,22 +331,22 @@ class FocusInstrument(Instrument):
             res["tab_fine"] = str(t.tab_fine)
         return res
 
-    def parse_magicfocus_parameters(self, parameters: dict):
-        if "coarse" in parameters:
-            coarse_focus_settings = FocusSearchSettings(**parameters["coarse"])
+    def parse_magicfocus_parameters(self, parameters: Config):
+        if "coarse" in parameters and isinstance(parameters["coarse"], dict):
+            coarse_focus_settings = FocusSearchSettings(parameters["coarse"])
         else:
             coarse_focus_settings = None
-        if "fine" in parameters:
-            fine_focus_settings = FocusSearchSettings(**parameters["fine"])
+        if "fine" in parameters and isinstance(parameters["fine"], dict):
+            fine_focus_settings = FocusSearchSettings(parameters["fine"])
         else:
             fine_focus_settings = None
         return coarse_focus_settings, fine_focus_settings
 
     def magic_focus(
         self,
-        coarse: Optional[FocusSearchSettings] = None,
-        fine: Optional[FocusSearchSettings] = None,
-        parameters: Optional[dict] = None,
+        coarse: FocusSearchSettings | None = None,
+        fine: FocusSearchSettings | None = None,
+        parameters: Config | None = None,
     ) -> FocusThread:
         """
         Estimates automatically the correct focus by moving the stage and analysing the
@@ -322,20 +354,14 @@ class FocusInstrument(Instrument):
         """
         if self.focus_thread is not None and self.focus_thread.isRunning():
             # Focus search already running
-            print("Focus search already running")
+            logging.getLogger("laserstudio").warning("Focus search already running")
             return self.focus_thread
 
         if parameters is not None:
             coarse, fine = self.parse_magicfocus_parameters(parameters)
 
         if coarse is None:
-            coarse = self.coarse_focus_settings or FocusSearchSettings(
-                span=4000,
-                steps=20,
-                averaging=5,
-                multi_peaks=True,
-                best_is_highest_z=False,
-            )
+            coarse = self.coarse_focus_settings or FocusSearchSettings()
         if fine is None:
             fine = self.fine_focus_settings
 
@@ -357,11 +383,11 @@ class FocusInstrument(Instrument):
         """Called when focus search thread has finished."""
         if self.focus_thread is None:
             return
-        print("Focus search finished")
-        print(f"{self.focus_thread.best_z=}")
-        print(f"{self.focus_thread.best_positions=}")
-        print(f"{self.focus_thread.tab_coarse=}")
-        print(f"{self.focus_thread.tab_fine=}")
+        logging.getLogger("laserstudio").info("Fomsg=cus search finished")
+        logging.getLogger("laserstudio").debug(f"{self.focus_thread.best_z=}")
+        logging.getLogger("laserstudio").debug(f"{self.focus_thread.best_positions=}")
+        logging.getLogger("laserstudio").debug(f"{self.focus_thread.tab_coarse=}")
+        logging.getLogger("laserstudio").debug(f"{self.focus_thread.tab_fine=}")
 
     @property
     def settings(self) -> Config:
@@ -379,11 +405,20 @@ class FocusInstrument(Instrument):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)
         points = data.get("autofocus_points", [])
-        if len(points) == 3:
+        if isinstance(points, list) and len(points) == 3:
             self.autofocus_helper.clear()
             for point in points:
-                if type(point) is list and len(point) == 3:
-                    self.autofocus_helper.register(point[0], point[1], point[2])
+                if isinstance(point, list) and len(point) == 3:
+                    if (
+                        isinstance(point[0], float)
+                        and isinstance(point[1], float)
+                        and isinstance(point[2], float)
+                    ):
+                        self.autofocus_helper.register(point[0], point[1], point[2])
+                    else:
+                        logging.getLogger("laserstudio").error(
+                            f"Invalid point: {point}"
+                        )
             self.parameter_changed.emit(
                 "autofocus_points", self.autofocus_helper.registered_points
             )

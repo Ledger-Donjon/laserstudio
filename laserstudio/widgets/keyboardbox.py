@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any
 import logging
 from PyQt6.QtWidgets import (
     QGroupBox,
@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from ..instruments.instruments import StageInstrument
 from enum import Enum
 
@@ -32,8 +33,8 @@ class KeyboardBox(QGroupBox):
     for each press of button or keys.
     """
 
-    def __init__(self, stage: StageInstrument, *__args):
-        super().__init__(*__args)
+    def __init__(self, stage: StageInstrument, *args: Any) -> None:
+        super().__init__(*args)
 
         self.stage_instrument = stage
         self.stage = stage.stage
@@ -65,7 +66,7 @@ class KeyboardBox(QGroupBox):
             w.setMaximum(1_000_000)
             w.setDecimals(1)
             w.setValue(self.displacement_xy)
-            w.valueChanged.connect(lambda v: self.__setattr__("displacement_xy", v))
+            w.valueChanged.connect(self.__on_displacement_xy_changed)
             w.setSuffix("\xa0µm")
             w.setSingleStep(5)
             grid.addWidget(w, 3, 1, 1, 3)
@@ -94,7 +95,7 @@ class KeyboardBox(QGroupBox):
             w.setMaximum(1000000)
             w.setDecimals(1)
             w.setValue(self.displacement_z)
-            w.valueChanged.connect(lambda v: self.__setattr__("displacement_z", v))
+            w.valueChanged.connect(self.__on_displacement_z_changed)
             w.setSuffix("\xa0µm")
             w.setSingleStep(10)
             grid.addWidget(w, 3, 4)
@@ -106,6 +107,12 @@ class KeyboardBox(QGroupBox):
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self._set_background_color()
+
+    def __on_displacement_xy_changed(self, value: float) -> None:
+        self.displacement_xy = value
+
+    def __on_displacement_z_changed(self, value: float) -> None:
+        self.displacement_z = value
 
     def move_stage(self, direction: Direction, coefficient: float = 1.0):
         # Give a factor if the keyboard SHIFT or ALT are pressed.
@@ -139,7 +146,7 @@ class KeyboardBox(QGroupBox):
         position[axe] += displacement
         self.stage_instrument.move_to(position, wait=False)
 
-    def _set_background_color(self, color: Optional[str] = None):
+    def _set_background_color(self, color: str | None = None) -> None:
         """
         Convenience function to change the background color of the Box.
 
@@ -151,21 +158,21 @@ class KeyboardBox(QGroupBox):
             + "}"
         )
 
-    def focusInEvent(self, a0) -> None:
+    def focusInEvent(self, a0: QFocusEvent | None) -> None:
         """
         Changes the background to gray to show the box has focused.
         """
         super().focusInEvent(a0)
         self._set_background_color(color="gray")
 
-    def focusOutEvent(self, a0) -> None:
+    def focusOutEvent(self, a0: QFocusEvent | None) -> None:
         """
         Removes the background color to show the box has focused out.
         """
         super().focusOutEvent(a0)
         self._set_background_color()
 
-    def keyPressEvent(self, a0):
+    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
         """
         Detects a key press event and redispatch to the correct
         movement.
