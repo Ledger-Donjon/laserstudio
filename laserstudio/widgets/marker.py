@@ -15,7 +15,7 @@ from PyQt6.QtGui import QPen, QColor, QColorConstants
 from PyQt6.QtCore import Qt, QPointF, QPoint
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
-from ..utils.colors import LedgerColors
+from ..utils.colors import LedgerColors, MARKERS_COLORS
 from ..utils.util import create_color_qicon
 from ..utils.yaml_types import Config
 
@@ -341,19 +341,11 @@ class IdMarker(Marker):
         """Show a context menu when the marker is right-clicked."""
         menu = QMenu()
         menu.addSection(self.label)
-        menu.addAction("Change label...", self.set_label)
+        _ = menu.addAction("Change label...", self.set_label)
         # Submenu for setting the color of the marker
         color_menu = QMenu("Change color", menu)
 
-        colors = [(lc.value, lc.name) for lc in LedgerColors] + [
-            (QColorConstants.Red, "Red"),
-            (QColorConstants.Green, "Green"),
-            (QColorConstants.Blue, "Blue"),
-            (QColorConstants.Yellow, "Yellow"),
-            (QColorConstants.Magenta, "Magenta"),
-            (QColorConstants.Cyan, "Cyan"),
-        ]
-        for color, name in colors:
+        for color, name in MARKERS_COLORS:
 
             def on_pick(
                 _checked: bool = False, *, c: QColor | Qt.GlobalColor | int = color

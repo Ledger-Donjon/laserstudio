@@ -1,4 +1,6 @@
-from PyQt6.QtGui import QColor, QPalette, QIcon, QPainter
+from __future__ import annotations
+from typing import Sequence
+from PyQt6.QtGui import QColor, QPalette, QIcon, QPainter, QColorConstants
 from PyQt6.QtWidgets import (
     QStyleFactory,
     QProxyStyle,
@@ -19,6 +21,19 @@ class LedgerColors(Enum):
     SecurityBlue = QColor(0, 27, 60)
     Grellow = QColor(222, 255, 0)
 
+
+MARKERS_COLORS: Sequence[tuple[QColor | Qt.GlobalColor | int, str]] = [
+    (lc.value, lc.name) for lc in LedgerColors
+] + [
+    (QColorConstants.Red, "Red"),
+    (QColorConstants.Green, "Green"),
+    (QColorConstants.Blue, "Blue"),
+    (QColorConstants.Yellow, "Yellow"),
+    (QColorConstants.Magenta, "Magenta"),
+    (QColorConstants.Cyan, "Cyan"),
+    (QColorConstants.Black, "Black"),
+    (QColorConstants.White, "White"),
+]
 
 LedgerPalette = QPalette()
 

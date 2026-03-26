@@ -6,7 +6,7 @@ from ...utils.util import colored_image, create_color_qicon
 from ..viewer import Viewer
 from .markerslistdockwidget import MarkersListDockWidget
 from ..coloredbutton import ColoredPushButton
-from ...utils.colors import LedgerColors
+from ...utils.colors import LedgerColors, MARKERS_COLORS
 
 
 class MarkersToolBar(QToolBar):
@@ -42,8 +42,12 @@ class MarkersToolBar(QToolBar):
         w.setIcon(QIcon(colored_image(":/icons/location-pin-dots.svg")))
         w.setIconSize(QSize(24, 24))
         markers_menu = QMenu("Markers", self)
-        markers_menu.addAction("Load markers from file...", lambda: self.load_markers())
-        markers_menu.addAction("Save markers to file...", lambda: self.save_markers())
+        _ = markers_menu.addAction(
+            "Load markers from file...", lambda: self.load_markers()
+        )
+        _ = markers_menu.addAction(
+            "Save markers to file...", lambda: self.save_markers()
+        )
         # Submenu for setting the color of the markers
         self._color_menu = color_menu = QMenu("Set color for new markers", self)
 
@@ -54,16 +58,7 @@ class MarkersToolBar(QToolBar):
                 lambda c=color: self.set_color(c),  # type: ignore
             )
         color_menu.addSeparator()
-        for color, name in [
-            (QColorConstants.Red, "Red"),
-            (QColorConstants.Green, "Green"),
-            (QColorConstants.Blue, "Blue"),
-            (QColorConstants.Yellow, "Yellow"),
-            (QColorConstants.Magenta, "Magenta"),
-            (QColorConstants.Cyan, "Cyan"),
-            (QColorConstants.Black, "Black"),
-            (QColorConstants.White, "White"),
-        ]:
+        for color, name in MARKERS_COLORS:
             color_menu.addAction(
                 create_color_qicon(color),
                 name,
