@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import cast, Any
+from typing import cast, Any, SupportsIndex, overload
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
 from pystages.exceptions import ProtocolError
@@ -95,15 +95,36 @@ class Vector(PystagesVector):
         return Vector(self.x, self.y)
 
     @xy.setter
-    def xy(self, value: Vector):
+    def xy(self, value: PystagesVector):
+        if not isinstance(value, Vector):
+            raise ValueError(f"Invalid value type: {type(value)}")
         self.x = value.x
         self.y = value.y
 
-    def __getitem__(self, key: int) -> float:
-        return self.data[key]
+    @overload
+    def __getitem__(self, key: SupportsIndex) -> float: ...
 
-    def __setitem__(self, key: int, value: float):
-        self.data[key] = value
+    @overload
+    def __getitem__(self, key: slice) -> list[float]: ...
+
+    def __getitem__(self, key: SupportsIndex | slice) -> float | list[float]:
+        if isinstance(key, slice):
+            return self.data[key]
+        else:
+            return self.data[key]
+
+    @overload
+    def __setitem__(self, key: SupportsIndex, value: float) -> None: ...
+    @overload
+    def __setitem__(self, key: slice, value: list[float]) -> None: ...
+
+    def __setitem__(self, key: SupportsIndex | slice, value: float | list[float]):
+        if isinstance(key, slice) and isinstance(value, list):
+            self.data[key] = value
+        elif isinstance(key, SupportsIndex) and isinstance(value, float):
+            self.data[key] = value
+        else:
+            raise ValueError(f"Inconsistent types in {key=} and {value=}")
 
 
 class MoveFor(object):
@@ -206,7 +227,7 @@ class StageInstrument(Instrument):
             self.stage = SMC100(dev=dev, addresses=adresses)
         elif device_type == "Dummy":
             logging.getLogger("laserstudio").info("Creating a dummy stage... ")
-            self.stage = StageDummy(config=config, stage_instrument=self)
+            self.stage = StageDummy(config=config)
         elif device_type == "REST":
             logging.getLogger("laserstudio").info(f"Connecting to {device_type}...")
             try:

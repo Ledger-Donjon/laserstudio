@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 from pystages import Stage, Vector
-from typing import cast, TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from .stage import StageInstrument
+from ..utils.yaml_types import Config
 
 
 class StageDummy(Stage):
     """Class to implement Dummy Stage"""
 
-    def __init__(self, config: dict[str, Any], stage_instrument: StageInstrument):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
-        :param stage_instrument: The StageInstrument the Stage is attached to.
         """
-        super().__init__(num_axis=cast(int, config.get("num_axis", 2)))
+        assert isinstance(config["num_axis"], int), "num_axis must be an integer"
+        super().__init__(num_axis=config["num_axis"])
         from .stage import Vector as LSVector
 
         self._position: Vector = LSVector(dim=self.num_axis)
-        self.stage_instrument = stage_instrument
 
     @property
     def position(self) -> Vector:

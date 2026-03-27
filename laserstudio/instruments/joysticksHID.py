@@ -1,6 +1,7 @@
-from PyQt6.QtCore import pyqtSignal, QObject, QThread
+from __future__ import annotations
 from enum import Enum, auto
 import hid
+from PyQt6.QtCore import pyqtSignal, QObject, QThread
 
 
 class Button(Enum):
@@ -29,7 +30,7 @@ class HIDGAMEPAD(Enum):
 
 
 class JoystickHIDThread(QThread):
-    def __init__(self, joystick: "JoystickHIDInstrument"):
+    def __init__(self, joystick: JoystickHIDInstrument):
         super(JoystickHIDThread, self).__init__()
         self.joystick = joystick
 
@@ -77,7 +78,7 @@ class JoystickHIDInstrument(QObject):
         """Creation of a specific thread for listening on port"""
         super().__init__()
         self.device_type = type
-        self.device = None
+        self.device: hid.device | None = None
 
         self.joy_thread = JoystickHIDThread(self)
         self.joy_thread.setTerminationEnabled(True)

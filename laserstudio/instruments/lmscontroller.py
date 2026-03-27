@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from pylmscontroller import LMSController, MotorState, ControlMode
 from typing import cast
 from .shutter import ShutterInstrument
@@ -18,7 +19,7 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
         dev = config.get("dev")
         if dev == "":
             dev = None
-        if dev is not None:
+        if isinstance(dev, str) or isinstance(dev, dict):
             dev = get_serial_device(dev)
 
         assert type(dev) is str, (
@@ -84,21 +85,21 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
         self.lms.apply()
 
     @property
-    def settings(self) -> dict:
+    def settings(self) -> Config:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
         return settings
 
     @settings.setter
-    def settings(self, data: dict):
+    def settings(self, data: Config):
         """Import and apply settings."""
         # Call the parent class settings setter
-        if "intensity" in data:
+        if "intensity" in data and isinstance(data["intensity"], float):
             self.intensity = data["intensity"]
             self.parameter_changed.emit("intensity", data["intensity"])
-        if "light" in data:
+        if "light" in data and isinstance(data["light"], bool):
             self.light = data["light"]
             self.parameter_changed.emit("light", data["light"])
-        if "open" in data:
+        if "open" in data and isinstance(data["open"], bool):
             self.open = data["open"]
             self.parameter_changed.emit("open", data["open"])

@@ -5,7 +5,7 @@
 
 from shapely.geometry import MultiPolygon, Polygon, GeometryCollection
 import random
-from typing import Union, Optional, cast
+from typing import cast
 from triangle import triangulate
 
 Point = tuple[float, float]
@@ -31,7 +31,7 @@ class RandomPointGenerator:
         # list of triangles and weight. Each element of this list is a tuple.
         # First element of tuple is triangle area.
         # Next three elements are the points of the triangle.
-        self.__triangles = []
+        self.__triangles: list[Triangle] = []
 
     def __update(self):
         """
@@ -43,7 +43,7 @@ class RandomPointGenerator:
         for area, _, _, _ in self.__triangles:
             self.__total_area += area
 
-    def __triangulate(self, geometry: Union[MultiPolygon, Polygon]) -> list[Triangle]:
+    def __triangulate(self, geometry: MultiPolygon | Polygon) -> list[Triangle]:
         """
         Triangulate a geometry using Constrained Delaunay Triangulation.
         :param geometry: A shapely geometry.
@@ -139,12 +139,12 @@ class RandomPointGenerator:
         return len(self.__triangles) == 0
 
     @property
-    def geometry(self):
+    def geometry(self) -> MultiPolygon | Polygon:
         """:return: Current geometry."""
         return self.__geometry
 
     @geometry.setter
-    def geometry(self, value):
+    def geometry(self, value: MultiPolygon | Polygon):
         """
         Change the geometry used for random points calculation.
         :param value: The new geometry. Any shapely geometry.
@@ -184,7 +184,7 @@ class ScanPathGenerator(RandomPointGenerator):
         self.__total: int = 0
 
     @RandomPointGenerator.geometry.setter
-    def geometry(self, value):
+    def geometry(self, value: MultiPolygon | Polygon):
         """
         Change the geometry used for random path generation. Changing the
         geometry will generate a new scan path.
@@ -215,7 +215,7 @@ class ScanPathGenerator(RandomPointGenerator):
             self.__paths.append(path)
             self.__total = len(path)
 
-    def __generate_path(self, length: int, start: Optional[Point] = None) -> Path:
+    def __generate_path(self, length: int, start: Point | None = None) -> Path:
         """
         Generate a new scan path.
 

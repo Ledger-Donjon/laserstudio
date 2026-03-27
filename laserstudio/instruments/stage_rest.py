@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from typing import cast, TYPE_CHECKING
-from pystages import Stage
+from typing import cast
+from pystages import Stage, Vector
+from ..utils.yaml_types import Config
 from .rest_instrument import RestInstrument
-
-if TYPE_CHECKING:
-    from .stage import Vector
 
 
 class StageRest(RestInstrument, Stage):
     """Class to implement REST stages"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import logging
+from typing import cast
 from PyQt6.QtCore import QTimer, QVariant, Qt
 from pypdm import (
     ConnectionFailure,
@@ -9,17 +13,16 @@ from pypdm import (
     InterlockStatus,
 )
 from .list_serials import get_serial_device, DeviceSearchError
-import logging
 from .laser import LaserInstrument
-from typing import cast, Any
+from ..utils.yaml_types import Config
 
 
 class PDMInstrument(LaserInstrument):
     "PDM device links dict. Used for link sharing between different lasers."
 
-    __PDM_LINKS = {}
+    __PDM_LINKS: dict[str, Link] = {}
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """
@@ -30,7 +33,7 @@ class PDMInstrument(LaserInstrument):
 
         device_type = config.get("type")
         dev = config.get("dev")
-        if dev is None:
+        if not isinstance(dev, str) and not isinstance(dev, dict):
             logging.getLogger("laserstudio").error(
                 f"In configuration file, 'laser.dev' is mandatory for type {device_type}"
             )
@@ -57,6 +60,7 @@ class PDMInstrument(LaserInstrument):
                 logging.getLogger("laserstudio").info("Connection to PDM failed")
                 raise
             PDMInstrument.__PDM_LINKS[dev] = link
+        assert isinstance(config["num"], int), "PDM number must be an integer"
         self.pdm = pdm = PDM(config["num"], link)
         # Switch off the laser as soon as possible
         logging.getLogger("laserstudio").debug("Deactivate laser")
@@ -199,7 +203,7 @@ class PDMInstrument(LaserInstrument):
             )
 
     @property
-    def settings(self):
+    def settings(self) -> Config:
         """
         Return a dict of settings for the PDM.
         """
@@ -218,24 +222,29 @@ class PDMInstrument(LaserInstrument):
         return super_settings
 
     @settings.setter
-    def settings(self, data: dict[str, Any]):
+    def settings(self, data: Config):
         """
         Set the settings of the PDM.
         """
         LaserInstrument.settings.__set__(self, data)
-        if "refresh_interval_ms" in data:
-            self.refresh_interval = data["refresh_interval_ms"]
+        if "refresh_interval_ms" in data and isinstance(
+            data["refresh_interval_ms"], int
+        ):
+            self.refresh_interval = int(data["refresh_interval_ms"])
             self.parameter_changed.emit(
                 "refresh_interval_ms", data["refresh_interval_ms"]
             )
-        if "delay_line_type" in data:
+
+        if "delay_line_type" in data and isinstance(data["delay_line_type"], str):
             self.delay_line_type = DelayLineType[data["delay_line_type"]]
             self.parameter_changed.emit(
                 "delay_line_type", DelayLineType[data["delay_line_type"]]
             )
-        if "pulse_width_ps" in data:
-            self.pulse_width = data["pulse_width_ps"]
+
+        if "pulse_width_ps" in data and isinstance(data["pulse_width_ps"], float | int):
+            self.pulse_width = float(data["pulse_width_ps"])
             self.parameter_changed.emit("pulse_width", data["pulse_width_ps"])
-        if "delay_ps" in data:
-            self.delay = data["delay_ps"]
+
+        if "delay_ps" in data and isinstance(data["delay_ps"], float | int):
+            self.delay = float(data["delay_ps"])
             self.parameter_changed.emit("delay", data["delay_ps"])

@@ -53,7 +53,7 @@ laserstudio_generate_config = 'laserstudio.config_generator:main_gui'
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
-lint = ["mypy", "types-pyserial", "types-PyYAML", "types-requests", "scipy-stubs"]
+lint = ["mypy", "types-pyserial", "types-PyYAML", "types-requests", "scipy-stubs", "hidapi-stubs"]
 docs = ["sphinx", "sphinx-rtd-theme", "myst_parser"]
 
 [tool.poetry-dynamic-versioning]
@@ -76,3 +76,4 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+mypy_path = "typings"
