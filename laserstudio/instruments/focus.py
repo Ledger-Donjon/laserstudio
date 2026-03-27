@@ -40,16 +40,26 @@ class FocusSearchSettings:
         multi_peaks = config.get("multi_peaks", True)
         best_is_highest_z = config.get("best_is_highest_z", True)
 
-        if not isinstance(span, float):
-            raise ValueError("Span must be a float")
+        if not isinstance(span, float | int):
+            raise ValueError(
+                f"In configuration file, span must be a number (int or float): got {span}"
+            )
         if not isinstance(steps, int):
-            raise ValueError("Steps must be an integer")
+            raise ValueError(
+                f"In configuration file, steps must be an integer: got {steps}"
+            )
         if not isinstance(averaging, int):
-            raise ValueError("Averaging must be an integer")
+            raise ValueError(
+                f"In configuration file, averaging must be an integer: got {averaging}"
+            )
         if not isinstance(multi_peaks, bool):
-            raise ValueError("Multi peaks must be a boolean")
+            raise ValueError(
+                f"In configuration file, multi peaks must be a boolean: got {multi_peaks}"
+            )
         if not isinstance(best_is_highest_z, bool):
-            raise ValueError("Best is highest z must be a boolean")
+            raise ValueError(
+                f"In configuration file, best is highest z must be a boolean: got {best_is_highest_z}"
+            )
         if span <= 0:
             raise ValueError("Span must be positive")
         if steps < 2:
