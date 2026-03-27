@@ -24,13 +24,13 @@ class DeviceSearchError(Exception):
     def __init__(
         self,
         sn: str | None = None,
-        vid_pid: tuple[int, int] | None = None,
+        vid_pid: tuple[str, str] | None = None,
         location: str | None = None,
         dev: str | None = None,
     ):
         self.sn = sn
         if vid_pid is not None and vid_pid[0] is not None:
-            self.vid_pid = vid_pid
+            self.vid_pid: tuple[str, str] | None = vid_pid
         else:
             self.vid_pid = None
         self.location = location
@@ -89,8 +89,15 @@ def get_serial_device(config: str | Config) -> str:
                 sn = cast(str, config["sn"])
                 match_sn = (sn == port.serial_number) or (port.device.endswith(sn))
             if "vid" in config and "pid" in config:
-                vid = cast(str, config["vid"])
-                pid = cast(str, config["pid"])
+                if not isinstance(config["vid"], str) or not isinstance(
+                    config["pid"], str
+                ):
+                    raise ValueError(
+                        "In configuration file, 'vid' and 'pid' must be strings "
+                        "in hexadecimal format (eg. '1234', 'ABCD')"
+                    )
+                vid = config["vid"]
+                pid = config["pid"]
                 match_vid_pid = (vid == f"{port.vid or 0:04X}") and (
                     pid == f"{port.pid or 0:04X}"
                 )

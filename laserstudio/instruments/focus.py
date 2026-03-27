@@ -301,8 +301,10 @@ class FocusInstrument(Instrument):
                     "Stage position has less than 3 dimensions"
                 )
                 return
-            position = tuple[float, float, float](stage_position.data[:3])
-        self.autofocus_helper.register(position[0], position[1], position[2])
+            x, y, z = stage_position.data[:3]
+        else:
+            x, y, z = position
+        self.autofocus_helper.register(x, y, z)
         self.parameter_changed.emit(
             "autofocus_points", self.autofocus_helper.registered_points
         )
@@ -325,10 +327,10 @@ class FocusInstrument(Instrument):
             )
         self.stage.move_to(Vector(pos.x, pos.y, z), wait=True)
 
-    def magic_focus_state(self):
+    def magic_focus_state(self) -> Config:
         if (t := self.focus_thread) is None:
             return {"existing": False}
-        res: dict[str, Any] = {
+        res: Config = {
             "existing": True,
             "running": t.isRunning(),
             "finished": t.isFinished(),
@@ -413,7 +415,7 @@ class FocusInstrument(Instrument):
     @settings.setter
     def settings(self, data: Config):
         """Import settings from a dict."""
-        Instrument.settings.__set__(self, data)
+        Instrument.settings.__set__(self, data)  # type: ignore[attr-defined]
         points = data.get("autofocus_points", [])
         if isinstance(points, list) and len(points) == 3:
             self.autofocus_helper.clear()

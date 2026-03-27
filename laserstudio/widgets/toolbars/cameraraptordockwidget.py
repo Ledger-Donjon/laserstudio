@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QImage
 from ...utils import util
 
 if TYPE_CHECKING:
@@ -83,42 +83,42 @@ class CameraRaptorDockWidget(CameraDockWidget):
         col += 1
 
         # Set the exposure time
-        self.exposure_time_sb = w = QDoubleSpinBox()
-        w.setToolTip("Set the camera's exposure time")
-        w.setRange(0, 10000)
-        w.setSuffix(" ms")
-        w.setSingleStep(0.1)
-        w.setValue(self.camera.get_exposure_time_ms())
-        w.valueChanged.connect(self.camera.set_exposure_time_ms)
+        self.exposure_time_sb = w_sb = QDoubleSpinBox()
+        w_sb.setToolTip("Set the camera's exposure time")
+        w_sb.setRange(0, 10000)
+        w_sb.setSuffix(" ms")
+        w_sb.setSingleStep(0.1)
+        w_sb.setValue(self.camera.get_exposure_time_ms())
+        w_sb.valueChanged.connect(self.camera.set_exposure_time_ms)
         vbox.addWidget(w)
 
         # Set the gain
-        self.gain_sb = w = QDoubleSpinBox()
-        w.setToolTip("Set the camera's gain (dB)")
-        w.setRange(0, 48)
-        w.setSuffix(" dB")
-        w.setSingleStep(0.1)
-        w.setValue(self.camera.get_digital_gain_db())
-        w.valueChanged.connect(self.camera.set_digital_gain_db)
+        self.gain_sb = w_sb = QDoubleSpinBox()
+        w_sb.setToolTip("Set the camera's gain (dB)")
+        w_sb.setRange(0, 48)
+        w_sb.setSuffix(" dB")
+        w_sb.setSingleStep(0.1)
+        w_sb.setValue(self.camera.get_digital_gain_db())
+        w_sb.valueChanged.connect(self.camera.set_digital_gain_db)
         vbox.addWidget(w)
 
-        w = self.obj_combobox
-        w.blockSignals(True)
-        w.clear()
+        w_cb = self.obj_combobox
+        w_cb.blockSignals(True)
+        w_cb.clear()
         selected_index: int | None = None
         for x in [10, 20]:
             icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
-            w.addItem(icon, f"{x} X")
+            w_cb.addItem(icon, f"{x} X")
             if float(x) == self.camera.objective:
-                selected_index = w.count() - 1
-        w.blockSignals(False)
+                selected_index = w_cb.count() - 1
+        w_cb.blockSignals(False)
 
         if selected_index is not None:
-            w.setCurrentIndex(selected_index)
+            w_cb.setCurrentIndex(selected_index)
 
         # Show last image number
-        self.frame_no_label = w = QLabel(f"{self.camera.last_frame_number}")
-        w.setToolTip("The last image number")
+        self.frame_no_label = w_l = QLabel(f"{self.camera.last_frame_number}")
+        w_l.setToolTip("The last image number")
         vbox.addWidget(w)
 
         vbox.addStretch()
@@ -152,32 +152,31 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addWidget(w)
 
         # Label to show the temperature
-        self.temp_label = w = QLabel()
-        w.setToolTip("The camera's temperature")
-        w.setFixedWidth(150)
-        vbox.addWidget(w)
+        self.temp_label = w_l = QLabel()
+        w_l.setToolTip("The camera's temperature")
+        w_l.setFixedWidth(150)
+        vbox.addWidget(w_l)
         self.camera.temperature_changed.connect(
             lambda t: self.temp_label.setText(f"Temperature: {t:.2f}°C")
         )
 
-        self.temperature_setpoint = QDoubleSpinBox()
-        self.temperature_setpoint.setRange(-20, 20)
-        self.temperature_setpoint.setSuffix("°C")
-        self.temperature_setpoint.setSingleStep(1)
-        self.temperature_setpoint.setValue(self.camera.get_tec_temperature_setpoint())
-        self.temperature_setpoint.valueChanged.connect(
-            self.camera.set_tec_temperature_setpoint
-        )
-        vbox.addWidget(self.temperature_setpoint)
+        self.temperature_setpoint = w_sb = QDoubleSpinBox()
+        w_sb.setRange(-20, 20)
+        w_sb.setSuffix("°C")
+        w_sb.setSingleStep(1)
+        w_sb.setValue(self.camera.get_tec_temperature_setpoint())
+        w_sb.valueChanged.connect(self.camera.set_tec_temperature_setpoint)
+        vbox.addWidget(w_sb)
         vbox.addStretch()
 
         # At each new image:
         # Refresh the image number, temperature, exposure time and gain
-        self.camera.new_image.connect(
-            lambda _: (
-                self.camera.get_sensor_temperature(),
-                self.frame_no_label.setText(f"{self.camera.last_frame_number}"),
-                self.exposure_time_sb.setValue(self.camera.get_exposure_time_ms()),
-                self.gain_sb.setValue(self.camera.get_digital_gain_db()),
-            )
-        )
+        self.camera.new_image.connect(lambda _: self.on_new_image())
+
+    def on_new_image(self, _: QImage | None = None) -> None:
+        if isinstance(self.camera, CameraRaptorInstrument):
+            temperature = self.camera.get_sensor_temperature()
+            self.temp_label.setText(f"Temperature: {temperature:.2f}°C")
+            self.frame_no_label.setText(f"{self.camera.last_frame_number}")
+            self.exposure_time_sb.setValue(self.camera.get_exposure_time_ms())
+            self.gain_sb.setValue(self.camera.get_digital_gain())

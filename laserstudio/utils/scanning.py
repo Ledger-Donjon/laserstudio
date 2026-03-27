@@ -26,7 +26,7 @@ class RandomPointGenerator:
     geometry. Distribution is homogeneous.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.__geometry = MultiPolygon()
         # list of triangles and weight. Each element of this list is a tuple.
         # First element of tuple is triangle area.
@@ -114,7 +114,7 @@ class RandomPointGenerator:
         # Polygon area must be take into account.
         r = random.random() * self.__total_area
         chosen_triangle = None
-        area_acc = 0
+        area_acc = 0.0
         for triangle in self.__triangles:
             area_acc += triangle[0]
             if r <= area_acc:
@@ -164,7 +164,7 @@ class ScanPathGenerator(RandomPointGenerator):
     between consecutive points.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         # Number of points for each path.
         # The highest it is, the smaller is the mean distance between

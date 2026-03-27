@@ -4,6 +4,7 @@ from referencing._core import Resolver
 import json
 import logging
 import os.path
+from ..utils.yaml_types import Config
 
 logger = logging.getLogger("Config Generator")
 
@@ -17,7 +18,7 @@ def set_base_url(url: str):
     BASE_URL = url
 
 
-def resolve_references(uri: str):
+def resolve_references(uri: str) -> Config:
     return _resolve(_resolver.lookup(uri).contents, _resolver)
 
 
@@ -36,14 +37,18 @@ _registry = Registry(retrieve=_retrieve)
 _resolver = _registry.resolver()
 
 
-def _resolve(schema, resolver: Resolver):
-    if "oneOf" in schema:
+def _resolve(schema: Config, resolver: Resolver) -> Config:
+    if "oneOf" in schema and isinstance(schema["oneOf"], list):
         schema["oneOf"] = [
-            _resolve(subschema, resolver) for subschema in schema["oneOf"]
+            _resolve(subschema, resolver)
+            for subschema in schema["oneOf"]
+            if isinstance(subschema, dict)
         ]
-    if "allOf" in schema:
+    if "allOf" in schema and isinstance(schema["allOf"], list):
         schema["allOf"] = [
-            _resolve(subschema, resolver) for subschema in schema["allOf"]
+            _resolve(subschema, resolver)
+            for subschema in schema["allOf"]
+            if isinstance(subschema, dict)
         ]
         schema = _flatten(schema)
 
@@ -54,10 +59,12 @@ def _resolve(schema, resolver: Resolver):
         resolved = resolver.lookup(ref).contents
         resolved = _resolve(resolved, resolver)
         return resolved
-    elif "properties" in schema:
+    elif "properties" in schema and isinstance(schema["properties"], dict):
         for key, subschema in schema["properties"].items():
+            if not isinstance(subschema, dict):
+                continue
             schema["properties"][key] = _resolve(subschema, resolver)
-    elif "items" in schema:
+    elif "items" in schema and isinstance(schema["items"], dict):
         schema["items"] = _resolve(schema["items"], resolver)
     return schema
 

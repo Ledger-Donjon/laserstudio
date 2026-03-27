@@ -625,7 +625,7 @@ class SchemaWidget(QGroupBox):
 
         return result
 
-    def validate(self):
+    def validate(self) -> bool:
         try:
             validate(self.json(), self.schema)
             for anyOf in self.anyOfs:
@@ -634,4 +634,5 @@ class SchemaWidget(QGroupBox):
         except ValidationError as e:
             error = QErrorMessage()
             error.showMessage(f"Error on validation of {e.json_path[2:]}: {e.message}")
+            # Return True to allow the wizard to continue
             return True

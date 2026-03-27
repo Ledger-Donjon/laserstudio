@@ -44,42 +44,48 @@ class ConfigGenerator:
         """
         Convenience function to make a string dimmed.
         """
-        return Style.DIM + s + Style.RESET_ALL
+        f: str = Style.DIM + s + Style.RESET_ALL
+        return f
 
     @staticmethod
     def bold(s: str) -> str:
         """
         Convenience function to make a string bold.
         """
-        return Style.BRIGHT + s + Style.RESET_ALL
+        f: str = Style.BRIGHT + s + Style.RESET_ALL
+        return f
 
     @staticmethod
     def green(s: str) -> str:
         """
         Convenience function to make a string green.
         """
-        return Fore.GREEN + s + Fore.RESET
+        f: str = Fore.GREEN + s + Fore.RESET
+        return f
 
     @staticmethod
     def blue(s: str) -> str:
         """
         Convenience function to make a string blue.
         """
-        return Fore.BLUE + s + Fore.RESET
+        f: str = Fore.BLUE + s + Fore.RESET
+        return f
 
     @staticmethod
     def yellow(s: str) -> str:
         """
         Convenience function to make a string orange.
         """
-        return Fore.YELLOW + s + Fore.RESET
+        f: str = Fore.YELLOW + s + Fore.RESET
+        return f
 
     @staticmethod
     def red(s: str) -> str:
         """
         Convenience function to make a string red.
         """
-        return Fore.RED + s + Fore.RESET
+        f: str = Fore.RED + s + Fore.RESET
+        return f
 
     @staticmethod
     def finput(input: str) -> str:
@@ -95,6 +101,17 @@ class ConfigGenerator:
             ConfigGenerator.green(key)
             + (ConfigGenerator.red("*") if is_required else "")
         )
+
+    @staticmethod
+    def strtoscalar(value: str, type: str) -> ScalarType:
+        if type == "integer":
+            return int(value)
+        elif type == "number":
+            return float(value)
+        elif type == "boolean":
+            return value.lower() == "true"
+        else:
+            return value
 
     def prompt_with_hint(
         self,
@@ -134,33 +151,16 @@ class ConfigGenerator:
             values: list[ScalarType] = []
             for i, x in enumerate(x.split(",")):
                 try:
-                    if _type == "integer":
-                        x = int(x)
-                    elif _type == "number":
-                        x = float(x)
-                    elif _type == "boolean":
-                        if x.lower() not in ["true", "false"]:
-                            raise ValueError(f"{x} is an invalid boolean value")
-                        x = x.lower() == "true"
-                    values.append(x)
-
+                    values.append(ConfigGenerator.strtoscalar(x, _type))
                 except Exception as e:
                     self.logger.error(
-                        f"The {i + 1}th value for property {ConfigGenerator.fproperty(key)} is invalid: {e}"
+                        f"The {i + 1}th value for property {ConfigGenerator.fproperty(key)} is invalid: {e}. Please try again."
                     )
                     return self.prompt_with_hint(key, _type, hint, is_array)
             return values
 
         try:
-            if _type == "integer":
-                x = int(x)
-            elif _type == "number":
-                x = float(x)
-            elif _type == "boolean":
-                if x.lower() not in ["true", "false"]:
-                    raise ValueError(f"{x} is an invalid boolean value")
-                x = x.lower() == "true"
-            return x
+            return ConfigGenerator.strtoscalar(x, _type)
 
         except Exception as e:
             self.logger.error(
@@ -561,7 +561,7 @@ class ConfigGenerator:
             __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
             self.use_local = True
 
-    def load_schema(self):
+    def load_schema(self) -> None:
         # Fetch the JSON schema from the URL
         if self.use_local:
             __dirname = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -570,7 +570,7 @@ class ConfigGenerator:
         schema = resolve_references(self.schema_uri)
         self.logger.info("Schema loaded successfully")
         self.logger.debug(json.dumps(schema, indent=2))
-        self.schema: dict[str, Any] = schema
+        self.schema: Config = schema
 
     @staticmethod
     def print_intro():
