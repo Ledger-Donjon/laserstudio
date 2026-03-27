@@ -1,3 +1,10 @@
+from __future__ import annotations
+import os
+import time
+import math
+from typing import Any, cast, TYPE_CHECKING
+import yaml
+from PIL import Image, ImageDraw
 from PyQt6.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
@@ -16,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QShortcut, QImage, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from .scan_file import ScanFile
 from ...instruments.instruments import (
     Instruments,
     CameraNITInstrument,
@@ -24,6 +32,8 @@ from ...instruments.instruments import (
     CameraInstrument,
     FocusInstrument,
 )
+from ...instruments.stage import Vector
+from ...utils.yaml_types import Config
 from ...widgets.stagesight import StageSight, StageSightViewer
 from ...widgets.toolbars import (
     CameraNITDockWidget,
@@ -35,14 +45,6 @@ from ...widgets.toolbars import (
     PhotoEmissionDockWidget,
     MainToolBar,
 )
-from PIL import Image, ImageDraw
-from pystages import Vector
-import time
-from typing import Optional, Any, cast, TYPE_CHECKING
-import math
-from .scan_file import ScanFile
-import os
-import yaml
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -72,7 +74,7 @@ class ScanThread(QThread):
         stage: StageInstrument,
         bl: Vector,
         tr: Vector,
-        focus: Optional[FocusInstrument],
+        focus: FocusInstrument | None,
         chipscan: "ChipScan",
     ):
         """
@@ -352,7 +354,7 @@ class ChipScan(QMainWindow):
 
         self.camera.new_image.connect(self.refresh)
         hbox.addWidget(w)
-        self.positions: list[Optional[Vector]] = [None] * len(self.pos_buttons)
+        self.positions: list[Vector | None] = [None] * len(self.pos_buttons)
 
         self.file_prefix = QLineEdit()
         self.file_prefix.setPlaceholderText("File prefix")
@@ -362,7 +364,7 @@ class ChipScan(QMainWindow):
         w.hide()
         hbox.addWidget(w)
 
-        self._last_image: Optional[Image.Image] = None
+        self._last_image: Image.Image | None = None
 
     @property
     def last_image(self):
@@ -531,7 +533,7 @@ class ChipScan(QMainWindow):
         disp_x = (self.camera.pixel_size_in_um[0] / mag) * self.camera.width
         # Calculate side pos and move stage
         side_pos = (start_pos[0] + disp_x, start_pos[1], start_pos[2])
-        self.stage.stage.wait_routine = lambda: (print("routine"))
+        self.stage.stage.wait_routine = lambda: print("routine")
         print("move")
         self.stage.move_to(Vector(*side_pos), wait=True, backlash=True)
         # Wait for 2 seconds
@@ -556,7 +558,7 @@ class ChipScan(QMainWindow):
         """
         Save some settings in the settings.yaml file.
         """
-        data: dict[str, Any] = {}
+        data: Config = {}
 
         # Camera settings
         if self.instruments.camera is not None:
