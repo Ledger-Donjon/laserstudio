@@ -1,0 +1,4 @@
+{
+  "stubPath": "typings",
+  "include": ["laserstudio", "tests", "typings"]
+}
