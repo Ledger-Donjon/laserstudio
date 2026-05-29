@@ -216,10 +216,10 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         """
         whole_command = command.value + data + RaptorErrorCode.ETX.value
         if checksum:
-            _checksum = 0
+            checksum_value = 0
             for byte in whole_command:
-                _checksum ^= byte
-            whole_command += _checksum.to_bytes(1, "big")
+                checksum_value ^= byte
+            whole_command += checksum.to_bytes(1, "big")
 
         # print(f"RAPTOR > {whole_command.hex()}")
         self.serial.write(whole_command)

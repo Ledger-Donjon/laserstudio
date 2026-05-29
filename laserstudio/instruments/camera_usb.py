@@ -21,13 +21,15 @@ class CameraUSBInstrument(CameraInstrument):
             raise ValueError("index must be an integer in configuration file")
         self.vc = self.__video_capture = cv2.VideoCapture(index)
 
-        width = config.get("width", self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        width = config.get(
+            "width", int(self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        )
         if not isinstance(width, int):
             raise ValueError("width must be an integer in configuration file")
         self.width = int(width)
 
         height = config.get(
-            "height", self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            "height", int(self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         )
         if not isinstance(height, int):
             raise ValueError("height must be an integer in configuration file")

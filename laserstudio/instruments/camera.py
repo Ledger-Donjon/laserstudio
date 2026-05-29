@@ -19,7 +19,7 @@ class CameraInstrument(Instrument):
     # Signal emitted when a new image is created
     new_image = pyqtSignal(QImage)
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         """
         :param config: YAML configuration object
         """
@@ -48,11 +48,11 @@ class CameraInstrument(Instrument):
         self.correction_matrix: QTransform | None = None
 
         # Shutter
-        shutter: Config | None = config.get("shutter")
         self.shutter: ShutterInstrument | None = None
+        shutter = config.get("shutter")
         if isinstance(shutter, dict) and shutter.get("enable", True):
             try:
-                if (device_type := cast(str, shutter.get("type"))) == "TIC":
+                if (device_type := shutter.get("type")) == "TIC":
                     self.shutter = TicShutterInstrument(shutter)
                 else:
                     logging.getLogger("laserstudio").error(
@@ -520,7 +520,8 @@ class CameraInstrument(Instrument):
             settings["transform"] = qtransform_to_yaml(self.correction_matrix)
         settings["white_level"] = self.white_level
         settings["black_level"] = self.black_level
-        settings["shutter"] = self.shutter.settings if self.shutter else None
+        if self.shutter is not None:
+            settings["shutter"] = self.shutter.settings
         settings["image_averaging"] = self.image_averaging
         settings["windowed_averaging"] = self.windowed_averaging
         settings["objective"] = self.objective
