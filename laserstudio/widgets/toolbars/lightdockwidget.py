@@ -54,7 +54,7 @@ class LightDockWidget(QDockWidget):
         w.setRange(0, 100)
         w.setValue(int(self.light.intensity * 100))
         w.setToolTip("Intensity of the light")
-        w.setSingleStep(10)
+        w.setSingleStep(1)
 
         w.valueChanged.connect(self.set_intensity)
         hbox.addWidget(w)

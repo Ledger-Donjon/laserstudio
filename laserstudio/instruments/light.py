@@ -23,14 +23,14 @@ class LightInstrument(Instrument):
     @property
     def intensity(self) -> float:
         """
-        The intensity of the light.
+        The intensity of the light in range [0.0, 1.0].
         """
         return 0.0
 
     @intensity.setter
     def intensity(self, value: float):
         """
-        Set the intensity of the light.
+        Set the intensity of the light in range [0.0, 1.0].
         """
 
     @property

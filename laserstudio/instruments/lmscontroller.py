@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pylmscontroller import LMSController, MotorState, ControlMode
 from typing import cast
 from .shutter import ShutterInstrument
@@ -37,8 +38,25 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
 
     # Shutter operations
     @property
-    def open(self):
-        return ShutterInstrument.open.__get__(self)
+    def open(self) -> bool:
+        """
+        Whether the shutter is open (eg camera can acquire images, light source is on...).
+        """
+        if self.motor == 1:
+            state = self.lms.measured_motor_1_position
+        elif self.motor == 2:
+            state = self.lms.measured_motor_2_position
+        elif self.motor == 3:
+            state = self.lms.measured_motor_3_position
+        else:
+            raise ValueError(f"Invalid motor index: {self.motor}")
+
+        # Consider the open_is_slidein configuration
+        return (
+            state == MotorState.SLIDE_IN
+            if self.open_is_slidein
+            else state == MotorState.SLIDE_OUT
+        )
 
     @open.setter
     def open(self, value: bool):
@@ -63,20 +81,35 @@ class LMSControllerInstrument(ShutterInstrument, LightInstrument):
     # Light operations
     @property
     def light(self):
+        """
+        Whether the light is on.
+        """
         return self.lms.led_activation
 
     @light.setter
     def light(self, value: bool):
+        """
+        Set the light to on or off.
+        """
         self.lms.led_activation = value
         self.lms.apply()
 
     @property
     def intensity(self):
-        return self.lms.led_current / self.lms.MAX_IR_LED_CURRENT
+        """
+        The intensity of the light in range [0.0, 1.0].
+        """
+        return self.lms.led_current / self.lms.MAX_IR_LED_CURRENT_MA
 
     @intensity.setter
     def intensity(self, value: float):
-        self.lms.led_current = value * self.lms.MAX_IR_LED_CURRENT
+        """
+        Set the intensity of the light in range [0.0, 1.0].
+        """
+        logging.getLogger("laserstudio").debug(f"Setting light intensity to {value}")
+        value_float = float(int(value * self.lms.MAX_IR_LED_CURRENT_MA))
+        logging.getLogger("laserstudio").debug(f"Applying: {value_float} to the device")
+        self.lms.led_current = value_float
         self.lms.apply()
 
     def __del__(self):

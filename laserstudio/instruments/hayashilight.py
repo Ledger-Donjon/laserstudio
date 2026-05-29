@@ -44,10 +44,16 @@ class HayashiLRInstrument(LightInstrument):
 
     @property
     def intensity(self):
+        """
+        The intensity of the light in range [0.0, 1.0].
+        """
         return self.hyslr.intensity
 
     @intensity.setter
     def intensity(self, value: float):
+        """
+        Set the intensity of the light in range [0.0, 1.0].
+        """
         self.hyslr.intensity = value
 
     @property
