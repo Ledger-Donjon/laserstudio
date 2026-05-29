@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import os
+import logging
 import time
 import math
 from typing import Any, cast, TYPE_CHECKING
@@ -223,8 +225,18 @@ class ScanThread(QThread):
         self.__move_to_tile(0, 0)
 
 
+logging.basicConfig(level=logging.WARNING)
+
+
 class ChipScan(QMainWindow):
-    def __init__(self, config: dict):
+    def set_log_level(self, level: int):
+        """
+        Set the log level of the logger "laserstudio".
+        """
+        logging.getLogger("laserstudio").setLevel(level)
+        logging.getLogger("chipscan").setLevel(level)
+
+    def __init__(self, config: Config):
         """
         Laser Studio main window.
 
@@ -331,13 +343,15 @@ class ChipScan(QMainWindow):
             ("Upper-left corner", 1, 0),
             ("Lower-right corner", 2, 0),
         )
+        self.positions: list[Vector | None] = [None, None]
         self.pos_buttons: list[QPushButton] = []
         for i, (label, row, col) in enumerate(positions):
             grid.addWidget(QLabel(label + ":"), row, col)
-            w = QPushButton("Set")
+            w = QPushButton()
             w.clicked.connect(lambda _, bound_i=i: self.set_pos(bound_i))
             self.pos_buttons.append(w)
             grid.addWidget(w, row, col + 1)
+        self.update_positions_button_texts()
 
         # Button to start images acquisition
         w = self.acquire_button = QPushButton("Acquire images")
@@ -354,11 +368,11 @@ class ChipScan(QMainWindow):
 
         self.camera.new_image.connect(self.refresh)
         hbox.addWidget(w)
-        self.positions: list[Vector | None] = [None] * len(self.pos_buttons)
 
         self.file_prefix = QLineEdit()
         self.file_prefix.setPlaceholderText("File prefix")
         self.file_prefix.setText("scan")
+        grid.addWidget(self.file_prefix, 4, 0, 1, 2)
 
         w = self.scan_progress_bar = QProgressBar()
         w.hide()
@@ -402,7 +416,7 @@ class ChipScan(QMainWindow):
             QMessageBox.question(
                 self,
                 "Start ?",
-                "{0} tiles to be captured. Continue ?".format(t.num_tiles),
+                f"{t.num_tiles} tiles to be captured. Continue ?",
             )
             == QMessageBox.StandardButton.Yes
         ):
@@ -459,6 +473,16 @@ class ChipScan(QMainWindow):
         """
         self.acquire_button.setEnabled(all(pos is not None for pos in self.positions))
 
+    def update_positions_button_texts(self):
+        """
+        Update the texts of the positions buttons.
+        """
+        for button, pos in zip(self.pos_buttons, self.positions):
+            if pos is not None:
+                button.setText("{0:.0f}, {1:.0f}".format(pos[0], pos[1]))
+            else:
+                button.setText("Set")
+
     def set_pos(self, index: int):
         """
         Called when a button to define a position parameter has been clicked.
@@ -467,14 +491,8 @@ class ChipScan(QMainWindow):
         :param index: Position index.
         """
         pos = self.stage.position
-        self.positions[index] = Vector(pos.x, pos.y, pos.z)
-        button = self.pos_buttons[index]
-        if index < 2:
-            # Corner points, no need to display Z
-            button.setText("{0:.0f}, {1:.0f}".format(pos[0], pos[1]))
-        else:
-            # Focus points
-            button.setText("{0:.0f}, {1:.0f}, {2:.0f}".format(pos[0], pos[1], pos[2]))
+        self.positions[index] = Vector(*pos.data)
+        self.update_positions_button_texts()
         self.update_acquire_button_enable()
 
         if index + 1 < len(self.pos_buttons):
@@ -533,25 +551,28 @@ class ChipScan(QMainWindow):
         disp_x = (self.camera.pixel_size_in_um[0] / mag) * self.camera.width
         # Calculate side pos and move stage
         side_pos = (start_pos[0] + disp_x, start_pos[1], start_pos[2])
-        self.stage.stage.wait_routine = lambda: print("routine")
-        print("move")
+        self.stage.stage.wait_routine = lambda: logging.getLogger("chipscan").info(
+            "routine"
+        )
+        logging.getLogger("chipscan").info("move")
         self.stage.move_to(Vector(*side_pos), wait=True, backlash=True)
         # Wait for 2 seconds
-        print("wait")
+        logging.getLogger("chipscan").info("wait")
         d = 20
         while d > 0:
             time.sleep(0.1)
             d -= 1
             QApplication.processEvents()
+
         # Take image
-        print("wait done")
+        logging.getLogger("chipscan").info("wait done")
         im = self.camera.get_last_qimage()
         self.image_label_right.setPixmap(QPixmap.fromImage(im))
         self.image_label_right.show()
         # Return to starting position
-        print("moveback")
+        logging.getLogger("chipscan").info("moveback")
         self.stage.move_to(start_pos, wait=True, backlash=True)
-        print("moveback done")
+        logging.getLogger("chipscan").info("moveback done")
         # self.instruments.stage.enable_joystick()
 
     def save_settings(self):
@@ -568,7 +589,17 @@ class ChipScan(QMainWindow):
         if self.instruments.focus_helper is not None:
             data["focus"] = self.instruments.focus_helper.settings
 
-        yaml.dump(data, open("settings.yaml", "w"))
+        # Center cross
+        data["center_cross"] = self.center_cross_checkbox.isChecked()
+        # Margin
+        data["margin"] = self.margin_checkbox.isChecked()
+        # File prefix
+        data["file_prefix"] = self.file_prefix.text()
+        # Positions
+        if all(pos is not None for pos in self.positions):
+            data["positions"] = [pos.data for pos in self.positions if pos is not None]
+
+        yaml.dump(data, open("chipscan_settings.yaml", "w"))
 
     def reload_settings(self):
         """
@@ -587,3 +618,14 @@ class ChipScan(QMainWindow):
         focus = data.get("focus")
         if self.instruments.focus_helper is not None and focus is not None:
             self.instruments.focus_helper.settings = focus
+
+        # Center cross
+        self.center_cross_checkbox.setChecked(data.get("center_cross", False))
+        # Margin
+        self.margin_checkbox.setChecked(data.get("margin", True))
+        # File prefix
+        self.file_prefix.setText(data.get("file_prefix", "scan"))
+        # Positions
+        self.positions = [Vector(*pos) for pos in data.get("positions", [None, None])]
+        self.update_positions_button_texts()
+        self.update_acquire_button_enable()

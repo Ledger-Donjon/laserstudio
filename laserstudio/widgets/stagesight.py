@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from enum import Enum, auto
 from typing import Any
@@ -38,8 +39,9 @@ class StageSightViewer(QGraphicsView):
 
         NONE = auto()
         STAGE = auto()
+        OFFSET_ORIGIN = auto()
 
-    def __init__(self, stage_sight: "StageSight", parent: QWidget | None = None):
+    def __init__(self, stage_sight: StageSight, parent: QWidget | None = None):
         super().__init__(parent)
         self.stage_sight = stage_sight
         self.__scene = s = QGraphicsScene(self)
