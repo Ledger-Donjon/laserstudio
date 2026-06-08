@@ -23,6 +23,7 @@ viewer
 scan
 rest
 lsapi
+mcp
 ```
 
 # Indices and tables

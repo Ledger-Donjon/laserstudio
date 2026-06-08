@@ -67,6 +67,7 @@ Extras are defined in `pyproject.toml` under `[project.optional-dependencies]`:
 | `test` | Unit tests ([pytest], [pytest-cov]) | `pip install laserstudio[test]` |
 | `lint` | Static typing ([mypy] and stubs) | `pip install laserstudio[lint]` |
 | `docs` | Building documentation ([Sphinx], RTD theme, MyST) | `pip install laserstudio[docs]` |
+| `mcp` | MCP server ([mcp]) exposing Laser Studio to MCP clients | `pip install laserstudio[mcp]` |
 
 From a clone, combine extras, for example:
 
@@ -116,6 +117,7 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [pypdm]: https://pypi.org/project/pypdm
 [fastapi]: https://pypi.org/project/fastapi
 [uvicorn]: https://pypi.org/project/uvicorn
+[mcp]: https://pypi.org/project/mcp
 [hidapi]: https://pypi.org/project/hidapi
 [colorama]: https://pypi.org/project/colorama/
 [pytest]: https://pypi.org/project/pytest/
