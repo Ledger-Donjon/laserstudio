@@ -226,6 +226,9 @@ fastapi_app = FastAPI(
     title="LaserStudio REST API",
     version="2.0",
     description="REST API to control Laser Studio from external applications.",
+    # Serve the Swagger UI at the root (as the previous flask-restx server did).
+    docs_url="/",
+    redoc_url="/redoc",
 )
 
 
