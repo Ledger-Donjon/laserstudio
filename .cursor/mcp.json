@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "laserstudio": {
-      "command": "poetry",
-      "args": ["run", "laserstudio_mcp"],
+      "command": "/Volumes/Work/Gits/Ledger-Donjon/laserstudio/.venv/bin/laserstudio_mcp",
       "env": {
         "LASERSTUDIO_HOST": "localhost",
         "LASERSTUDIO_PORT": "4444"
