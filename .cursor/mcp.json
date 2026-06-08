@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "laserstudio": {
+      "command": "poetry",
+      "args": ["run", "laserstudio_mcp"],
+      "env": {
+        "LASERSTUDIO_HOST": "localhost",
+        "LASERSTUDIO_PORT": "4444"
+      }
+    }
+  }
+}
