@@ -131,8 +131,10 @@ def raise_for_response(response: requests.Response) -> None:
                 details = raw_details
         elif isinstance(error, str):
             message = error
+        elif isinstance(payload.get("detail"), str):
+            # FastAPI default error shape (e.g. unknown route): {"detail": "..."}
+            message = payload["detail"]
         elif isinstance(payload.get("message"), str):
-            # flask-restx default error shape: {"message": "..."}
             message = payload["message"]
 
     if message is None:

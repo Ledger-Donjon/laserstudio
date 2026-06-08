@@ -3,6 +3,15 @@
 Laser Studio serves a REST API to be controlled by external applications.
 By default, it runs by serving the api on the port 4444.
 
+The API is built with [FastAPI]. Interactive, auto-generated documentation is
+available while Laser Studio is running:
+
+* Swagger UI: <http://localhost:4444/docs>
+* ReDoc: <http://localhost:4444/redoc>
+* OpenAPI schema: <http://localhost:4444/openapi.json>
+
+[FastAPI]: https://fastapi.tiangolo.com/
+
 ## Error handling
 
 On success, endpoints return a `2xx` status code. On error, they return an

@@ -53,7 +53,7 @@ These packages are installed automatically with `laserstudio` (see `pyproject.to
 | [requests] | HTTP |
 | [numpy], [scipy] | Numerics |
 | [pypdm] | PDM protocol |
-| [flask], [flask-restx] | REST API |
+| [fastapi], [uvicorn] | REST API |
 | [hidapi] | USB HID |
 | [colorama] | Terminal colors |
 | [hyshlr], pylmscontroller | Ledger hardware integration |
@@ -114,8 +114,8 @@ LaserStudio is released under GNU Lesser General Public License version 3 (LGPLv
 [numpy]: https://pypi.org/project/numpy/
 [scipy]: https://pypi.org/project/scipy/
 [pypdm]: https://pypi.org/project/pypdm
-[flask]: https://pypi.org/project/flask
-[flask-restx]: https://pypi.org/project/flask-restx
+[fastapi]: https://pypi.org/project/fastapi
+[uvicorn]: https://pypi.org/project/uvicorn
 [hidapi]: https://pypi.org/project/hidapi
 [colorama]: https://pypi.org/project/colorama/
 [pytest]: https://pypi.org/project/pytest/

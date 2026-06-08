@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import functools
 import io
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
-import flask
 import numpy
-from flask_restx import Api, Resource, fields
-from flask_restx.api import HTTPStatus
-from PIL.Image import Image
+import uvicorn
+from fastapi import APIRouter, Body, FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from PyQt6.QtCore import (
     QMetaObject,
     QObject,
@@ -34,13 +37,13 @@ if TYPE_CHECKING:
 
 class RestProxy(QObject):
     """
-    Executes the REST requests (which originate from the Flask thread) in the
-    same thread as Laser Studio (the GUI thread).
+    Executes the REST requests (which originate from the uvicorn worker threads)
+    in the same thread as Laser Studio (the GUI thread).
 
     A single generic slot (:meth:`_execute`) runs an arbitrary callable in the
     GUI thread and ships back either its return value or the exception it
-    raised. This removes the need for one typed ``QVariant`` slot per action and
-    lets domain exceptions propagate all the way to the HTTP layer.
+    raised. This removes the need for one typed slot per action and lets domain
+    exceptions propagate all the way to the HTTP layer.
     """
 
     def __init__(self, laser_studio: LaserStudio, config: Config):
@@ -56,7 +59,7 @@ class RestProxy(QObject):
         """Run ``box['call']`` in the GUI thread, capturing result or exception.
 
         The result is written back into the (mutable) ``box`` dictionary, which
-        is shared by reference with the caller in the Flask thread. A return
+        is shared by reference with the caller in the REST thread. A return
         value is intentionally *not* used: ``Q_RETURN_ARG('PyQt_PyObject')`` is
         unreliable across PyQt versions, whereas mutating a passed-by-reference
         object is robust.
@@ -109,7 +112,7 @@ class RestProxy(QObject):
     def handle_position(self, pos: list[float] | None) -> dict[str, Any]:
         return self.laser_studio.handle_position(pos)
 
-    def handle_camera(self, path: str | None) -> Image | None:
+    def handle_camera(self, path: str | None) -> Any:
         return self.laser_studio.handle_camera(path)
 
     def handle_camera_accumulator(self, path: str | None) -> Any:
@@ -123,7 +126,7 @@ class RestProxy(QObject):
     ) -> Any:
         return self.laser_studio.handle_camera_reference(dotake, refname)
 
-    def handle_screenshot(self, path: str | None) -> Image:
+    def handle_screenshot(self, path: str | None) -> Any:
         return self.laser_studio.handle_screenshot(path)
 
     def handle_laser(
@@ -143,7 +146,7 @@ class RestProxy(QObject):
 
 class RestThread(QThread):
     """
-    Subclass of QThread where to launch the Rest server.
+    Subclass of QThread where to launch the REST (uvicorn) server.
     """
 
     def __init__(self, config: dict[str, Any], parent: QObject | None = None) -> None:
@@ -176,11 +179,16 @@ class RestServer(QObject):
     @staticmethod
     def serve(host: str, port: int):
         """
-        Launch flask's REST server on the given port
+        Launch the uvicorn server on the given host/port.
 
-        :param port: The HTTP port to listen
+        uvicorn only installs OS signal handlers when running in the main
+        thread, so it is safe to run it here from the REST :class:`QThread`.
+
+        :param host: The network interface to listen on.
+        :param port: The HTTP port to listen on.
         """
-        flask_app.run(host=host, port=port)
+        config = uvicorn.Config(fastapi_app, host=host, port=port, log_level="warning")
+        uvicorn.Server(config).run()
 
     @staticmethod
     def run(member: str, *args: Any) -> Any:
@@ -189,7 +197,7 @@ class RestServer(QObject):
 
         The call is blocking until execution is done. If the handler raises an
         exception (e.g. a :class:`~laserstudio.restserver.errors.LaserStudioError`),
-        that exception is re-raised here, in the Flask thread, so it can be
+        that exception is re-raised here, in the REST thread, so it can be
         translated into an HTTP error response.
 
         :param member: The name of the handler method on :class:`RestProxy`.
@@ -210,288 +218,266 @@ class RestServer(QObject):
         return box["result"]
 
 
-flask_app = flask.Flask(__name__)
-flask_api = Api(flask_app, version="1.2", title="LaserStudio REST API")
+# --------------------------------------------------------------------------- #
+# FastAPI application
+# --------------------------------------------------------------------------- #
 
-
-error_model = flask_api.model(
-    "Error",
-    {
-        "code": fields.String(
-            description="Machine-readable error code.",
-            example="INSTRUMENT_NOT_FOUND",
-        ),
-        "message": fields.String(description="Human-readable error message."),
-        "details": fields.Raw(description="Optional structured context."),
-    },
+fastapi_app = FastAPI(
+    title="LaserStudio REST API",
+    version="2.0",
+    description="REST API to control Laser Studio from external applications.",
 )
-error_envelope = flask_api.model("ErrorEnvelope", {"error": fields.Nested(error_model)})
 
 
-@flask_api.errorhandler(LaserStudioError)
-def handle_laserstudio_error(error: LaserStudioError):
+class ErrorDetail(BaseModel):
+    code: str = Field(examples=["INSTRUMENT_NOT_FOUND"])
+    message: str
+    details: dict[str, Any] = {}
+
+
+class ErrorEnvelope(BaseModel):
+    error: ErrorDetail
+
+
+# Reusable OpenAPI documentation for the error responses.
+_ERR = {"model": ErrorEnvelope}
+
+
+@fastapi_app.exception_handler(LaserStudioError)
+async def _laserstudio_error_handler(request: Request, exc: LaserStudioError):
     """Translate a domain error into a normalized HTTP error response."""
-    return error.to_dict(), error.http_status
+    return JSONResponse(status_code=exc.http_status, content=exc.to_dict())
 
 
-def _require_json() -> dict[str, Any]:
-    """Return the request JSON body, raising on invalid input.
-
-    :raises InvalidParameterError: If the body is not a JSON object.
-    """
-    if not flask.request.is_json:
-        raise InvalidParameterError("Request body must be JSON.")
-    json = flask.request.json
-    if not isinstance(json, dict):
-        raise InvalidParameterError("Request body must be a JSON object.")
-    return json
-
-
-image = flask_api.namespace("images", description="Get some images")
-path_png = image.model("Image Path", {"path": fields.String(example="/tmp/image.png")})
-path_file = image.model("File Path", {"path": fields.String(example="/tmp/file.bin")})
-
-
-@image.route("/screenshot")
-class Screenshot(Resource):
-    @image.produces(["image/png"])
-    def get(self):
-        im = RestServer.run("handle_screenshot", None)
-        buffer = io.BytesIO()
-        im.save(buffer, format="PNG")
-        buffer.seek(0)
-        return flask.send_file(buffer, mimetype="image/png")
-
-    @image.expect(path_png)
-    def post(self):
-        json = _require_json()
-        RestServer.run("handle_screenshot", json.get("path"))
-        return ""
-
-
-@image.route("/camera")
-class Camera(Resource):
-    @image.produces(["image/png"])
-    @image.response(
-        HTTPStatus.SERVICE_UNAVAILABLE, "No camera is available", error_envelope
+@fastapi_app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request: Request, exc: RequestValidationError):
+    """Return the normalized error body for request validation failures."""
+    return JSONResponse(
+        status_code=HTTPStatus.BAD_REQUEST,
+        content={
+            "error": {
+                "code": "INVALID_PARAMETER",
+                "message": "Invalid request.",
+                "details": {"errors": jsonable_encoder(exc.errors())},
+            }
+        },
     )
-    def get(self):
-        im = RestServer.run("handle_camera", None)
-        buffer = io.BytesIO()
-        im.save(buffer, format="PNG")
-        buffer.seek(0)
-        return flask.send_file(buffer, mimetype="image/png")
-
-    @image.expect(path_png)
-    def post(self):
-        json = _require_json()
-        RestServer.run("handle_camera", json.get("path"))
-        return ""
 
 
-@image.route("/camera/accumulator")
-class CameraAccumulator(Resource):
-    @image.response(
-        HTTPStatus.SERVICE_UNAVAILABLE,
-        "No camera/data is available",
-        error_envelope,
+class PathBody(BaseModel):
+    path: str | None = Field(default=None, examples=["/tmp/image.png"])
+
+
+class PositionBody(BaseModel):
+    pos: list[float] = Field(examples=[[42.5, 44.1, -10.22]])
+
+
+class MarkerBody(BaseModel):
+    pos: list[list[float]] | None = Field(default=None, examples=[[[42.5, 44.1]]])
+    color: list[float] | None = Field(default=None, examples=[[0.0, 1.0, 0.0, 0.5]])
+    label: str | None = None
+    visible: bool = True
+
+
+class InstrumentSettingsBody(BaseModel):
+    settings: dict[str, Any]
+
+
+# --- images ---------------------------------------------------------------- #
+
+images_router = APIRouter(prefix="/images", tags=["images"])
+
+
+@images_router.get("/screenshot", responses={200: {"content": {"image/png": {}}}})
+def get_screenshot() -> Response:
+    """Return the screenshot of the viewer as a PNG image."""
+    im = RestServer.run("handle_screenshot", None)
+    buffer = io.BytesIO()
+    im.save(buffer, format="PNG")
+    return Response(content=buffer.getvalue(), media_type="image/png")
+
+
+@images_router.post("/screenshot")
+def post_screenshot(body: PathBody) -> str:
+    """Save the screenshot to ``path`` on the serving machine."""
+    RestServer.run("handle_screenshot", body.path)
+    return ""
+
+
+@images_router.get(
+    "/camera",
+    responses={200: {"content": {"image/png": {}}}, 503: _ERR},
+)
+def get_camera() -> Response:
+    """Return the main camera image as a PNG image."""
+    im = RestServer.run("handle_camera", None)
+    buffer = io.BytesIO()
+    im.save(buffer, format="PNG")
+    return Response(content=buffer.getvalue(), media_type="image/png")
+
+
+@images_router.post("/camera", responses={503: _ERR})
+def post_camera(body: PathBody) -> str:
+    """Save the main camera image to ``path`` on the serving machine."""
+    RestServer.run("handle_camera", body.path)
+    return ""
+
+
+@images_router.get("/camera/accumulator", responses={503: _ERR})
+def get_accumulator() -> Response:
+    """Return the camera accumulator data as a numpy ``.npy`` payload."""
+    frame = RestServer.run("handle_camera_accumulator", None)
+    buffer = io.BytesIO()
+    numpy.save(buffer, frame)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": "attachment; filename=accumulator.npy"},
     )
-    def get(self):
-        frame = RestServer.run("handle_camera_accumulator", None)
-        buffer = io.BytesIO()
-        numpy.save(buffer, frame)
-        buffer.seek(0)
-        return flask.send_file(
-            buffer, mimetype="application/octet-stream", download_name="accumulator.npy"
-        )
-
-    @image.expect(path_file)
-    def post(self):
-        json = _require_json()
-        path = json.get("path")
-        RestServer.run("handle_camera_accumulator", path)
-        return path
 
 
-count = image.model("Average Count", {"count": fields.Integer(example="50")})
+@images_router.post("/camera/accumulator", responses={503: _ERR})
+def post_accumulator(body: PathBody) -> str | None:
+    """Save the camera accumulator data to ``path`` on the serving machine."""
+    RestServer.run("handle_camera_accumulator", body.path)
+    return body.path
 
 
-@image.route("/camera/averaging")
-class CameraAveraging(Resource):
-    @image.response(200, "Get the current number of averaged images")
-    def get(self):
-        return RestServer.run("handle_camera_average", False)
-
-    @image.response(200, "Clear the current average")
-    def delete(self):
-        return RestServer.run("handle_camera_average", True)
+@images_router.get("/camera/averaging")
+def get_averaging() -> int:
+    """Return the current number of averaged images."""
+    return int(RestServer.run("handle_camera_average", False))
 
 
-@image.route("/camera/reference/")
-@image.route("/camera/reference/<refname>")
-class CameraReference(Resource):
-    @image.response(200, "Select the reference image")
-    def get(self, refname: str | None = None):
-        return RestServer.run("handle_camera_reference", None, refname)
-
-    @image.response(200, "Set the reference image")
-    def post(self, refname: str | None = None):
-        return RestServer.run("handle_camera_reference", True, refname)
-
-    @image.response(200, "Unset the reference image")
-    def delete(self, refname: str | None = None):
-        return RestServer.run("handle_camera_reference", False, refname)
+@images_router.delete("/camera/averaging")
+def delete_averaging() -> int:
+    """Clear the current average and return the new count."""
+    return int(RestServer.run("handle_camera_average", True))
 
 
-motion = flask_api.namespace("motion", description="Control stage position")
-
-viewer_pos = fields.List(fields.Float, example=[42.5, 44.1])
-stage_pos = fields.List(fields.Float, example=[42.5, 44.1, -10.22])
-laser_gonext = motion.model(
-    "Laser GoNext parameters", {"current_percentage": fields.Float}
-)
-lasers_gonext = motion.model(
-    "Lasers GoNext parameters",
-    {
-        "lasers": fields.List(fields.Nested(laser_gonext)),
-    },
-)
-gonext_response = motion.model(
-    "Go Next Response",
-    {
-        "next_point_geometry": stage_pos,
-        "lasers": fields.List(fields.Nested(laser_gonext)),
-        "next_point_applied": viewer_pos,
-    },
-)
+@images_router.get("/camera/reference", responses={503: _ERR})
+@images_router.get("/camera/reference/{refname}", responses={503: _ERR})
+def get_reference(refname: str | None = None):
+    """Select and return the current reference image name."""
+    return RestServer.run("handle_camera_reference", None, refname)
 
 
-@motion.route("/go_next")
-class GoNext(Resource):
-    @motion.response(HTTPStatus.CONFLICT, "Scanning is not enabled", error_envelope)
-    def post(self):
-        return RestServer.run("handle_go_next")
+@images_router.post("/camera/reference", responses={503: _ERR})
+@images_router.post("/camera/reference/{refname}", responses={503: _ERR})
+def post_reference(refname: str | None = None):
+    """Take a new reference image and return its name."""
+    return RestServer.run("handle_camera_reference", True, refname)
 
 
-@motion.route("/autofocus")
-class Autofocus(Resource):
-    @motion.response(200, "Autofocus is done")
-    @motion.response(
-        HTTPStatus.SERVICE_UNAVAILABLE, "No focus helper available", error_envelope
+@images_router.delete("/camera/reference", responses={503: _ERR})
+@images_router.delete("/camera/reference/{refname}", responses={503: _ERR})
+def delete_reference(refname: str | None = None):
+    """Unset the reference image and return the current name."""
+    return RestServer.run("handle_camera_reference", False, refname)
+
+
+# --- motion ---------------------------------------------------------------- #
+
+motion_router = APIRouter(prefix="/motion", tags=["motion"])
+
+
+@motion_router.post("/go_next", responses={409: _ERR})
+def post_go_next():
+    """Jump to the next scan position."""
+    return RestServer.run("handle_go_next")
+
+
+@motion_router.post("/autofocus", responses={503: _ERR})
+def post_autofocus():
+    """Perform autofocus."""
+    return RestServer.run("handle_autofocus", False)
+
+
+@motion_router.put("/autofocus", responses={503: _ERR})
+def put_autofocus():
+    """Register current position for autofocus."""
+    return RestServer.run("handle_autofocus", True)
+
+
+@motion_router.get("/autofocus", responses={503: _ERR})
+def get_autofocus():
+    """Get current registered points for autofocus."""
+    return RestServer.run("handle_autofocus", None)
+
+
+@motion_router.get("/magicfocus", responses={503: _ERR})
+def get_magicfocus():
+    """Get the status of magicfocus."""
+    return RestServer.run("handle_magicfocus", None)
+
+
+@motion_router.post("/magicfocus", responses={503: _ERR})
+def post_magicfocus(parameters: dict[str, Any] = Body(default_factory=dict)):
+    """Perform magicfocus with the given parameters."""
+    RestServer.run("handle_magicfocus", parameters)
+    return {"OK": True}
+
+
+@motion_router.put("/go_to_memory_point/{index}", responses={404: _ERR, 503: _ERR})
+def put_memory_point(index: int):
+    """Move the stage to the memory point at ``index``."""
+    return RestServer.run("handle_go_to_memory_point", index)
+
+
+@motion_router.get("/position", responses={503: _ERR})
+def get_position():
+    """Return the current stage position."""
+    return RestServer.run("handle_position", None)
+
+
+@motion_router.put("/position", responses={400: _ERR, 503: _ERR})
+def put_position(body: PositionBody):
+    """Move the stage to the given position and return the final position."""
+    return RestServer.run("handle_position", body.pos)
+
+
+# --- annotation ------------------------------------------------------------ #
+
+annotation_router = APIRouter(prefix="/annotation", tags=["annotation"])
+
+
+@annotation_router.put("/add_markers", responses={400: _ERR})
+@annotation_router.put("/add_marker", responses={400: _ERR})
+@annotation_router.put("/add_measurement", responses={400: _ERR})
+def add_markers(body: MarkerBody):
+    """Add one or several markers and return their final position(s)/id(s)."""
+    return RestServer.run(
+        "handle_add_markers", body.pos, body.color, body.label, body.visible
     )
-    def post(self):
-        """Perform autofocus"""
-        return RestServer.run("handle_autofocus", False)
-
-    def put(self):
-        """Register current position for autofocus"""
-        return RestServer.run("handle_autofocus", True)
-
-    def get(self):
-        """Get current registered points for autofocus"""
-        return RestServer.run("handle_autofocus", None)
 
 
-@motion.route("/magicfocus")
-class MagicFocus(Resource):
-    @motion.response(200, "Get status of magicfocus")
-    @motion.response(
-        HTTPStatus.SERVICE_UNAVAILABLE, "No focus helper available", error_envelope
-    )
-    def get(self):
-        return RestServer.run("handle_magicfocus", None)
-
-    def post(self):
-        """Perform magicfocus with given parameters"""
-        json = _require_json()
-        RestServer.run("handle_magicfocus", json)
-        return {"OK": True}
+@annotation_router.get("/markers")
+def get_markers():
+    """Return the list of markers currently in the scene."""
+    return RestServer.run("handle_markers")
 
 
-@motion.route("/go_to_memory_point/<int:index>")
-class GoToMemoryPoint(Resource):
-    @motion.response(200, "Go to memory point is done", stage_pos)
-    @motion.response(HTTPStatus.NOT_FOUND, "Unknown memory point", error_envelope)
-    def put(self, index):
-        return RestServer.run("handle_go_to_memory_point", index)
+# --- instruments ----------------------------------------------------------- #
+
+instruments_router = APIRouter(prefix="/instruments", tags=["instruments"])
 
 
-position_move = motion.model("Stage State", {"pos": stage_pos})
+@instruments_router.get("/{label}/settings", responses={404: _ERR})
+def get_instrument_settings(label: str):
+    """Return the settings of the instrument identified by ``label``."""
+    return RestServer.run("handle_instrument_settings", label, None)
 
 
-@motion.route("/position")
-class Position(Resource):
-    @motion.expect(motion.model("Stage Position", {"pos": stage_pos}))
-    @motion.response(200, "Go to position is done", position_move)
-    @motion.response(HTTPStatus.BAD_REQUEST, "Invalid position", error_envelope)
-    def put(self):
-        json = _require_json()
-        return RestServer.run("handle_position", json.get("pos"))
-
-    @motion.response(200, "Stage position and moving state", position_move)
-    def get(self):
-        return RestServer.run("handle_position", None)
+@instruments_router.put("/{label}/settings", responses={404: _ERR, 400: _ERR})
+def put_instrument_settings(label: str, body: InstrumentSettingsBody):
+    """Update and return the settings of the instrument identified by ``label``."""
+    return RestServer.run("handle_instrument_settings", label, body.settings)
 
 
-annotation_ns = flask_api.namespace("annotation", description="Manage annotations")
-
-marker = flask_api.model(
-    "Marker",
-    {
-        "pos": fields.List(viewer_pos),
-        "color": fields.List(fields.Float, example=[0.0, 1.0, 0.0, 0.5]),
-        "visible": fields.Boolean(
-            description="If False, marker(s) are created but not displayed."
-        ),
-    },
-)
-
-
-@annotation_ns.route("/add_markers")
-@annotation_ns.route("/add_marker", doc={"description": "Alias for /add_markers"})
-@annotation_ns.route("/add_measurement", doc={"description": "Alias for /add_markers"})
-class AddMarker(Resource):
-    @annotation_ns.expect(marker)
-    @annotation_ns.response(HTTPStatus.BAD_REQUEST, "Invalid marker", error_envelope)
-    def put(self):
-        json = _require_json()
-        return RestServer.run(
-            "handle_add_markers",
-            json.get("pos"),
-            json.get("color"),
-            json.get("label"),
-            json.get("visible", True),
-        )
-
-
-@annotation_ns.route("/markers")
-class Markers(Resource):
-    def get(self):
-        return RestServer.run("handle_markers")
-
-
-instruments = flask_api.namespace("instruments", description="Control instruments")
-
-instrument = instruments.model(
-    "Instrument",
-    {
-        "settings": fields.Raw(description="The settings of the instrument"),
-    },
-)
-
-
-@instruments.route("/<label>/settings")
-@instruments.param("label", "Label of the instrument.")
-@instruments.response(HTTPStatus.NOT_FOUND, "Unknown instrument", error_envelope)
-class Instrument(Resource):
-    @instruments.doc("get_instrument_settings")
-    def get(self, label: str):
-        return RestServer.run("handle_instrument_settings", label, None)
-
-    @instruments.doc("put_instrument_settings")
-    @instruments.expect(instrument)
-    def put(self, label: str):
-        json = _require_json()
-        if "settings" not in json:
-            raise InvalidParameterError("Missing 'settings' field in request body.")
-        return RestServer.run("handle_instrument_settings", label, json["settings"])
+for _router in (
+    images_router,
+    motion_router,
+    annotation_router,
+    instruments_router,
+):
+    fastapi_app.include_router(_router)
