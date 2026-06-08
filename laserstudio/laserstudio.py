@@ -412,6 +412,17 @@ class LaserStudio(QMainWindow):
         self.photoemission_dockwidget.update_ref_image_controls()
         return camera.current_reference_image
 
+    def handle_list_instruments(self) -> list[Config]:
+        """List the available instruments.
+
+        :return: A list of dictionaries, each describing an instrument by its
+            ``type`` (the instrument class name) and its ``label``.
+        """
+        return [
+            {"type": type(inst).__name__, "label": inst.label}
+            for inst in self.instruments.all_instruments
+        ]
+
     def handle_instrument_settings(
         self, label: str, settings: Config | None
     ) -> Config:

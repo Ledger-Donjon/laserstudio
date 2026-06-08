@@ -138,6 +138,9 @@ class RestProxy(QObject):
     ) -> Any:
         raise ActionNotImplementedError("Laser control is not implemented yet.")
 
+    def handle_list_instruments(self) -> list[Config]:
+        return self.laser_studio.handle_list_instruments()
+
     def handle_instrument_settings(
         self, label: str, conf: dict[str, Any] | None
     ) -> Any:
@@ -284,6 +287,13 @@ class MarkerBody(BaseModel):
 
 class InstrumentSettingsBody(BaseModel):
     settings: dict[str, Any]
+
+
+class InstrumentInfo(BaseModel):
+    type: str = Field(
+        description="Instrument class name.", examples=["PDMInstrument"]
+    )
+    label: str | None = Field(description="Instrument label, if any.")
 
 
 # --- images ---------------------------------------------------------------- #
@@ -463,6 +473,13 @@ def get_markers():
 # --- instruments ----------------------------------------------------------- #
 
 instruments_router = APIRouter(prefix="/instruments", tags=["instruments"])
+
+
+@instruments_router.get("/", response_model=list[InstrumentInfo])
+@instruments_router.get("", response_model=list[InstrumentInfo], include_in_schema=False)
+def list_instruments():
+    """List the available instruments (type and label)."""
+    return RestServer.run("handle_list_instruments")
 
 
 @instruments_router.get("/{label}/settings", responses={404: _ERR})

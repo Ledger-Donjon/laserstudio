@@ -106,3 +106,25 @@ The body of the request must be a JSON object.
 This group of endpoints permits to add markers to be shown on the viewer.
 
 ### `/annotation/add_marker`
+
+## Instruments
+
+This group of endpoints permits to list and configure the instruments.
+
+### `/instruments/`
+
+A `GET` on this endpoint returns the list of available instruments, each
+described by its `type` (the instrument class name) and its `label`:
+
+```json
+[
+  { "type": "StageInstrument", "label": "Main stage" },
+  { "type": "PDMInstrument", "label": "PDM" }
+]
+```
+
+### `/instruments/<label>/settings`
+
+A `GET` returns the settings of the instrument identified by `<label>`, and a
+`PUT` (with a `{"settings": {...}}` body) updates them. An unknown label returns
+a `404` error.

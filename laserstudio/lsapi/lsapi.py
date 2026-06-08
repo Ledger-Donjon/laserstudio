@@ -279,6 +279,16 @@ class LSAPI:
         pos = res.json()
         return pos
 
+    def instruments(self) -> list[dict[str, Any]]:
+        """
+        List the available instruments.
+
+        :return: A list of dictionaries, each describing an instrument by its
+            ``type`` (the instrument class name) and its ``label``.
+        """
+        result: list[dict[str, Any]] = self.send("instruments/").json()
+        return result
+
     def instrument_settings(
         self, label: str, settings: dict[str, Any] | None = None
     ) -> dict[str, Any] | None:
