@@ -171,3 +171,9 @@ class Instruments:
             if instrument.label == label:
                 return instrument
         return None
+
+    def set_log_level(self, level: int) -> None:
+        for instrument in self.all_instruments:
+            instrument.set_log_level(level)
+        if self.focus_helper is not None:
+            self.focus_helper.set_log_level(level)

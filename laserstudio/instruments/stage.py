@@ -7,6 +7,7 @@ from pystages.exceptions import ProtocolError
 from pystages import (
     Corvus,
     CNCRouter,
+    CNCError,
     Stage,
     Vector as PystagesVector,
     Autofocus,
@@ -15,6 +16,7 @@ from pystages import (
     SMC100,
     PI,
 )
+from ..utils.grbl_alarms import format_grbl_alarm_message
 from .stage_rest import StageRest
 from .stage_dummy import StageDummy
 from .list_serials import get_serial_device, DeviceSearchError
@@ -158,6 +160,11 @@ class StageInstrument(Instrument):
 
     # Signal emitted when a new position is fetched
     position_changed = pyqtSignal(Vector)
+    grbl_alarm = pyqtSignal(str)
+    # Signal emitted when the software limits (min, max, enabled) change
+    soft_limits_changed = pyqtSignal()
+    # Signal emitted when a move is rejected because it falls outside the limits
+    soft_limit_violation = pyqtSignal(str)
 
     def __init__(self, config: dict[str, Any]):
         """
@@ -165,6 +172,7 @@ class StageInstrument(Instrument):
         """
         super().__init__(config)
         self.mutex = QMutex()
+        self._last_reported_alarm: tuple[int | None, str] | None = None
 
         device_type = config.get("type")
         # To refresh stage position in the view, in real-time
@@ -210,6 +218,8 @@ class StageInstrument(Instrument):
             self.stage = CNCRouter(dev)
             if self.refresh_interval is None:
                 self.refresh_interval = 200
+
+
         elif device_type == "PI":
             logging.getLogger("laserstudio").info(
                 "Creating a PI/Mercury stage... "
@@ -303,20 +313,152 @@ class StageInstrument(Instrument):
 
         self.mem_points = [Vector(*i) for i in config.get("mem_points", [])]
 
+        # Software limits (LaserStudio-side), expressed in stage µm coordinates.
+        # When enabled, a move whose target falls outside [min, max] on any
+        # constrained axis is rejected. These are independent from any firmware
+        # soft limits (e.g. GRBL $20).
+        self._soft_limits_enabled: bool = bool(
+            config.get("soft_limits_enabled", False)
+        )
+        self._soft_limits_min: list[float] | None = None
+        self._soft_limits_max: list[float] | None = None
+        soft_min = config.get("soft_limits_min")
+        soft_max = config.get("soft_limits_max")
+        if soft_min is not None and soft_max is not None:
+            self._set_soft_limits_raw(
+                cast(list[float], soft_min), cast(list[float], soft_max)
+            )
+
         # Indicate
         self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
+    def set_log_level(self, level: int) -> None:
+        if hasattr(self.stage, "logger"):
+            self.stage.logger.setLevel(level)
+
+    def _handle_cnc_error(self, error: CNCError, *, notify: bool = False) -> None:
+        message = format_grbl_alarm_message(error)
+        alarm_key = (error.alarm_code, error.args[0] if error.args else "")
+        if alarm_key != self._last_reported_alarm:
+            self._last_reported_alarm = alarm_key
+            logging.getLogger("laserstudio").warning(message)
+            if notify:
+                self.grbl_alarm.emit(message)
+
+    def clear_grbl_alarm_state(self) -> None:
+        """Clear the GRBL alarm state so position polling can resume after unlock."""
+        self._last_reported_alarm = None
+
+    def _pad_axes(self, values: list[float]) -> list[float]:
+        """Pad/truncate a list of values to match the number of axes."""
+        values = list(values[: self.num_axis])
+        if len(values) < self.num_axis:
+            values += [0.0] * (self.num_axis - len(values))
+        return values
+
+    def _set_soft_limits_raw(
+        self, minimum: list[float], maximum: list[float]
+    ) -> None:
+        """Set the soft limits without emitting any signal (used at init)."""
+        minimum = self._pad_axes([float(v) for v in minimum])
+        maximum = self._pad_axes([float(v) for v in maximum])
+        # Make sure min <= max on each axis.
+        for i in range(self.num_axis):
+            if minimum[i] > maximum[i]:
+                minimum[i], maximum[i] = maximum[i], minimum[i]
+        self._soft_limits_min = minimum
+        self._soft_limits_max = maximum
+
     @property
-    def position(self) -> Vector:
-        """Get the position of the stage instrument
+    def soft_limits_enabled(self) -> bool:
+        """Whether the LaserStudio software limits are enforced on moves."""
+        return self._soft_limits_enabled
 
-        :return: Get the position of the stage
+    @soft_limits_enabled.setter
+    def soft_limits_enabled(self, value: bool) -> None:
+        value = bool(value)
+        if value == self._soft_limits_enabled:
+            return
+        self._soft_limits_enabled = value
+        self.soft_limits_changed.emit()
+
+    @property
+    def soft_limits_min(self) -> list[float] | None:
+        """Lower bounds of the software limits per axis (stage µm), or None."""
+        return None if self._soft_limits_min is None else list(self._soft_limits_min)
+
+    @property
+    def soft_limits_max(self) -> list[float] | None:
+        """Upper bounds of the software limits per axis (stage µm), or None."""
+        return None if self._soft_limits_max is None else list(self._soft_limits_max)
+
+    @property
+    def has_soft_limits(self) -> bool:
+        """True if a software limit box has been defined."""
+        return self._soft_limits_min is not None and self._soft_limits_max is not None
+
+    def set_soft_limits(
+        self, minimum: list[float], maximum: list[float]
+    ) -> None:
+        """Define the software limit box (stage µm coordinates) and notify."""
+        self._set_soft_limits_raw(minimum, maximum)
+        self.soft_limits_changed.emit()
+
+    def _ensure_soft_limits(self) -> None:
+        """Make sure a limit box exists, defaulting to the current position."""
+        if not self.has_soft_limits:
+            base = self._pad_axes([float(v) for v in self.position.data])
+            self._soft_limits_min = list(base)
+            self._soft_limits_max = list(base)
+
+    def _set_axis_no_emit(self, axis: int, low: float, high: float) -> None:
+        self._ensure_soft_limits()
+        assert self._soft_limits_min is not None and self._soft_limits_max is not None
+        if axis < 0 or axis >= self.num_axis:
+            return
+        if low > high:
+            low, high = high, low
+        self._soft_limits_min[axis] = float(low)
+        self._soft_limits_max[axis] = float(high)
+
+    def set_soft_limits_axis(self, axis: int, low: float, high: float) -> None:
+        """Update the software limits for a single axis."""
+        self._set_axis_no_emit(axis, low, high)
+        self.soft_limits_changed.emit()
+
+    def set_soft_limits_xy(
+        self, xmin: float, ymin: float, xmax: float, ymax: float
+    ) -> None:
+        """Update the X and Y software limits in one shot (single notification)."""
+        self._set_axis_no_emit(0, xmin, xmax)
+        self._set_axis_no_emit(1, ymin, ymax)
+        self.soft_limits_changed.emit()
+
+    def _is_within_soft_limits(self, position: Vector) -> tuple[bool, int | None]:
+        """Check a target position against the soft limits.
+
+        :return: (ok, axis) where axis is the first violated axis index if any.
         """
-        self.mutex.lock()
-        position = Vector(*[float(v) for v in self.stage.position.data])
-        self.mutex.unlock()
+        if (
+            not self._soft_limits_enabled
+            or self._soft_limits_min is None
+            or self._soft_limits_max is None
+        ):
+            return True, None
+        tol = 1e-6
+        for i in range(min(len(position), self.num_axis)):
+            if (
+                position[i] < self._soft_limits_min[i] - tol
+                or position[i] > self._soft_limits_max[i] + tol
+            ):
+                return False, i
+        return True, None
 
-        # Apply shearing transformation
+    def _read_raw_position(self) -> Vector:
+        """Read the device position. The stage mutex must already be locked."""
+        return Vector(*[float(v) for v in self.stage.position.data])
+
+    def _apply_position_transforms(self, position: Vector) -> Vector:
         x = position.x
         y = position.y
 
@@ -328,6 +470,19 @@ class StageInstrument(Instrument):
             factors = [float(factors)] * len(position)
         for i in range(len(position)):
             position[i] = position[i] * factors[i] + self.offset_origin[i]
+        return position
+
+    @property
+    def position(self) -> Vector:
+        """Get the position of the stage instrument
+
+        :return: Get the position of the stage
+        """
+        self.mutex.lock()
+        try:
+            position = self._apply_position_transforms(self._read_raw_position())
+        finally:
+            self.mutex.unlock()
 
         self.position_changed.emit(position)
         return position
@@ -348,13 +503,43 @@ class StageInstrument(Instrument):
     def __autorefresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal
         This method is not public, it is called by a QTimer to refresh the stage position regularly."""
+        if self._last_reported_alarm is not None:
+            if self.refresh_interval is not None:
+                QTimer.singleShot(
+                    self.refresh_interval,
+                    Qt.TimerType.CoarseTimer,
+                    self.__autorefresh_stage,
+                )
+            return
+
+        if not self.mutex.tryLock():
+            if self.refresh_interval is not None:
+                QTimer.singleShot(
+                    self.refresh_interval,
+                    Qt.TimerType.CoarseTimer,
+                    self.__autorefresh_stage,
+                )
+            return
+
         try:
-            self.position_changed.emit(position := self.position)
+            position = self._apply_position_transforms(self._read_raw_position())
+            self._last_reported_alarm = None
             logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
+        except CNCError as e:
+            self._handle_cnc_error(e)
         except ProtocolError as e:
             logging.getLogger("laserstudio").warning(
                 f"Warning: Bad response!: {repr(e)}"
             )
+        except Exception as e:
+            logging.getLogger("laserstudio").error(
+                f"Error: {repr(e)}", exc_info=True
+            )
+        else:
+            self.position_changed.emit(position)
+        finally:
+            self.mutex.unlock()
+
         if self.refresh_interval is not None:
             QTimer.singleShot(
                 self.refresh_interval,
@@ -415,6 +600,17 @@ class StageInstrument(Instrument):
                     )
                     return
 
+        within_limits, violated_axis = self._is_within_soft_limits(position)
+        if not within_limits and violated_axis is not None:
+            axis_name = "XYZ"[violated_axis] if violated_axis < 3 else str(violated_axis)
+            message = (
+                f"Move blocked by software limits: axis {axis_name} target "
+                f"{position[violated_axis]:.1f}\xa0µm is outside the allowed area."
+            )
+            logging.getLogger("laserstudio").warning(message)
+            self.soft_limit_violation.emit(message)
+            return
+
         result = Vector(dim=len(position))
 
         # Move to actual destination
@@ -439,18 +635,33 @@ class StageInstrument(Instrument):
         result[1] = y + self.shear[1] * x
         logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
 
+        move_ok = False
+        move_error: CNCError | None = None
         self.mutex.lock()
-        if backlash and len(self.backlashes) == len(position):
-            backlashes = Vector(*self.backlashes)
-            # Apply unit factors
-            for i in range(len(backlashes)):
-                backlashes[i] = backlashes[i] / factors[i]
-            self.stage.move_to(result - backlashes, wait=True)
-        self.stage.move_to(result, wait=wait)
-        if isinstance(self.stage, Corvus):
-            self.stage.enable_joystick()
-        self.mutex.unlock()
-        _ = self.position
+        try:
+            if backlash and len(self.backlashes) == len(position):
+                backlashes = Vector(*self.backlashes)
+                # Apply unit factors
+                for i in range(len(backlashes)):
+                    backlashes[i] = backlashes[i] / factors[i]
+                self.stage.move_to(result - backlashes, wait=True)
+            self.stage.move_to(result, wait=wait)
+            if isinstance(self.stage, Corvus):
+                self.stage.enable_joystick()
+            self._last_reported_alarm = None
+            move_ok = True
+        except CNCError as e:
+            move_error = e
+        finally:
+            self.mutex.unlock()
+
+        if move_error is not None:
+            self._handle_cnc_error(move_error, notify=True)
+        elif move_ok:
+            try:
+                _ = self.position
+            except CNCError as e:
+                self._handle_cnc_error(e)
 
     @property
     def num_axis(self) -> int:
@@ -484,6 +695,10 @@ class StageInstrument(Instrument):
         """
         super_settings = super().settings
         super_settings["offset_origin"] = self.offset_origin
+        super_settings["soft_limits_enabled"] = self._soft_limits_enabled
+        if self._soft_limits_min is not None and self._soft_limits_max is not None:
+            super_settings["soft_limits_min"] = list(self._soft_limits_min)
+            super_settings["soft_limits_max"] = list(self._soft_limits_max)
         logging.getLogger("laserstudio").debug(f"Stage settings: {super_settings}")
         return super_settings
 
@@ -502,3 +717,12 @@ class StageInstrument(Instrument):
                 "Please check your settings file"
             )
             self.offset_origin = cast(list[float], data["offset_origin"])
+        soft_min = data.get("soft_limits_min")
+        soft_max = data.get("soft_limits_max")
+        if soft_min is not None and soft_max is not None:
+            self._set_soft_limits_raw(
+                cast(list[float], soft_min), cast(list[float], soft_max)
+            )
+        if "soft_limits_enabled" in data:
+            self._soft_limits_enabled = bool(data["soft_limits_enabled"])
+        self.soft_limits_changed.emit()

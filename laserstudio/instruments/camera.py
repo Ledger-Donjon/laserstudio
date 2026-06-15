@@ -318,6 +318,50 @@ class CameraInstrument(Instrument):
         )
         return image.clip(min=0).astype(type_)
 
+    def levels_autoset(
+        self,
+        low_percentile: float = 1.0,
+        high_percentile: float = 99.0,
+    ) -> tuple[float, float]:
+        """
+        Set black and white levels from the current image histogram.
+
+        :param low_percentile: Percentile used for the black point.
+        :param high_percentile: Percentile used for the white point.
+        :return: The new ``(black_level, white_level)`` pair, normalized to [0, 1].
+        """
+        frame = self._last_frame_accumulator
+        if frame is None:
+            logging.getLogger("laserstudio").warning(
+                "Auto levels skipped: no image available yet"
+            )
+            return self.black_level, self.white_level
+
+        if frame.ndim == 3:
+            samples = frame.mean(axis=-1, dtype=numpy.float64).ravel()
+        else:
+            samples = frame.astype(numpy.float64, copy=False).ravel()
+
+        lo = float(numpy.percentile(samples, low_percentile))
+        hi = float(numpy.percentile(samples, high_percentile))
+        scale = self.white_value * max(self.average_count, 1)
+        if hi <= lo:
+            hi = min(scale, lo + 1.0)
+
+        black_level = max(0.0, min(1.0, lo / scale))
+        white_level = max(0.0, min(1.0, hi / scale))
+        if white_level <= black_level:
+            white_level = min(1.0, black_level + 0.01)
+
+        self.black_level = black_level
+        self.white_level = white_level
+        self.parameter_changed.emit("black_level", black_level)
+        self.parameter_changed.emit("white_level", white_level)
+        logging.getLogger("laserstudio").info(
+            f"Auto levels set to black={black_level:.4f}, white={white_level:.4f}"
+        )
+        return black_level, white_level
+
     def compute_histogram(self, frame: NDArray[Any], width: int = -1):
         """
         Computes the histogram of the given frame.

@@ -673,6 +673,7 @@ class LaserStudio(QMainWindow):
 
     def set_log_level(self, level: int):
         """
-        Set the log level of the logger "laserstudio".
+        Set the log level of the application and instrument loggers.
         """
         logging.getLogger("laserstudio").setLevel(level)
+        self.instruments.set_log_level(level)

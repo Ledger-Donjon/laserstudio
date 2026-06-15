@@ -163,6 +163,9 @@ class RaptorCommand(bytes, Enum):
 class CameraRaptorInstrument(CameraUSBInstrument):
     """Class to implement the Raptor cameras"""
 
+    def _should_probe_resolutions(self) -> bool:
+        return False
+
     def __init__(self, config: Config):
         super().__init__(config)
 

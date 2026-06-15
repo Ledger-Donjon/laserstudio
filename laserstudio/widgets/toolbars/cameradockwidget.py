@@ -27,6 +27,24 @@ if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
 
 
+def _resolution_label(width: int, height: int) -> str:
+    return f"{width}\xa0×\xa0{height}"
+
+
+def _resolution_combobox_index(
+    combobox: QComboBox, width: int, height: int
+) -> int:
+    index = combobox.findText(_resolution_label(width, height))
+    if index != -1:
+        return index
+    for index in range(combobox.count()):
+        data = combobox.itemData(index)
+        if isinstance(data, (list, tuple)) and len(data) == 2:
+            if int(data[0]) == width and int(data[1]) == height:
+                return index
+    return -1
+
+
 class CameraImageAdjustementDockWidget(QDockWidget):
     def __init__(self, laser_studio: LaserStudio):
         self.laser_studio = laser_studio
@@ -156,6 +174,26 @@ class CameraImageAdjustementDockWidget(QDockWidget):
         grid.addWidget(self.white_level_sb, row, 2)
         row += 1
 
+        auto_levels_button = QPushButton("Auto Levels")
+        auto_levels_button.setToolTip(
+            "Adjust black and white levels from the current image histogram"
+        )
+        auto_levels_button.clicked.connect(self.levels_autoset)
+        grid.addWidget(auto_levels_button, row, 1, 1, 2)
+        row += 1
+
+        self.camera.parameter_changed.connect(self.camera_parameter_changed)
+
+    def levels_autoset(self):
+        black, white = self.camera.levels_autoset()
+        self.update_levels(black=black, white=white)
+
+    def camera_parameter_changed(self, parameter: str, value: Any):
+        if parameter == "black_level" and isinstance(value, (int, float)):
+            self.update_levels(black=float(value))
+        elif parameter == "white_level" and isinstance(value, (int, float)):
+            self.update_levels(white=float(value))
+
     def update_histogram(self):
         """Update the histogram chart with the new data.
 
@@ -272,8 +310,26 @@ class CameraDockWidget(QDockWidget):
         )
         grid.addWidget(w, 3, 2)
 
+        next_row = 4
+        self.resolution_combobox: QComboBox | None = None
+        if type(self.camera) is CameraUSBInstrument and self.camera.supported_resolutions:
+            grid.addWidget(QLabel("Resolution:"), next_row, 1)
+            self.resolution_combobox = w = QComboBox()
+            w.blockSignals(True)
+            for width, height in self.camera.supported_resolutions:
+                w.addItem(_resolution_label(width, height), (width, height))
+            current_index = _resolution_combobox_index(
+                w, self.camera.width, self.camera.height
+            )
+            if current_index != -1:
+                w.setCurrentIndex(current_index)
+            w.blockSignals(False)
+            w.currentIndexChanged.connect(self.resolution_changed)
+            grid.addWidget(w, next_row, 2)
+            next_row += 1
+
         if self.camera.shutter is not None:
-            grid.addWidget(QLabel("Shutter:"), 4, 1)
+            grid.addWidget(QLabel("Shutter:"), next_row, 1)
 
             w = ColoredPushButton(
                 ":/icons/shutter-closed.svg",
@@ -282,7 +338,8 @@ class CameraDockWidget(QDockWidget):
             w.setCheckable(True)
             w.setChecked(self.camera.shutter.open)
             w.clicked.connect(lambda b: self.camera.shutter.__setattr__("open", b))
-            grid.addWidget(w, 4, 2)
+            grid.addWidget(w, next_row, 2)
+            next_row += 1
 
         # Objective selector
         self.obj_combobox = w = QComboBox()
@@ -293,14 +350,15 @@ class CameraDockWidget(QDockWidget):
                 w.setCurrentIndex(w.count() - 1)
         w.setStyleSheet("QListView::item {height:24px;}")
         w.currentIndexChanged.connect(self.obj_changed)
-        grid.addWidget(QLabel("Objective:"), 5, 1)
-        grid.addWidget(w, 5, 2)
+        grid.addWidget(QLabel("Objective:"), next_row, 1)
+        grid.addWidget(w, next_row, 2)
+        next_row += 1
 
         # Second representation of the camera image
         stage_sight = StageSight(None, self.camera)
         self.second_view = w = StageSightViewer(stage_sight)
         w.setHidden(True)
-        grid.addWidget(w, 6, 1, 1, 2)
+        grid.addWidget(w, next_row, 1, 1, 2)
 
         # Add stretch of last row
         grid.setRowStretch(grid.rowCount(), 1)
@@ -323,6 +381,31 @@ class CameraDockWidget(QDockWidget):
                 )
 
             self.obj_combobox.blockSignals(False)
+        elif parameter == "resolution" and self.resolution_combobox is not None:
+            if (
+                isinstance(value, list)
+                and len(value) == 2
+                and isinstance(value[0], int)
+                and isinstance(value[1], int)
+            ):
+                self.resolution_combobox.blockSignals(True)
+                index = _resolution_combobox_index(
+                    self.resolution_combobox, value[0], value[1]
+                )
+                if index != -1:
+                    self.resolution_combobox.setCurrentIndex(index)
+                self.resolution_combobox.blockSignals(False)
+
+    def resolution_changed(self):
+        if self.resolution_combobox is None:
+            return
+        resolution = self.resolution_combobox.currentData()
+        if not isinstance(resolution, tuple) or len(resolution) != 2:
+            return
+        width, height = resolution
+        if not isinstance(width, int) or not isinstance(height, int):
+            return
+        self.camera.set_resolution(width, height)
 
     def obj_changed(self):
         """

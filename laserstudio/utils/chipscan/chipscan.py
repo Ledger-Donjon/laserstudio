@@ -231,10 +231,11 @@ logging.basicConfig(level=logging.WARNING)
 class ChipScan(QMainWindow):
     def set_log_level(self, level: int):
         """
-        Set the log level of the logger "laserstudio".
+        Set the log level of the application and instrument loggers.
         """
         logging.getLogger("laserstudio").setLevel(level)
         logging.getLogger("chipscan").setLevel(level)
+        self.instruments.set_log_level(level)
 
     def __init__(self, config: Config):
         """

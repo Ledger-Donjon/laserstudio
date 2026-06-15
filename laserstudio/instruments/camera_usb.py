@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import logging
+
+import numpy
+
 from ..utils.yaml_types import Config
 from .camera import CameraInstrument
+from .camera_usb_probe import native_resolutions
 
 
 class CameraUSBInstrument(CameraInstrument):
@@ -20,20 +25,90 @@ class CameraUSBInstrument(CameraInstrument):
         if not isinstance(index, int):
             raise ValueError("index must be an integer in configuration file")
         self.vc = self.__video_capture = cv2.VideoCapture(index)
+        if not self.__video_capture.isOpened():
+            raise RuntimeError(f"Cannot open USB camera index {index}")
 
-        width = config.get(
-            "width", int(self.__video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        )
-        if not isinstance(width, int):
-            raise ValueError("width must be an integer in configuration file")
-        self.width = int(width)
+        if self._should_probe_resolutions():
+            logging.getLogger("laserstudio").info(
+                "Probing supported resolutions for USB camera..."
+            )
+            thorough = bool(config.get("probe_resolutions_thorough", False))
+            self._supported_resolutions = native_resolutions(
+                self.__video_capture, thorough=thorough
+            )
+            logging.getLogger("laserstudio").info(
+                "USB camera native resolutions: "
+                + ", ".join(f"{w}x{h}" for w, h in self._supported_resolutions)
+            )
+        else:
+            self._supported_resolutions = []
 
-        height = config.get(
-            "height", int(self.__video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        requested_width = config.get("width")
+        requested_height = config.get("height")
+        if self._supported_resolutions:
+            max_width, max_height = max(
+                self._supported_resolutions, key=lambda size: size[0] * size[1]
+            )
+            self.set_resolution(max_width, max_height)
+        elif isinstance(requested_width, int) and isinstance(requested_height, int):
+            self.set_resolution(requested_width, requested_height)
+        else:
+            self._apply_current_capture_resolution()
+
+    def _should_probe_resolutions(self) -> bool:
+        return True
+
+    @property
+    def supported_resolutions(self) -> list[tuple[int, int]]:
+        return list(self._supported_resolutions)
+
+    def _apply_current_capture_resolution(self) -> tuple[int, int]:
+        width = int(self.__video_capture.get(self.cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self.__video_capture.get(self.cv2.CAP_PROP_FRAME_HEIGHT))
+        return self._update_resolution(width, height)
+
+    def set_resolution(self, width: int, height: int) -> tuple[int, int]:
+        self.__video_capture.set(self.cv2.CAP_PROP_FRAME_WIDTH, width)
+        self.__video_capture.set(self.cv2.CAP_PROP_FRAME_HEIGHT, height)
+        for _ in range(3):
+            self.__video_capture.read()
+        ret, frame = self.__video_capture.read()
+        if ret and frame is not None:
+            width = int(frame.shape[1])
+            height = int(frame.shape[0])
+        else:
+            width = int(self.__video_capture.get(self.cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(self.__video_capture.get(self.cv2.CAP_PROP_FRAME_HEIGHT))
+
+        if (
+            self._supported_resolutions
+            and (width, height) not in self._supported_resolutions
+        ):
+            logging.getLogger("laserstudio").warning(
+                "Requested resolution resolved to "
+                f"{width}x{height}, which was not found during probing"
+            )
+        return self._update_resolution(width, height)
+
+    def _update_resolution(self, width: int, height: int) -> tuple[int, int]:
+        if width == self.width and height == self.height:
+            return width, height
+
+        self.width = width
+        self.height = height
+        self._reset_frame_buffers()
+        logging.getLogger("laserstudio").info(
+            f"USB camera resolution set to {width}x{height}"
         )
-        if not isinstance(height, int):
-            raise ValueError("height must be an integer in configuration file")
-        self.height = int(height)
+        self.parameter_changed.emit("resolution", [width, height])
+        return width, height
+
+    def _reset_frame_buffers(self) -> None:
+        self._last_frame_accumulator = None
+        self._last_frames = []
+        self.number_of_averaged_images = 0
+        self._last_pos = numpy.zeros((self.width, self.height), dtype=numpy.uint8)
+        self.reference_image_accumulators = {}
 
     def __del__(self):
         self.__video_capture.release()
@@ -43,7 +118,7 @@ class CameraUSBInstrument(CameraInstrument):
         if not ret:
             return None
         frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
-        if frame.shape[2:] != (self.height, self.width):
+        if frame.shape[0:2] != (self.height, self.width):
             size = self.width, self.height
             frame = self.cv2.resize(frame, size, interpolation=self.cv2.INTER_AREA)
 
@@ -140,3 +215,23 @@ class CameraUSBInstrument(CameraInstrument):
         exp = self.__video_capture.get(self.cv2.CAP_PROP_EXPOSURE)
         exp = int(exp)
         return exp, exp
+
+    @property
+    def settings(self) -> Config:
+        settings = super().settings
+        settings["width"] = self.width
+        settings["height"] = self.height
+        settings["supported_resolutions"] = [
+            [width, height] for width, height in self._supported_resolutions
+        ]
+        return settings
+
+    @settings.setter
+    def settings(self, data: Config):
+        CameraInstrument.settings.__set__(self, data)  # type: ignore[attr-defined]
+        if not self._should_probe_resolutions():
+            return
+        width = data.get("width")
+        height = data.get("height")
+        if isinstance(width, int) and isinstance(height, int):
+            self.set_resolution(width, height)

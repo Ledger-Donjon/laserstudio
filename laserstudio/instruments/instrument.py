@@ -31,3 +31,7 @@ class Instrument(QObject):
                 + f"label ({data.get('label')})."
             )
         return
+
+    def set_log_level(self, level: int) -> None:
+        """Propagate the application log level to instrument-specific loggers."""
+        return

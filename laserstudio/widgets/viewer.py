@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -39,6 +39,7 @@ from .stagesight import (
 )
 from .marker import IdMarker, Marker
 from .scangeometry import ScanGeometry
+from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from ..instruments.stage import MoveFor
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
@@ -159,6 +160,12 @@ class Viewer(QGraphicsView):
         self.offset_origin_line.setPen(pen)
         self.__scene.addItem(self.offset_origin_line)
         self.offset_origin_line.hide()
+
+        # Software limits box (LaserStudio-side limits, editable in the view)
+        self.soft_limits_item = SoftLimitsItem()
+        self.__scene.addItem(self.soft_limits_item)
+        self.soft_limits_item.hide()
+        self.soft_limits_item.edit_finished.connect(self._push_soft_limits_to_stage)
 
         self.setMouseTracking(True)
 
@@ -307,6 +314,39 @@ class Viewer(QGraphicsView):
         self.stage_sight = StageSight(stage, camera, probes)
         self.stage_sight.setZValue(1)
         self.__scene.addItem(self.stage_sight)
+
+        if stage is not None:
+            stage.soft_limits_changed.connect(self.refresh_soft_limits_item)
+            self.refresh_soft_limits_item()
+
+    def refresh_soft_limits_item(self):
+        """Synchronize the soft-limits box in the view with the stage model."""
+        stage = self.stage_sight.stage if self.stage_sight is not None else None
+        if stage is None:
+            return
+        minimum = stage.soft_limits_min
+        maximum = stage.soft_limits_max
+        if minimum is not None and maximum is not None and len(minimum) >= 2:
+            self.soft_limits_item.set_bounds(
+                minimum[0], minimum[1], maximum[0], maximum[1]
+            )
+
+    def set_soft_limits_editable(self, editable: bool):
+        """Show or hide the editable soft-limits box in the view."""
+        if editable:
+            self.refresh_soft_limits_item()
+            self.soft_limits_item.show()
+        else:
+            self.soft_limits_item.hide()
+
+    def _push_soft_limits_to_stage(self, rect: QRectF):
+        """Write the XY box edited in the view back to the stage model."""
+        stage = self.stage_sight.stage if self.stage_sight is not None else None
+        if stage is None:
+            return
+        stage.set_soft_limits_xy(
+            rect.left(), rect.top(), rect.right(), rect.bottom()
+        )
 
     @property
     def mode(self) -> Mode:
@@ -476,6 +516,17 @@ class Viewer(QGraphicsView):
         if event is None:
             return
 
+        # Let interactive edit handles (soft-limits box, zone vertices) process
+        # their own events, instead of triggering a stage move, a zone creation
+        # or any mode-specific action.
+        if event.button() == Qt.MouseButton.LeftButton:
+            item = self.itemAt(event.pos())
+            while item is not None:
+                if getattr(item, EDIT_HANDLE_ATTR, False):
+                    super().mousePressEvent(event)
+                    return
+                item = item.parentItem()
+
         # We want to catch a right-click on a marker
         if event.button() == Qt.MouseButton.RightButton:
             item = self.itemAt(event.pos())
@@ -566,6 +617,13 @@ class Viewer(QGraphicsView):
             # Map the mouse position to the scene position
             scene_pos = self.mapToScene(event.pos())
             self.mouse_moved.emit(scene_pos.x(), scene_pos.y())
+
+            # Reveal edit handles only when the cursor is close to them. The
+            # threshold is kept constant on screen (in pixels).
+            threshold = 24.0 / max(self.zoom, 1e-9)
+            if self.soft_limits_item.isVisible():
+                self.soft_limits_item.update_cursor_proximity(scene_pos, threshold)
+            self.scan_geometry.update_cursor_proximity(scene_pos, threshold)
 
             if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
                 # Check if mouse button is pressed
@@ -658,6 +716,12 @@ class Viewer(QGraphicsView):
                 self.zone_poly.clear()
 
         return super().mouseDoubleClickEvent(event)
+
+    def leaveEvent(self, event: Any):
+        """Hide the edit handles when the cursor leaves the view."""
+        self.soft_limits_item.update_cursor_proximity(None, 0.0)
+        self.scan_geometry.update_cursor_proximity(None, 0.0)
+        super().leaveEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent | None):
         """

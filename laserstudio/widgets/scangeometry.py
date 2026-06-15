@@ -1,17 +1,95 @@
 import logging
+import math
 from typing import Optional, Any
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
     QGraphicsPathItem,
+    QGraphicsRectItem,
+    QGraphicsSceneMouseEvent,
 )
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QPolygonF, QPen, QPainterPath, QBrush, QColor
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from shapely.geometry.base import BaseGeometry
 from .scanpath import ScanPath
 from ..utils.scanning import ScanPathGenerator, EmptyGeometryError
 from ..utils.yaml_types import Config
+
+# Generic marker attribute (see softlimits.EDIT_HANDLE_ATTR) so the Viewer
+# routes presses on these handles to the handle itself.
+EDIT_HANDLE_ATTR = "is_edit_handle"
+ZONE_HANDLE_SIZE = 11.0
+
+
+class _ZoneVertexHandle(QGraphicsRectItem):
+    """A small, constant-size square handle sitting on a zone polygon vertex.
+
+    Dragging it moves the corresponding vertex of the (flattened) zone.
+    ``ring_index`` is -1 for the exterior ring, or the interior (hole) index.
+    """
+
+    def __init__(
+        self,
+        owner: "ScanGeometry",
+        geom_index: int,
+        ring_index: int,
+        vertex_index: int,
+    ):
+        # Not parented to the ScanGeometry group: a QGraphicsItemGroup would
+        # intercept its children's mouse events (and Qt6 removed the
+        # setHandlesChildEvents API to opt out). Instead the handle is added as
+        # a top-level scene item so it receives its own events.
+        super().__init__(
+            -ZONE_HANDLE_SIZE / 2,
+            -ZONE_HANDLE_SIZE / 2,
+            ZONE_HANDLE_SIZE,
+            ZONE_HANDLE_SIZE,
+        )
+        setattr(self, EDIT_HANDLE_ATTR, True)
+        self._owner = owner
+        self.geom_index = geom_index
+        self.ring_index = ring_index
+        self.vertex_index = vertex_index
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations, True)
+        self.setZValue(20)
+        self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
+        self.setAcceptHoverEvents(True)
+        self._apply_style(hovered=False)
+        self.setCursor(Qt.CursorShape.SizeAllCursor)
+
+    def _apply_style(self, hovered: bool):
+        color = QColor(180, 255, 80) if hovered else QColor(100, 255, 0)
+        pen = QPen(QColor(255, 255, 255))
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setBrush(QBrush(color))
+
+    def hoverEnterEvent(self, event):
+        self._apply_style(hovered=True)
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self._apply_style(hovered=False)
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None):
+        if event is None:
+            return
+        self._owner._begin_vertex_edit()
+        event.accept()
+
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent | None):
+        if event is None:
+            return
+        self._owner._move_vertex(self, event.scenePos())
+        event.accept()
+
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent | None):
+        if event is None:
+            return
+        self._owner._end_vertex_edit()
+        event.accept()
 
 
 class ScanGeometry(QGraphicsItemGroup):
@@ -44,6 +122,12 @@ class ScanGeometry(QGraphicsItemGroup):
         self.addToGroup(self.__scan_path)
         # Scan generator
         self.scan_path_generator = ScanPathGenerator()
+
+        # Interactive vertex-edition state.
+        self.__vertex_handles: list[_ZoneVertexHandle] = []
+        self.__editing = False
+        self.__handles_dragging = False
+        self.__edit_polys: list[Polygon] = []
 
     def __clear_scan_geometry_items(self):
         """Clear the scan geometry items."""
@@ -96,6 +180,141 @@ class ScanGeometry(QGraphicsItemGroup):
 
         self.scan_path_generator.geometry = self.__scan_geometry
         self.__update_scan_path()
+
+        if not self.__editing:
+            self.__rebuild_handles()
+
+    # -- Interactive vertex edition --------------------------------------
+    def __current_polygons(self) -> list[Polygon]:
+        """Return the polygons of the currently displayed (merged) geometry."""
+        geometry = self.__scan_geometry
+        if isinstance(geometry, MultiPolygon):
+            return [p for p in geometry.geoms if isinstance(p, Polygon)]
+        if isinstance(geometry, Polygon):
+            return [] if geometry.is_empty else [geometry]
+        return []
+
+    @staticmethod
+    def __ring_coords(poly: Polygon, ring_index: int) -> list[tuple[float, float]]:
+        if ring_index < 0:
+            ring = poly.exterior
+        else:
+            interiors = list(poly.interiors)
+            if ring_index >= len(interiors):
+                return []
+            ring = interiors[ring_index]
+        # Drop the closing duplicate point.
+        return [(float(x), float(y)) for x, y in list(ring.coords)[:-1]]
+
+    def __rebuild_handles(self):
+        """Recreate the vertex handles from the current geometry."""
+        scene = self.scene()
+        for handle in self.__vertex_handles:
+            if handle.scene() is not None:
+                handle.scene().removeItem(handle)
+        self.__vertex_handles = []
+
+        # The handles are top-level scene items; if we are not in a scene yet
+        # there is nothing to attach them to.
+        if scene is None:
+            return
+
+        polys = self.__edit_polys if self.__editing else self.__current_polygons()
+        for geom_index, poly in enumerate(polys):
+            if not isinstance(poly, Polygon) or poly.is_empty:
+                continue
+            rings = [-1] + list(range(len(list(poly.interiors))))
+            for ring_index in rings:
+                coords = self.__ring_coords(poly, ring_index)
+                for vertex_index, (x, y) in enumerate(coords):
+                    handle = _ZoneVertexHandle(
+                        self, geom_index, ring_index, vertex_index
+                    )
+                    handle.setPos(QPointF(x, y))
+                    handle.setVisible(False)
+                    scene.addItem(handle)
+                    self.__vertex_handles.append(handle)
+
+    def __reposition_handles(self):
+        """Update handle positions from the edited polygons (no recreation)."""
+        for handle in self.__vertex_handles:
+            if handle.geom_index >= len(self.__edit_polys):
+                continue
+            poly = self.__edit_polys[handle.geom_index]
+            coords = self.__ring_coords(poly, handle.ring_index)
+            if handle.vertex_index < len(coords):
+                x, y = coords[handle.vertex_index]
+                handle.setPos(QPointF(x, y))
+
+    def update_cursor_proximity(
+        self, scene_point: QPointF | None, threshold: float
+    ) -> None:
+        """Show a vertex handle when the cursor gets close to it."""
+        if self.__handles_dragging:
+            return
+        for handle in self.__vertex_handles:
+            if scene_point is None:
+                handle.setVisible(False)
+                continue
+            pos = handle.pos()
+            distance = math.hypot(pos.x() - scene_point.x(), pos.y() - scene_point.y())
+            handle.setVisible(distance <= threshold)
+
+    def _begin_vertex_edit(self):
+        self.__handles_dragging = True
+        if not self.__editing:
+            self.__editing = True
+            # Flatten the merged geometry into individually editable polygons.
+            self.__edit_polys = self.__current_polygons()
+
+    def _move_vertex(self, handle: _ZoneVertexHandle, scene_point: QPointF):
+        if not self.__editing or handle.geom_index >= len(self.__edit_polys):
+            return
+        poly = self.__edit_polys[handle.geom_index]
+        exterior = self.__ring_coords(poly, -1)
+        interiors = [
+            self.__ring_coords(poly, i) for i in range(len(list(poly.interiors)))
+        ]
+        point = (scene_point.x(), scene_point.y())
+        if handle.ring_index < 0:
+            if handle.vertex_index < len(exterior):
+                exterior[handle.vertex_index] = point
+        elif handle.ring_index < len(interiors):
+            ring = interiors[handle.ring_index]
+            if handle.vertex_index < len(ring):
+                ring[handle.vertex_index] = point
+        try:
+            self.__edit_polys[handle.geom_index] = Polygon(exterior, interiors)
+        except Exception:
+            return
+        self.__render_edit_polys()
+        self.__reposition_handles()
+
+    def __render_edit_polys(self):
+        """Render the raw (non-merged) edited polygons during a drag."""
+        self.__clear_scan_geometry_items()
+        for poly in self.__edit_polys:
+            if not isinstance(poly, Polygon) or poly.is_empty:
+                continue
+            try:
+                item = ScanGeometry.__poly_to_path_item(poly)
+            except Exception:
+                continue
+            self.__scan_geometry_items.addToGroup(item)
+
+    def _end_vertex_edit(self):
+        self.__handles_dragging = False
+        if not self.__editing:
+            return
+        self.__editing = False
+        polys = [
+            p
+            for p in self.__edit_polys
+            if isinstance(p, Polygon) and p.is_valid and not p.is_empty
+        ]
+        self.scan_geometries = [(p, True) for p in polys]
+        self.__edit_polys = []
+        self.__update()
 
     def __update_scan_path(self):
         """Update scanning path display."""

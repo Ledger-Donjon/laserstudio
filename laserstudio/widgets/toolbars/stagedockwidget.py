@@ -1,7 +1,7 @@
 import os
 from typing import TYPE_CHECKING, Callable
 import logging
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QPushButton,
     QComboBox,
@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QSizePolicy,
     QMenu,
+    QCheckBox,
 )
 from PyQt6.QtGui import QGuiApplication, QFont, QAction, QIcon
 from ..coloredbutton import ColoredPushButton
@@ -33,10 +34,75 @@ from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
 from ..marker import IdMarker
 from ...utils.util import create_color_qicon
+from pystages.grbl import GRBLSetting
 
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
+
+
+class GrblSerialThread(QThread):
+    finished_with_result = pyqtSignal(bool, str, object)
+
+    def __init__(
+        self,
+        stage: StageInstrument,
+        operation: str,
+        payload: object = None,
+    ):
+        super().__init__()
+        self.stage = stage
+        self.operation = operation
+        self.payload = payload
+
+    def run(self):
+        cnc = self.stage.stage
+        if not isinstance(cnc, CNCRouter):
+            self.finished_with_result.emit(False, "CNC stage not found.", None)
+            return
+        self.stage.mutex.lock()
+        try:
+            if self.operation == "unlock":
+                ok = cnc.unlock()
+                if not ok:
+                    self.finished_with_result.emit(
+                        False,
+                        "Could not unlock ($X). Try \"Reset GRBL\" first, "
+                        "then \"Unlock\" if needed.",
+                        None,
+                    )
+                    return
+            elif self.operation == "reset":
+                ok = cnc.reset_grbl()
+                if not ok:
+                    self.finished_with_result.emit(
+                        False,
+                        "GRBL reset did not receive a valid response. "
+                        "Check the serial connection and try again.",
+                        None,
+                    )
+                    return
+            elif self.operation == "read_soft_limits":
+                enabled = bool(cnc.get_grbl_setting(GRBLSetting.SOFT_LIMITS))
+                self.finished_with_result.emit(True, "", enabled)
+                return
+            elif self.operation == "set_soft_limits":
+                cnc.set_grbl_setting(GRBLSetting.SOFT_LIMITS, bool(self.payload))
+                self.finished_with_result.emit(True, "", self.payload)
+                return
+            else:
+                self.finished_with_result.emit(
+                    False, f"Unknown GRBL operation: {self.operation}", None
+                )
+                return
+            self.finished_with_result.emit(True, "", None)
+        except Exception as e:
+            logging.getLogger("laserstudio").error(
+                f"GRBL {self.operation} failed: {e}", exc_info=True
+            )
+            self.finished_with_result.emit(False, str(e), None)
+        finally:
+            self.stage.mutex.unlock()
 
 
 class PositioningOffsetDialog(QDialog):
@@ -161,6 +227,22 @@ class StageDockWidget(QDockWidget):
         grid.setContentsMargins(0, 0, 0, 0)
         vbox.addLayout(grid)
 
+        self._grbl_alarm_box: QMessageBox | None = None
+        self._grbl_thread: GrblSerialThread | None = None
+        self._updating_soft_limits_checkbox = False
+        self.soft_limits_checkbox: QCheckBox | None = None
+        self._updating_limit_ui = False
+        self._limit_violation_box: QMessageBox | None = None
+
+        if isinstance(self.stage.stage, CNCRouter):
+            self.stage.grbl_alarm.connect(
+                self.show_grbl_alarm, Qt.ConnectionType.QueuedConnection
+            )
+
+        self.stage.soft_limit_violation.connect(
+            self.show_soft_limit_violation, Qt.ConnectionType.QueuedConnection
+        )
+
         # Activate stage-move mode
         w = ColoredPushButton(
             ":/icons/fontawesome-free/directions-solid.svg", parent=self
@@ -241,6 +323,11 @@ class StageDockWidget(QDockWidget):
 
         if isinstance(stage := self.stage.stage, CNCRouter):
             w = QPushButton(self)
+            w.setText("Unlock")
+            w.clicked.connect(self._unlock_grbl)
+            grid.addWidget(w, 2, 1)
+
+            w = QPushButton(self)
             w.setText("Set Device Origin")
             w.setToolTip(
                 "Set the current position as the origin of the device. This is permanent so will impact other projects."
@@ -249,8 +336,19 @@ class StageDockWidget(QDockWidget):
             grid.addWidget(w, 3, 0)
             w = QPushButton(self)
             w.setText("Reset GRBL")
-            w.clicked.connect(stage.reset_grbl)
+            w.clicked.connect(self._reset_grbl)
             grid.addWidget(w, 3, 1)
+
+            soft_limits_checkbox = QCheckBox("Soft limits")
+            soft_limits_checkbox.setToolTip(
+                "Enable or disable GRBL soft limits ($20). "
+                "When enabled, motion outside allowed travel triggers an alarm."
+            )
+            soft_limits_checkbox.toggled.connect(self._soft_limits_toggled)
+            grid.addWidget(soft_limits_checkbox, 4, 0, 1, 2)
+            self.soft_limits_checkbox = soft_limits_checkbox
+            self._refresh_soft_limits_checkbox()
+
 
         elif isinstance(stage := self.stage.stage, SMC100):
             w = QPushButton(self)
@@ -275,6 +373,42 @@ class StageDockWidget(QDockWidget):
             w.setText("Enable Joystick")
             w.clicked.connect(stage.enable_joystick)
             grid.addWidget(w, 3, 1)
+
+        # Software limit area (LaserStudio-side, editable in the viewer)
+        limit_box = QHBoxLayout()
+        limit_box.setContentsMargins(0, 0, 0, 0)
+        self.limit_area_checkbox = QCheckBox("Limit stage area")
+        self.limit_area_checkbox.setToolTip(
+            "Enable a LaserStudio software limit area. When enabled, moves whose "
+            "target is outside the area are blocked.\n"
+            "Drag the handles of the rectangle in the viewer to resize the area."
+        )
+        self.limit_area_checkbox.toggled.connect(self._limit_area_toggled)
+        limit_box.addWidget(self.limit_area_checkbox)
+        vbox.addLayout(limit_box)
+
+        self.z_min_spin: QDoubleSpinBox | None = None
+        self.z_max_spin: QDoubleSpinBox | None = None
+        if self.stage.num_axis >= 3:
+            z_box = QHBoxLayout()
+            z_box.setContentsMargins(0, 0, 0, 0)
+            z_box.addWidget(QLabel("Z limits:"))
+            z_min_spin = QDoubleSpinBox()
+            z_max_spin = QDoubleSpinBox()
+            for sb in (z_min_spin, z_max_spin):
+                sb.setMinimum(-1000000.0)
+                sb.setMaximum(1000000.0)
+                sb.setDecimals(1)
+                sb.setSuffix("\xa0µm")
+                sb.valueChanged.connect(lambda _=0.0: self._z_limits_changed())
+                z_box.addWidget(sb)
+            self.z_min_spin = z_min_spin
+            self.z_max_spin = z_max_spin
+            vbox.addLayout(z_box)
+
+        self.stage.soft_limits_changed.connect(self._refresh_limit_area_ui)
+        self._refresh_limit_area_ui()
+        self.viewer.set_soft_limits_editable(self.stage.soft_limits_enabled)
 
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
@@ -579,3 +713,186 @@ class StageDockWidget(QDockWidget):
             self.stage.offset_origin = dialog.new_offset_origin
         else:
             self.stage.offset_origin = dialog.original_offset_origin
+
+    def _run_grbl_operation(
+        self,
+        operation: str,
+        title: str,
+        *,
+        payload: object = None,
+        on_finished=None,
+    ):
+        if self._grbl_thread is not None and self._grbl_thread.isRunning():
+            return
+        self._grbl_thread = GrblSerialThread(self.stage, operation, payload=payload)
+        if on_finished is None:
+            on_finished = (
+                lambda ok, msg, _val: self._on_grbl_operation_finished(
+                    operation, title, ok, msg
+                )
+            )
+        self._grbl_thread.finished_with_result.connect(on_finished)
+        self._grbl_thread.start()
+
+    def _on_grbl_operation_finished(
+        self, operation: str, title: str, ok: bool, error_msg: str
+    ):
+        if ok and operation in ("unlock", "reset"):
+            self.stage.clear_grbl_alarm_state()
+        elif not ok and error_msg:
+            QMessageBox.warning(self, title, error_msg)
+
+    def _refresh_soft_limits_checkbox(self):
+        if self.soft_limits_checkbox is None:
+            return
+        self._run_grbl_operation(
+            "read_soft_limits",
+            "Soft limits",
+            on_finished=self._on_soft_limits_read,
+        )
+
+    def _on_soft_limits_read(self, ok: bool, error_msg: str, value: object):
+        if self.soft_limits_checkbox is None:
+            return
+        if not ok:
+            if error_msg:
+                logging.getLogger("laserstudio").warning(
+                    f"Could not read GRBL soft limits: {error_msg}"
+                )
+            return
+        if not isinstance(value, bool):
+            return
+        self._updating_soft_limits_checkbox = True
+        try:
+            self.soft_limits_checkbox.setChecked(value)
+        finally:
+            self._updating_soft_limits_checkbox = False
+
+    def _soft_limits_toggled(self, enabled: bool):
+        if self._updating_soft_limits_checkbox:
+            return
+        self._run_grbl_operation(
+            "set_soft_limits",
+            "Soft limits",
+            payload=enabled,
+            on_finished=lambda ok, msg, _val: self._on_soft_limits_set(ok, msg, enabled),
+        )
+
+    def _on_soft_limits_set(self, ok: bool, error_msg: str, enabled: bool):
+        if ok:
+            logging.getLogger("laserstudio").info(
+                f"GRBL soft limits {'enabled' if enabled else 'disabled'}."
+            )
+            return
+        if self.soft_limits_checkbox is not None:
+            self._updating_soft_limits_checkbox = True
+            try:
+                self.soft_limits_checkbox.setChecked(not enabled)
+            finally:
+                self._updating_soft_limits_checkbox = False
+        if error_msg:
+            QMessageBox.warning(self, "Soft limits", error_msg)
+
+    def _unlock_grbl(self):
+        if not isinstance(self.stage.stage, CNCRouter):
+            return
+        self._run_grbl_operation("unlock", "Unlock GRBL")
+
+    def _reset_grbl(self):
+        if not isinstance(self.stage.stage, CNCRouter):
+            return
+        self._run_grbl_operation("reset", "Reset GRBL")
+
+    def _init_default_soft_limits(self):
+        """Initialize a default limit box around the visible area / current position."""
+        position = self.stage.position.data
+        rect = None
+        viewport = self.viewer.viewport()
+        if viewport is not None:
+            rect = self.viewer.mapToScene(viewport.rect()).boundingRect()
+        if rect is not None and rect.width() > 1.0 and rect.height() > 1.0:
+            xmin, xmax = rect.left(), rect.right()
+            ymin, ymax = rect.top(), rect.bottom()
+        else:
+            x = position[0] if len(position) > 0 else 0.0
+            y = position[1] if len(position) > 1 else 0.0
+            xmin, xmax = x - 5000.0, x + 5000.0
+            ymin, ymax = y - 5000.0, y + 5000.0
+        minimum = [xmin, ymin]
+        maximum = [xmax, ymax]
+        if self.stage.num_axis >= 3:
+            z = position[2] if len(position) > 2 else 0.0
+            minimum.append(z - 5000.0)
+            maximum.append(z + 5000.0)
+        self.stage.set_soft_limits(minimum, maximum)
+
+    def _limit_area_toggled(self, checked: bool):
+        if self._updating_limit_ui:
+            return
+        if checked and not self.stage.has_soft_limits:
+            self._init_default_soft_limits()
+        self.stage.soft_limits_enabled = checked
+        self.viewer.set_soft_limits_editable(checked)
+        self._refresh_limit_area_ui()
+
+    def _z_limits_changed(self):
+        if self._updating_limit_ui or self.stage.num_axis < 3:
+            return
+        if self.z_min_spin is None or self.z_max_spin is None:
+            return
+        self.stage.set_soft_limits_axis(
+            2, self.z_min_spin.value(), self.z_max_spin.value()
+        )
+
+    def _refresh_limit_area_ui(self):
+        self._updating_limit_ui = True
+        try:
+            self.limit_area_checkbox.setChecked(self.stage.soft_limits_enabled)
+            if (
+                self.stage.num_axis >= 3
+                and self.z_min_spin is not None
+                and self.z_max_spin is not None
+            ):
+                minimum = self.stage.soft_limits_min
+                maximum = self.stage.soft_limits_max
+                if minimum is not None and maximum is not None and len(minimum) >= 3:
+                    self.z_min_spin.setValue(minimum[2])
+                    self.z_max_spin.setValue(maximum[2])
+        finally:
+            self._updating_limit_ui = False
+        # Keep the editable box in the viewer in sync with the enabled state.
+        self.viewer.set_soft_limits_editable(self.stage.soft_limits_enabled)
+
+    def show_soft_limit_violation(self, message: str):
+        if (
+            self._limit_violation_box is not None
+            and self._limit_violation_box.isVisible()
+        ):
+            self._limit_violation_box.setText(message)
+            return
+        box = QMessageBox(
+            QMessageBox.Icon.Warning, "Software limits", message, parent=self
+        )
+        box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        box.setModal(False)
+        box.finished.connect(self._on_limit_violation_dismissed)
+        self._limit_violation_box = box
+        box.show()
+
+    def _on_limit_violation_dismissed(self):
+        self._limit_violation_box = None
+
+    def show_grbl_alarm(self, message: str):
+        if self._grbl_alarm_box is not None and self._grbl_alarm_box.isVisible():
+            self._grbl_alarm_box.setText(message)
+            return
+
+        box = QMessageBox(QMessageBox.Icon.Warning, "GRBL Alarm", message, parent=self)
+        box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        box.setModal(False)
+        box.finished.connect(self._on_grbl_alarm_dismissed)
+        self._grbl_alarm_box = box
+        box.show()
+
+    def _on_grbl_alarm_dismissed(self):
+        self._grbl_alarm_box = None
