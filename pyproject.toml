@@ -27,8 +27,8 @@ dependencies = [
     "requests>=2.32.3,<3.0.0",
     "numpy<2.0",
     "pypdm>=2.0",
-    "flask",
-    "flask-restx",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
     "hidapi>=0.14.0",
     "colorama",
     "donjon_hyshlr",
@@ -50,11 +50,13 @@ laserstudio = 'laserstudio.__main__:main'
 laserstudio_listdevices = 'laserstudio.instruments.list_serials:list_devices'
 laserstudio_generate_config_cli = 'laserstudio.config_generator:main_cli'
 laserstudio_generate_config = 'laserstudio.config_generator:main_gui'
+laserstudio_mcp = 'laserstudio.mcpserver.__main__:main'
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
 lint = ["mypy", "types-pyserial", "types-PyYAML", "types-requests", "scipy-stubs", "hidapi-stubs"]
 docs = ["sphinx", "sphinx-rtd-theme", "myst_parser"]
+mcp = ["mcp>=1.2"]
 
 [tool.poetry-dynamic-versioning]
 enable = true

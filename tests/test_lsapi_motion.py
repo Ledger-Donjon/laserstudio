@@ -1,7 +1,7 @@
-from laserstudio.lsapi import LSAPI
+from laserstudio.lsapi import LSAPI, InstrumentNotFound, InvalidParameter
 import numpy
 import pytest
-from typing import Any, cast
+from typing import cast
 
 
 def test_go_next():
@@ -12,7 +12,8 @@ def test_go_next():
 def test_get_settings():
     api = LSAPI()
     assert api.instrument_settings("test") is not None
-    assert api.instrument_settings("test2") is None
+    with pytest.raises(InstrumentNotFound):
+        api.instrument_settings("test2")
 
 
 def test_set_settings():
@@ -35,10 +36,7 @@ def test_go_to_position_shorter_coordinates():
         pytest.skip("Need at least 2 axes to test partial move")
     partial = list(current[:-1])
     partial[0] = float(partial[0]) + 1.0
-    result = cast(dict[str, Any], api.go_to_position(partial))
-    assert "error" not in result
-    assert "pos" in result
-    new_pos = cast(list[float], result["pos"])
+    new_pos = api.go_to_position(partial)
     assert len(new_pos) == len(current)
     tolerance = 1e-6
     for i, value in enumerate(partial):
@@ -54,12 +52,11 @@ def test_go_to_position_too_many_coordinates():
     new_pos = list(current)
     new_pos[0] += 1.0
     too_long = new_pos + [0.0]
-    response = api.send("motion/position", {"pos": too_long}, is_put=True)
-    assert response.status_code == 400
-    result = cast(dict[str, Any], response.json())
-    assert "error" in result
-    assert "pos" in result
-    final_pos = cast(list[float], result["pos"])
+    with pytest.raises(InvalidParameter) as excinfo:
+        api.go_to_position(too_long)
+    error = excinfo.value
+    assert error.status_code == 400
+    final_pos = cast(list[float], error.details["pos"])
     tolerance = 1e-6
     assert len(final_pos) == len(current)
     for i, value in enumerate(current):

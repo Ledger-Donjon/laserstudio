@@ -10,7 +10,7 @@ import numpy
 from numpy.typing import NDArray
 from collections.abc import Sequence
 from typing import Any
-from PyQt6.QtCore import Qt, QKeyCombination, QSettings
+from PyQt6.QtCore import Qt, QKeyCombination, QSettings, QPointF
 from PyQt6.QtGui import (
     QColor,
     QShortcut,
@@ -48,6 +48,12 @@ from .widgets.toolbars import (
     FocusToolBar,
 )
 from .restserver.server import RestProxy
+from .restserver.errors import (
+    DeviceUnavailableError,
+    InstrumentNotFoundError,
+    InvalidParameterError,
+    MemoryPointNotFoundError,
+)
 from .utils.yaml_types import Config
 
 
@@ -310,7 +316,7 @@ class LaserStudio(QMainWindow):
             return Image.new("1", (1, 1))
         return ImageQt.fromqpixmap(pixmap)
 
-    def handle_camera(self, path: str | None = None) -> Image.Image | None:
+    def handle_camera(self, path: str | None = None) -> Image.Image:
         """
         Handle a Camera API request to get the image of the camera associated to the main Stage.
         Either stores it to a given path (and returns a place holder pixel) or returns the image's data.
@@ -322,7 +328,7 @@ class LaserStudio(QMainWindow):
         """
         # Takes the Image of the camera associated to the stage.
         if self.viewer.stage_sight is None or self.viewer.stage_sight.camera is None:
-            return None
+            raise DeviceUnavailableError("No camera is available.")
 
         im = self.viewer.stage_sight.image.pixmap()
         if path is not None:
@@ -344,7 +350,7 @@ class LaserStudio(QMainWindow):
             self.viewer.stage_sight is None
             or (camera := self.viewer.stage_sight.camera) is None
         ):
-            return None
+            raise DeviceUnavailableError("No camera is available.")
 
         if reset:
             camera.clear_averaged_images()
@@ -352,7 +358,7 @@ class LaserStudio(QMainWindow):
         # Return the number of averaged images
         return camera.number_of_averaged_images
 
-    def handle_camera_accumulator(self, path: str | None) -> NDArray[Any] | None:
+    def handle_camera_accumulator(self, path: str | None) -> NDArray[Any]:
         """
         Handle a Camera API request to get the accumulated image of the camera.
         Either stores it to a given path (and returns a place holder pixel) or returns the accumulator's data.
@@ -367,11 +373,11 @@ class LaserStudio(QMainWindow):
             self.viewer.stage_sight is None
             or (camera := self.viewer.stage_sight.camera) is None
         ):
-            return None
+            raise DeviceUnavailableError("No camera is available.")
 
         frame = camera.last_frame_accumulator
         if frame is None:
-            return None
+            raise DeviceUnavailableError("No accumulated data is available yet.")
 
         if path is not None:
             numpy.save(path, frame)
@@ -398,7 +404,7 @@ class LaserStudio(QMainWindow):
             self.viewer.stage_sight is None
             or (camera := self.viewer.stage_sight.camera) is None
         ):
-            return
+            raise DeviceUnavailableError("No camera is available.")
         if refname is not None:
             camera.current_reference_image = refname
         if dotake is not None:
@@ -406,9 +412,20 @@ class LaserStudio(QMainWindow):
         self.photoemission_dockwidget.update_ref_image_controls()
         return camera.current_reference_image
 
+    def handle_list_instruments(self) -> list[Config]:
+        """List the available instruments.
+
+        :return: A list of dictionaries, each describing an instrument by its
+            ``type`` (the instrument class name) and its ``label``.
+        """
+        return [
+            {"type": type(inst).__name__, "label": inst.label}
+            for inst in self.instruments.all_instruments
+        ]
+
     def handle_instrument_settings(
         self, label: str, settings: Config | None
-    ) -> Config | None:
+    ) -> Config:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -422,30 +439,30 @@ class LaserStudio(QMainWindow):
             instrument if the instrument is found, otherwise None.
         """
         inst = self.instruments.get_instrument_with_label(label)
-        if inst is not None:
-            if settings is not None:
-                inst.settings = settings
-            return {"settings": inst.settings}
-        return None
+        if inst is None:
+            raise InstrumentNotFoundError(label)
+        if settings is not None:
+            inst.settings = settings
+        return {"settings": inst.settings}
 
     def handle_position(self, pos: Sequence[float] | None) -> dict[str, Any]:
         if self.instruments.stage is None:
-            return {"pos": []}
+            raise DeviceUnavailableError("No stage is available.")
         stage = self.instruments.stage
         if pos is not None:
             if not isinstance(pos, (list, tuple)):
                 current_pos = [float(v) for v in stage.position.data]
-                return {
-                    "error": "Invalid position: expected a list of coordinates",
-                    "pos": current_pos,
-                }
+                raise InvalidParameterError(
+                    "Invalid position: expected a list of coordinates.",
+                    details={"pos": current_pos},
+                )
             num_axis = stage.num_axis
             if len(pos) > num_axis:
                 current_pos = [float(v) for v in stage.position.data]
-                return {
-                    "error": "Too many coordinates for stage axes",
-                    "pos": current_pos,
-                }
+                raise InvalidParameterError(
+                    "Too many coordinates for stage axes.",
+                    details={"pos": current_pos, "num_axis": num_axis},
+                )
             if len(pos) < num_axis:
                 target = [float(v) for v in stage.position.data]
                 for i, value in enumerate(pos):
@@ -483,8 +500,9 @@ class LaserStudio(QMainWindow):
             if len(color) == 3:
                 color.append(1.0)
             if len(color) != 4:
-                ValueError(
-                    "Color argument is invalid. It should be a list of 3 or 4 floats"
+                raise InvalidParameterError(
+                    "Color argument is invalid. It should be a list of 3 or 4 floats.",
+                    details={"color": color},
                 )
             qcolor = QColor(
                 int(color[0] * 255),
@@ -509,6 +527,57 @@ class LaserStudio(QMainWindow):
             return markers[0].to_dict()
         return {"markers": [marker.to_dict() for marker in markers]}
 
+    def handle_delete_markers(self, ids: list[int] | None = None) -> Config:
+        """Delete marker(s) from the viewer.
+
+        :param ids: The identifiers of the markers to delete. If None or empty,
+            all markers are removed.
+        :return: A dictionary containing the list of deleted marker identifiers
+            under the ``deleted`` key.
+        """
+        if not ids:
+            deleted = [marker.id for marker in self.viewer.markers]
+            self.viewer.clear_markers()
+            return {"deleted": deleted}
+
+        id_set = set(ids)
+        deleted = []
+        for marker in self.viewer.markers:
+            if marker.id in id_set:
+                self.viewer.remove_marker(marker)
+                deleted.append(marker.id)
+        return {"deleted": deleted}
+
+    def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
+        """Convert camera-image pixel coordinates into viewer coordinates.
+
+        The conversion relies on the actual Qt scene transform of the camera
+        image item, so it accounts for the camera resolution, the objective
+        magnification, the stage position and any distortion applied to the
+        image.
+
+        :param pixels: A list of ``[px, py]`` pixel coordinates, with the
+            origin ``(0, 0)`` at the top-left corner of the camera image.
+        :return: A dictionary with the converted coordinates under the
+            ``positions`` key, as a list of ``[x, y]`` viewer coordinates in
+            the same order as the input.
+        """
+        stage_sight = self.viewer.stage_sight
+        if stage_sight is None:
+            raise DeviceUnavailableError("No camera (stage sight) is available.")
+
+        image = stage_sight.image
+        positions: list[list[float]] = []
+        for pixel in pixels:
+            if len(pixel) != 2:
+                raise InvalidParameterError(
+                    "Each pixel must be a [px, py] pair.",
+                    details={"pixel": pixel},
+                )
+            scene_point = image.mapToScene(QPointF(pixel[0], pixel[1]))
+            positions.append([scene_point.x(), scene_point.y()])
+        return {"positions": positions}
+
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
             Memory points are defined in the configuration file, on the
@@ -516,10 +585,13 @@ class LaserStudio(QMainWindow):
 
         :param index: The index of the memory point to go to.
         """
-        if self.instruments.stage is None or index not in range(
-            len(self.instruments.stage.mem_points)
-        ):
-            return {"pos": list[float]()}
+        if self.instruments.stage is None:
+            raise DeviceUnavailableError("No stage is available.")
+        if index not in range(len(self.instruments.stage.mem_points)):
+            raise MemoryPointNotFoundError(
+                index,
+                details={"available": len(self.instruments.stage.mem_points)},
+            )
 
         point = self.instruments.stage.mem_points[index]
 

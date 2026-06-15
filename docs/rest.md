@@ -3,6 +3,47 @@
 Laser Studio serves a REST API to be controlled by external applications.
 By default, it runs by serving the api on the port 4444.
 
+The API is built with [FastAPI]. Interactive, auto-generated documentation is
+available while Laser Studio is running:
+
+* Swagger UI: <http://localhost:4444/>
+* ReDoc: <http://localhost:4444/redoc>
+* OpenAPI schema: <http://localhost:4444/openapi.json>
+
+[FastAPI]: https://fastapi.tiangolo.com/
+
+## Error handling
+
+On success, endpoints return a `2xx` status code. On error, they return an
+appropriate HTTP status code together with a normalized JSON body:
+
+```json
+{
+  "error": {
+    "code": "INSTRUMENT_NOT_FOUND",
+    "message": "No instrument matches the label 'laser2'.",
+    "details": { "label": "laser2" }
+  }
+}
+```
+
+The `code` field is a stable, machine-readable identifier. The mapping between
+error codes and HTTP statuses is:
+
+| `code` | HTTP status | Meaning |
+|---|---|---|
+| `INVALID_PARAMETER` | `400 Bad Request` | A parameter is missing or invalid. |
+| `INSTRUMENT_NOT_FOUND` | `404 Not Found` | No instrument matches the given label. |
+| `MEMORY_POINT_NOT_FOUND` | `404 Not Found` | No memory point matches the given index. |
+| `CONFLICT` | `409 Conflict` | The action cannot be performed in the current state (e.g. scanning not enabled). |
+| `NOT_IMPLEMENTED` | `501 Not Implemented` | The action is not implemented yet. |
+| `DEVICE_UNAVAILABLE` | `503 Service Unavailable` | A required device (camera, stage, focus helper...) is not available. |
+
+A `404` denotes a *named* resource that does not exist (an instrument label, a
+memory point index), whereas `503` denotes a *device type* that is not
+configured or connected (no camera, no stage). The Python {doc}`lsapi` client
+turns these errors into typed exceptions.
+
 ## `images` Endpoints
 
 This group of endpoints permits to get images files.
@@ -65,3 +106,53 @@ The body of the request must be a JSON object.
 This group of endpoints permits to add markers to be shown on the viewer.
 
 ### `/annotation/add_marker`
+
+### `/annotation/markers`
+
+A `GET` returns the list of markers currently in the scene.
+
+A `DELETE` removes markers. With a `{"ids": [1, 2, 3]}` body, only the markers
+with the given identifiers are removed; with no body (or `{"ids": null}`), all
+markers are removed. The response lists the deleted identifiers:
+
+```json
+{
+  "deleted": [1, 2, 3]
+}
+```
+
+### `/annotation/pixel_to_position`
+
+A `POST` with a `{"pixels": [[px, py], ...]}` body converts camera-image pixel
+coordinates (origin at the top-left of the image) into viewer coordinates. The
+conversion uses the actual scene transform of the camera image, so it accounts
+for the camera resolution, the objective, the stage position and any image
+distortion:
+
+```json
+{
+  "positions": [[30.0, 40.0], [-2850.0, 1660.0]]
+}
+```
+
+## Instruments
+
+This group of endpoints permits to list and configure the instruments.
+
+### `/instruments/`
+
+A `GET` on this endpoint returns the list of available instruments, each
+described by its `type` (the instrument class name) and its `label`:
+
+```json
+[
+  { "type": "StageInstrument", "label": "Main stage" },
+  { "type": "PDMInstrument", "label": "PDM" }
+]
+```
+
+### `/instruments/<label>/settings`
+
+A `GET` returns the settings of the instrument identified by `<label>`, and a
+`PUT` (with a `{"settings": {...}}` body) updates them. An unknown label returns
+a `404` error.

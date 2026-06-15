@@ -38,6 +38,27 @@ for iteration in range(100):
 lsapi.laser(1, active=False)
 ```
 
+## Error handling
+
+When the server returns an HTTP error, the client raises a typed exception
+deriving from `LSAPIError`. The concrete subclass is reconstructed from the
+server-reported error `code`, so callers can catch precisely the error they
+care about:
+
+```python
+from laserstudio.lsapi import LSAPI, InstrumentNotFound
+
+lsapi = LSAPI()
+try:
+    lsapi.get_instrument_settings("does_not_exist")
+except InstrumentNotFound as exc:
+    print(exc.code, exc.status_code, exc.message, exc.details)
+```
+
+Available exceptions: `LSAPIError` (base), `LSAPIConnectionError`,
+`InvalidParameter`, `InstrumentNotFound`, `MemoryPointNotFound`,
+`DeviceUnavailable`, `Conflict` and `ActionNotImplemented`.
+
 ## API documentation
 
 ```{eval-rst}
