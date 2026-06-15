@@ -1,7 +1,7 @@
 from laserstudio.lsapi import LSAPI, InstrumentNotFound, InvalidParameter
 import numpy
 import pytest
-from typing import Any, cast
+from typing import cast
 
 
 def test_go_next():
@@ -36,10 +36,7 @@ def test_go_to_position_shorter_coordinates():
         pytest.skip("Need at least 2 axes to test partial move")
     partial = list(current[:-1])
     partial[0] = float(partial[0]) + 1.0
-    result = cast(dict[str, Any], api.go_to_position(partial))
-    assert "error" not in result
-    assert "pos" in result
-    new_pos = cast(list[float], result["pos"])
+    new_pos = api.go_to_position(partial)
     assert len(new_pos) == len(current)
     tolerance = 1e-6
     for i, value in enumerate(partial):

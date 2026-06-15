@@ -109,6 +109,12 @@ class RestProxy(QObject):
     def handle_markers(self) -> list[Config]:
         return self.laser_studio.handle_markers()
 
+    def handle_delete_markers(self, ids: list[int] | None) -> Config:
+        return self.laser_studio.handle_delete_markers(ids)
+
+    def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
+        return self.laser_studio.handle_pixel_to_position(pixels)
+
     def handle_position(self, pos: list[float] | None) -> dict[str, Any]:
         return self.laser_studio.handle_position(pos)
 
@@ -283,6 +289,23 @@ class MarkerBody(BaseModel):
     color: list[float] | None = Field(default=None, examples=[[0.0, 1.0, 0.0, 0.5]])
     label: str | None = None
     visible: bool = True
+
+
+class DeleteMarkerBody(BaseModel):
+    ids: list[int] | None = Field(
+        default=None,
+        description="Identifiers of the markers to delete. "
+        "If omitted or null, all markers are removed.",
+        examples=[[1, 2, 3]],
+    )
+
+
+class PixelToPositionBody(BaseModel):
+    pixels: list[list[float]] = Field(
+        description="Camera-image pixel coordinates ``[px, py]`` to convert, "
+        "with the origin at the top-left of the image.",
+        examples=[[[960, 540], [0, 0]]],
+    )
 
 
 class InstrumentSettingsBody(BaseModel):
@@ -468,6 +491,27 @@ def add_markers(body: MarkerBody):
 def get_markers():
     """Return the list of markers currently in the scene."""
     return RestServer.run("handle_markers")
+
+
+@annotation_router.delete("/markers", responses={400: _ERR})
+def delete_markers(body: DeleteMarkerBody | None = None):
+    """Delete marker(s) by id, or all markers when no id is given.
+
+    Returns the list of deleted marker identifiers under the ``deleted`` key.
+    """
+    ids = body.ids if body is not None else None
+    return RestServer.run("handle_delete_markers", ids)
+
+
+@annotation_router.post("/pixel_to_position", responses={400: _ERR, 503: _ERR})
+def pixel_to_position(body: PixelToPositionBody):
+    """Convert camera-image pixel coordinates to viewer coordinates.
+
+    The conversion uses the actual scene transform of the camera image, so it
+    accounts for the camera resolution, the objective, the stage position and
+    any image distortion. Returns the converted ``positions`` (``[x, y]``).
+    """
+    return RestServer.run("handle_pixel_to_position", body.pixels)
 
 
 # --- instruments ----------------------------------------------------------- #

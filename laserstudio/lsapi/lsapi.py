@@ -166,6 +166,49 @@ class LSAPI:
             params["pos"] = list_positions
         return self.send("annotation/add_markers", params, is_put=True).json()
 
+    def delete_markers(self, ids: list[int] | None = None) -> dict[str, Any]:
+        """
+        Delete marker(s) from the scene.
+
+        :param ids: The identifiers of the markers to delete. If None (or an
+            empty list), all markers are removed.
+        :return: A dictionary with the list of deleted marker identifiers under
+            the ``deleted`` key.
+        """
+        params: dict[str, Any] = {"ids": ids}
+        result: dict[str, Any] = self.send(
+            "annotation/markers", params, is_delete=True
+        ).json()
+        return result
+
+    def pixel_to_position(
+        self,
+        pixels: list[tuple[float, float]] | tuple[float, float],
+    ) -> list[list[float]]:
+        """
+        Convert camera-image pixel coordinates into viewer coordinates.
+
+        The conversion is performed by Laser Studio using the actual scene
+        transform of the camera image, hence it accounts for the camera
+        resolution, the objective magnification, the stage position and any
+        image distortion.
+
+        :param pixels: A single ``(px, py)`` pixel coordinate or a list of
+            them, with the origin at the top-left of the camera image.
+        :return: The converted ``[x, y]`` viewer coordinates, as a list in the
+            same order as the input.
+        """
+        if isinstance(pixels, tuple):
+            list_pixels = [list(pixels)]
+        else:
+            list_pixels = [list(pixel) for pixel in pixels]
+        params: dict[str, Any] = {"pixels": list_pixels}
+        result: dict[str, Any] = self.send(
+            "annotation/pixel_to_position", params
+        ).json()
+        positions: list[list[float]] = result["positions"]
+        return positions
+
     def go_to(self, index: int) -> list[float]:
         """
         Jump to saved position, referenced by a memory point index.
@@ -276,8 +319,8 @@ class LSAPI:
         """
         params = {"pos": pos}
         res = self.send("motion/position", params, is_put=True)
-        pos = res.json()
-        return pos
+        final_pos: list[float] = res.json()["pos"]
+        return final_pos
 
     def instruments(self) -> list[dict[str, Any]]:
         """

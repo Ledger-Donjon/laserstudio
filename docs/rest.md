@@ -107,6 +107,34 @@ This group of endpoints permits to add markers to be shown on the viewer.
 
 ### `/annotation/add_marker`
 
+### `/annotation/markers`
+
+A `GET` returns the list of markers currently in the scene.
+
+A `DELETE` removes markers. With a `{"ids": [1, 2, 3]}` body, only the markers
+with the given identifiers are removed; with no body (or `{"ids": null}`), all
+markers are removed. The response lists the deleted identifiers:
+
+```json
+{
+  "deleted": [1, 2, 3]
+}
+```
+
+### `/annotation/pixel_to_position`
+
+A `POST` with a `{"pixels": [[px, py], ...]}` body converts camera-image pixel
+coordinates (origin at the top-left of the image) into viewer coordinates. The
+conversion uses the actual scene transform of the camera image, so it accounts
+for the camera resolution, the objective, the stage position and any image
+distortion:
+
+```json
+{
+  "positions": [[30.0, 40.0], [-2850.0, 1660.0]]
+}
+```
+
 ## Instruments
 
 This group of endpoints permits to list and configure the instruments.

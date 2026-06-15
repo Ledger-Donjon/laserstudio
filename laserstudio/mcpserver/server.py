@@ -139,6 +139,31 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
             visible=visible,
         )
 
+    @mcp.tool()
+    def delete_markers(ids: list[int] | None = None) -> dict[str, Any]:
+        """Delete markers from the viewer.
+
+        :param ids: Identifiers of the markers to delete (as returned by
+            ``list_markers`` / ``add_marker``). If omitted, all markers are
+            removed.
+        :return: A dict with the list of deleted identifiers under ``deleted``.
+        """
+        return call(api.delete_markers, ids)
+
+    @mcp.tool()
+    def pixel_to_position(pixels: list[list[float]]) -> list[list[float]]:
+        """Convert camera-image pixel coordinates to viewer coordinates.
+
+        Useful to place markers at features detected in the camera image. The
+        conversion accounts for the camera resolution, the objective, the stage
+        position and any image distortion.
+
+        :param pixels: A list of ``[px, py]`` pixel coordinates, with the origin
+            at the top-left of the camera image.
+        :return: The converted ``[x, y]`` viewer coordinates, in the same order.
+        """
+        return call(api.pixel_to_position, pixels)
+
     # -- Imaging ------------------------------------------------------------ #
 
     @mcp.tool()

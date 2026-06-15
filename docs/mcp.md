@@ -72,6 +72,8 @@ For example:
 | `magic_focus` | Perform a magic focus or get its state. |
 | `list_markers` | List the markers in the viewer. |
 | `add_marker` | Add a marker in the viewer. |
+| `delete_markers` | Delete markers by id, or all markers when no id is given. |
+| `pixel_to_position` | Convert camera-image pixel coordinates to viewer coordinates. |
 | `get_camera_image` | Capture the main camera image (PNG). |
 | `get_screenshot` | Capture a screenshot of the viewer (PNG). |
 | `get_averaging` | Get the camera averaging count. |

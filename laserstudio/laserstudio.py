@@ -10,7 +10,7 @@ import numpy
 from numpy.typing import NDArray
 from collections.abc import Sequence
 from typing import Any
-from PyQt6.QtCore import Qt, QKeyCombination, QSettings
+from PyQt6.QtCore import Qt, QKeyCombination, QSettings, QPointF
 from PyQt6.QtGui import (
     QColor,
     QShortcut,
@@ -526,6 +526,57 @@ class LaserStudio(QMainWindow):
         if len(markers) == 1:
             return markers[0].to_dict()
         return {"markers": [marker.to_dict() for marker in markers]}
+
+    def handle_delete_markers(self, ids: list[int] | None = None) -> Config:
+        """Delete marker(s) from the viewer.
+
+        :param ids: The identifiers of the markers to delete. If None or empty,
+            all markers are removed.
+        :return: A dictionary containing the list of deleted marker identifiers
+            under the ``deleted`` key.
+        """
+        if not ids:
+            deleted = [marker.id for marker in self.viewer.markers]
+            self.viewer.clear_markers()
+            return {"deleted": deleted}
+
+        id_set = set(ids)
+        deleted = []
+        for marker in self.viewer.markers:
+            if marker.id in id_set:
+                self.viewer.remove_marker(marker)
+                deleted.append(marker.id)
+        return {"deleted": deleted}
+
+    def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
+        """Convert camera-image pixel coordinates into viewer coordinates.
+
+        The conversion relies on the actual Qt scene transform of the camera
+        image item, so it accounts for the camera resolution, the objective
+        magnification, the stage position and any distortion applied to the
+        image.
+
+        :param pixels: A list of ``[px, py]`` pixel coordinates, with the
+            origin ``(0, 0)`` at the top-left corner of the camera image.
+        :return: A dictionary with the converted coordinates under the
+            ``positions`` key, as a list of ``[x, y]`` viewer coordinates in
+            the same order as the input.
+        """
+        stage_sight = self.viewer.stage_sight
+        if stage_sight is None:
+            raise DeviceUnavailableError("No camera (stage sight) is available.")
+
+        image = stage_sight.image
+        positions: list[list[float]] = []
+        for pixel in pixels:
+            if len(pixel) != 2:
+                raise InvalidParameterError(
+                    "Each pixel must be a [px, py] pair.",
+                    details={"pixel": pixel},
+                )
+            scene_point = image.mapToScene(QPointF(pixel[0], pixel[1]))
+            positions.append([scene_point.x(), scene_point.y()])
+        return {"positions": positions}
 
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
