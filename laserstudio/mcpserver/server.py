@@ -26,8 +26,9 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, read or move the stage, run scans (go_next), focus, manage
-markers, and capture camera images or screenshots.
+instrument settings, read or update scan geometry, read or move the stage, run
+scans (go_next), focus, manage markers, and capture camera images or
+screenshots.
 
 Tools fail with an explicit error message prefixed by a machine-readable code
 (e.g. INSTRUMENT_NOT_FOUND, DEVICE_UNAVAILABLE, INVALID_PARAMETER) when an
@@ -70,6 +71,23 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
     ) -> dict[str, Any]:
         """Update the settings of the instrument identified by its label."""
         return call(api.set_instrument_settings, label, settings)
+
+    # -- Scan geometry ------------------------------------------------------ #
+
+    @mcp.tool()
+    def get_scangeometry() -> dict[str, Any]:
+        """Get the current scan geometry settings (polygons and density)."""
+        return call(api.scangeometry)
+
+    @mcp.tool()
+    def set_scangeometry(settings: dict[str, Any]) -> dict[str, Any]:
+        """Update the scan geometry settings (polygons and optional density)."""
+        return call(api.set_scangeometry, settings)
+
+    @mcp.tool()
+    def delete_scangeometry() -> dict[str, Any]:
+        """Clear the scan geometry by setting an empty polygon."""
+        return call(api.delete_scangeometry)
 
     # -- Motion ------------------------------------------------------------- #
 

@@ -152,6 +152,12 @@ class RestProxy(QObject):
     ) -> Any:
         return self.laser_studio.handle_instrument_settings(label, conf)
 
+    def handle_scangeometry(self, settings: dict[str, Any] | None) -> Config:
+        return self.laser_studio.handle_scangeometry(settings)
+
+    def handle_clear_scangeometry(self) -> Config:
+        return self.laser_studio.handle_clear_scangeometry()
+
 
 class RestThread(QThread):
     """
@@ -310,6 +316,29 @@ class PixelToPositionBody(BaseModel):
 
 class InstrumentSettingsBody(BaseModel):
     settings: dict[str, Any]
+
+
+class ScanGeometryBody(BaseModel):
+    settings: dict[str, Any] = Field(
+        description="Scan geometry settings (``geometry`` and optional ``density``).",
+        examples=[
+            {
+                "density": 100,
+                "geometry": {
+                    "polygon": {
+                        "exterior": [
+                            {"x": 0.0, "y": 0.0},
+                            {"x": 100.0, "y": 0.0},
+                            {"x": 100.0, "y": 100.0},
+                            {"x": 0.0, "y": 100.0},
+                            {"x": 0.0, "y": 0.0},
+                        ],
+                        "interiors": [],
+                    }
+                },
+            }
+        ],
+    )
 
 
 class InstrumentInfo(BaseModel):
@@ -538,10 +567,37 @@ def put_instrument_settings(label: str, body: InstrumentSettingsBody):
     return RestServer.run("handle_instrument_settings", label, body.settings)
 
 
+# --- scangeometry ---------------------------------------------------------- #
+
+scangeometry_router = APIRouter(prefix="/scangeometry", tags=["scangeometry"])
+
+
+@scangeometry_router.get("")
+@scangeometry_router.get("/", include_in_schema=False)
+def get_scangeometry():
+    """Return the current scan geometry settings."""
+    return RestServer.run("handle_scangeometry", None)
+
+
+@scangeometry_router.put("", responses={400: _ERR})
+@scangeometry_router.put("/", include_in_schema=False, responses={400: _ERR})
+def put_scangeometry(body: ScanGeometryBody):
+    """Update and return the scan geometry settings."""
+    return RestServer.run("handle_scangeometry", body.settings)
+
+
+@scangeometry_router.delete("")
+@scangeometry_router.delete("/", include_in_schema=False)
+def delete_scangeometry():
+    """Clear the scan geometry (empty polygon) and return the new settings."""
+    return RestServer.run("handle_clear_scangeometry")
+
+
 for _router in (
     images_router,
     motion_router,
     annotation_router,
     instruments_router,
+    scangeometry_router,
 ):
     fastapi_app.include_router(_router)

@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Optional, Any
+from typing import Any
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsItemGroup,
@@ -108,7 +108,7 @@ class ScanGeometry(QGraphicsItemGroup):
         self.scan_geometries.append((polygon, isAdd))
         self.__update()
 
-    def __init__(self, parent: Optional[QGraphicsItem] = None):
+    def __init__(self, parent: QGraphicsItem | None = None):
         super().__init__(parent)
 
         self.scan_geometries: list[tuple[Polygon, bool]] = []
@@ -210,8 +210,8 @@ class ScanGeometry(QGraphicsItemGroup):
         """Recreate the vertex handles from the current geometry."""
         scene = self.scene()
         for handle in self.__vertex_handles:
-            if handle.scene() is not None:
-                handle.scene().removeItem(handle)
+            if (scene := handle.scene()) is not None:
+                scene.removeItem(handle)
         self.__vertex_handles = []
 
         # The handles are top-level scene items; if we are not in a scene yet
@@ -360,7 +360,7 @@ class ScanGeometry(QGraphicsItemGroup):
         item.setBrush(brush)
         return item
 
-    def next_point(self) -> Optional[tuple[float, float]]:
+    def next_point(self) -> tuple[float, float] | None:
         if self.scan_path_generator.is_empty():
             logging.getLogger("laserstudio").error(
                 "Cannot get next point, the scan geometry is empty."
@@ -492,12 +492,29 @@ class ScanGeometry(QGraphicsItemGroup):
 
     @property
     def settings(self) -> Config:
-        return __class__.shapely_to_yaml(self.__scan_geometry)
+        c = {}
+        c["geometry"] = __class__.shapely_to_yaml(self.__scan_geometry)
+        c["density"] = self.density
+        return c
 
     @settings.setter
     def settings(self, data: Config):
         logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {data}...")
-        geoms = __class__.yaml_to_shapely(data)
+        
+        if "density" in data and isinstance(data["density"], int):
+            self.density = data["density"]
+
+        if "polygon" in data or "multipolygon" in data or "geometrycollection" in data:
+            dictionary = data
+        elif "geometry" in data and isinstance(data["geometry"], dict):
+            dictionary = data["geometry"]
+        else:
+            logging.getLogger("laserstudio").error(
+                f"Invalid data for scan geometry: {data=}"
+            )
+            return
+        
+        geoms = __class__.yaml_to_shapely(dictionary)
         if isinstance(geoms, Polygon):
             self.scan_geometries = [(geoms, True)]
         elif isinstance(geoms, MultiPolygon):
@@ -507,4 +524,5 @@ class ScanGeometry(QGraphicsItemGroup):
                 f"Invalid geometry type: {type(geoms)=}, {geoms=}"
             )
             return
+
         self.__update()

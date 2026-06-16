@@ -377,3 +377,20 @@ class LSAPI:
         :return: The response from the API containing the instrument's settings.
         """
         return self.send(f"instruments/{label}/settings").json()["settings"]
+
+    def scangeometry(self) -> dict[str, Any]:
+        """Return the current scan geometry settings."""
+        result: dict[str, Any] = self.send("scangeometry").json()
+        return result
+
+    def set_scangeometry(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update and return the scan geometry settings."""
+        result: dict[str, Any] = self.send(
+            "scangeometry", {"settings": settings}, is_put=True
+        ).json()
+        return result
+
+    def delete_scangeometry(self) -> dict[str, Any]:
+        """Clear the scan geometry (empty polygon) and return the new settings."""
+        result: dict[str, Any] = self.send("scangeometry", is_delete=True).json()
+        return result

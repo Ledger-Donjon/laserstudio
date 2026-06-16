@@ -578,6 +578,26 @@ class LaserStudio(QMainWindow):
             positions.append([scene_point.x(), scene_point.y()])
         return {"positions": positions}
 
+    EMPTY_SCAN_GEOMETRY: Config = {
+        "geometry": {"polygon": {"exterior": [], "interiors": []}}
+    }
+
+    def handle_scangeometry(self, settings: Config | None = None) -> Config:
+        """Get or set the viewer scan geometry settings.
+
+        :param settings: If provided, apply these settings to the scan geometry.
+            If ``None``, return the current settings unchanged.
+        :return: The current scan geometry settings.
+        """
+        if settings is not None:
+            self.viewer.scan_geometry.settings = settings
+        return self.viewer.scan_geometry.settings
+
+    def handle_clear_scangeometry(self) -> Config:
+        """Clear the scan geometry by setting an empty polygon."""
+        self.viewer.scan_geometry.settings = self.EMPTY_SCAN_GEOMETRY
+        return self.viewer.scan_geometry.settings
+
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
             Memory points are defined in the configuration file, on the

@@ -64,6 +64,9 @@ For example:
 | `list_instruments` | List the available instruments (type and label). |
 | `get_instrument_settings` | Get the settings of an instrument by label. |
 | `set_instrument_settings` | Update the settings of an instrument by label. |
+| `get_scangeometry` | Get the current scan geometry settings. |
+| `set_scangeometry` | Update the scan geometry settings. |
+| `delete_scangeometry` | Clear the scan geometry (empty polygon). |
 | `get_stage_position` | Get the current stage position. |
 | `move_stage` | Move the stage to a position. |
 | `go_to_memory_point` | Move the stage to a memory point. |

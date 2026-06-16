@@ -156,3 +156,36 @@ described by its `type` (the instrument class name) and its `label`:
 A `GET` returns the settings of the instrument identified by `<label>`, and a
 `PUT` (with a `{"settings": {...}}` body) updates them. An unknown label returns
 a `404` error.
+
+## Scan geometry
+
+This group of endpoints permits to read and update the scanning geometry shown
+in the viewer.
+
+### `/scangeometry`
+
+A `GET` returns the current scan geometry settings (``geometry`` and
+``density``):
+
+```json
+{
+  "density": 100,
+  "geometry": {
+    "polygon": {
+      "exterior": [
+        {"x": 0.0, "y": 0.0},
+        {"x": 100.0, "y": 0.0},
+        {"x": 100.0, "y": 100.0},
+        {"x": 0.0, "y": 100.0},
+        {"x": 0.0, "y": 0.0}
+      ],
+      "interiors": []
+    }
+  }
+}
+```
+
+A `PUT` (with a `{"settings": {...}}` body in the same format) updates them.
+
+A `DELETE` clears the geometry by setting an empty polygon and returns the new
+settings.
