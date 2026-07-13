@@ -119,6 +119,33 @@ _PATHS: dict[str, str] = {
         '<line x1="8" x2="8" y1="10" y2="14"/>'
         '<line x1="16" x2="16" y1="18" y2="22"/>'
     ),
+    # ── Positioning / navigation ───────────────────────────────────────────────
+    "move-3d": (
+        '<path d="M5 3v16h16"/>'
+        '<path d="m5 19 6-6"/>'
+        '<path d="m2 6 3-3 3 3"/>'
+        '<path d="m18 16 3 3-3 3"/>'
+    ),
+    "home": (
+        '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+        '<polyline points="9 22 9 12 15 12 15 22"/>'
+    ),
+    "arrow-up": (
+        '<path d="m5 12 7-7 7 7"/>'
+        '<path d="M12 19V5"/>'
+    ),
+    "arrow-down": (
+        '<path d="m5 12 7 7 7-7"/>'
+        '<path d="M12 5v14"/>'
+    ),
+    "arrow-left": (
+        '<path d="m12 19-7-7 7-7"/>'
+        '<path d="M19 12H5"/>'
+    ),
+    "arrow-right": (
+        '<path d="m12 5 7 7-7 7"/>'
+        '<path d="M5 12h14"/>'
+    ),
     "image": (
         '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>'
         '<circle cx="9" cy="9" r="2"/>'
@@ -131,6 +158,25 @@ _PATHS: dict[str, str] = {
         '<line x1="14" x2="14" y1="11" y2="17"/>'
     ),
     "chevron-down": ('<path d="m6 9 6 6 6-6"/>'),
+    "x": (
+        '<path d="M18 6 6 18"/>'
+        '<path d="m6 6 12 12"/>'
+    ),
+    "check": (
+        '<path d="M20 6 9 17l-5-5"/>'
+    ),
+    "locate-fixed": (
+        '<line x1="2" x2="5" y1="12" y2="12"/>'
+        '<line x1="19" x2="22" y1="12" y2="12"/>'
+        '<line x1="12" x2="12" y1="2" y2="5"/>'
+        '<line x1="12" x2="12" y1="19" y2="22"/>'
+        '<circle cx="12" cy="12" r="7"/>'
+        '<circle cx="12" cy="12" r="3"/>'
+    ),
+    "spline": (
+        '<path d="M3 17c3-6 6-6 9 0s6 6 9 0"/>'
+        '<path d="M3 7c3-6 6-6 9 0s6 6 9 0"/>'
+    ),
 }
 
 
@@ -229,3 +275,32 @@ def ledger_pixmap(size: int = 16, color: str = "#D4A0FF") -> QPixmap:
 def ledger_icon(size: int = 16, color: str = "#D4A0FF") -> QIcon:
     """Return the Ledger single-L logo as a QIcon."""
     return QIcon(ledger_pixmap(size, color))
+
+
+def svg_file_pixmap(path: str, size: int) -> QPixmap:
+    """Render an on-disk SVG file HiDPI-aware, preserving aspect ratio."""
+    renderer = QSvgRenderer(path)
+    if not renderer.isValid():
+        return QPixmap()
+    dpr = _device_pixel_ratio()
+    dim = max(1, round(size * dpr))
+    px = QPixmap(dim, dim)
+    px.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(px)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    default = renderer.defaultSize()
+    if default.width() > 0 and default.height() > 0:
+        scale = min(dim / default.width(), dim / default.height())
+        w = default.width() * scale
+        h = default.height() * scale
+        renderer.render(painter, QRectF((dim - w) / 2, (dim - h) / 2, w, h))
+    else:
+        renderer.render(painter)
+    painter.end()
+    px.setDevicePixelRatio(dpr)
+    return px
+
+
+def svg_file_icon(path: str, size: int) -> QIcon:
+    """Return a QIcon rendered from an SVG file on disk."""
+    return QIcon(svg_file_pixmap(path, size))

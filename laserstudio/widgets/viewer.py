@@ -43,6 +43,7 @@ from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from ..instruments.stage import MoveFor
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
+from ..utils.background_align import BackgroundPin, compute_affine_transform
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -69,6 +70,8 @@ class Viewer(QGraphicsView):
     mouse_moved = pyqtSignal(float, float)
     # Signal emitted when the follow stage sight option changed
     follow_stage_sight_changed = pyqtSignal(bool)
+    # Background reference image state
+    background_changed = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -120,6 +123,9 @@ class Viewer(QGraphicsView):
         # Background picture
         self.__picture_item = None
         self.background_picture_path = None
+        self._background_opacity = 1.0
+        self._background_base_transform: QTransform | None = None
+        self._background_committed_pins: list[BackgroundPin] = []
 
         # Pin points for background picture
         self.pins: list[tuple[tuple[float, float], tuple[float, float]]] = []
@@ -257,6 +263,10 @@ class Viewer(QGraphicsView):
 
         item.setTransform(transform)
         self.__scene.addItem(item)
+        item.setOpacity(self._background_opacity)
+        self._background_base_transform = QTransform(item.transform())
+        self._background_committed_pins.clear()
+        self.background_changed.emit()
 
     def __set_picture_item(self, item: QGraphicsPixmapItem):
         item = self.__picture_item = QGraphicsPixmapItem(item.pixmap())
@@ -276,6 +286,126 @@ class Viewer(QGraphicsView):
             self.__scene.removeItem(self.__picture_item)
             self.__picture_item = None
             self.background_picture_path = None
+            self._background_base_transform = None
+            self._background_committed_pins.clear()
+            self.pins.clear()
+            for m in self.pin_markers:
+                m.hide()
+            self.background_changed.emit()
+
+    @property
+    def has_background_picture(self) -> bool:
+        return self.__picture_item is not None
+
+    @property
+    def background_opacity(self) -> int:
+        """Opacity percentage (0–100) for the reference image."""
+        return int(round(self._background_opacity * 100))
+
+    def set_background_opacity(self, percent: int) -> None:
+        self._background_opacity = max(0.0, min(100, percent)) / 100.0
+        if self.__picture_item is not None:
+            self.__picture_item.setOpacity(self._background_opacity)
+        self.background_changed.emit()
+
+    @property
+    def background_is_aligned(self) -> bool:
+        return len(self._background_committed_pins) == 3
+
+    @property
+    def background_committed_pins(self) -> list[BackgroundPin]:
+        return list(self._background_committed_pins)
+
+    def background_pixmap(self) -> QPixmap | None:
+        if self.__picture_item is None:
+            return None
+        return self.__picture_item.pixmap()
+
+    def background_picture_transform(self) -> QTransform | None:
+        if self.__picture_item is None:
+            return None
+        return QTransform(self.__picture_item.transform())
+
+    def restore_background_transform(self, transform: QTransform | None) -> None:
+        """Restore the background picture transform (e.g. after canceling a preview)."""
+        pic = self.__picture_item
+        if pic is None:
+            return
+        if transform is None:
+            self._restore_background_base_transform()
+            return
+        pic.resetTransform()
+        pic.setTransform(QTransform(transform))
+
+    def _restore_background_base_transform(self) -> None:
+        pic = self.__picture_item
+        if pic is None or self._background_base_transform is None:
+            return
+        pic.resetTransform()
+        pic.setTransform(QTransform(self._background_base_transform))
+
+    def preview_background_alignment(self, pins: list[BackgroundPin]) -> bool:
+        """Apply a temporary affine transform from *pins* (preview, not committed)."""
+        pic = self.__picture_item
+        if pic is None:
+            return False
+        transform = compute_affine_transform(pins)
+        if transform is None:
+            return False
+        pic.resetTransform()
+        pic.setTransform(transform)
+        return True
+
+    def commit_background_alignment(self, pins: list[BackgroundPin]) -> bool:
+        """Persist *pins* and keep the current affine transform."""
+        if not self.preview_background_alignment(pins):
+            return False
+        self._background_committed_pins = list(pins)
+        self.pins.clear()
+        for m in self.pin_markers:
+            m.hide()
+        self.background_changed.emit()
+        return True
+
+    def reset_background_alignment(self) -> None:
+        """Remove alignment distortion; keep image placement and viewer position."""
+        self._background_committed_pins.clear()
+        self.pins.clear()
+        for m in self.pin_markers:
+            m.hide()
+        self._restore_background_base_transform()
+        self.background_changed.emit()
+
+    def background_stage_coords(self) -> tuple[float, float, str]:
+        """
+        Current stage/scene coordinates for alignment.
+
+        Returns ``(x, y, unit_label)`` where *unit_label* is ``"µm"`` when a
+        stage is available, otherwise ``"scene"``.
+        """
+        if self.stage_sight is None:
+            return 0.0, 0.0, "scene"
+        if self.stage_sight.stage is not None:
+            pos = self.stage_sight.stage.position
+            return float(pos[0]), float(pos[1]), "µm"
+        scene_pos = self.stage_sight.pos()
+        return scene_pos.x(), scene_pos.y(), "scene"
+
+    def capture_background_pin(self, image_px: tuple[float, float]) -> BackgroundPin:
+        """Build a pin from an image pixel and the current stage/scene position."""
+        stage_xy = self._background_stage_scene_xy()
+        return BackgroundPin(image_px=image_px, stage_xy=stage_xy)
+
+    def _background_stage_scene_xy(self) -> tuple[float, float]:
+        if self.stage_sight is None:
+            return 0.0, 0.0
+        if self.stage_sight.stage is None:
+            pos = self.stage_sight.pos()
+            return pos.x(), pos.y()
+        scene = self.stage_sight.scene_coords_from_stage_coords(
+            self.stage_sight.stage.position
+        )
+        return scene.x(), scene.y()
 
     def load_picture(self, picture_path: str | None = None):
         """Requests loading a backgound picture from the user"""
@@ -790,39 +920,10 @@ class Viewer(QGraphicsView):
 
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
-            # Time to recalculate the picture transformation matrix!
-            #
-            # We have three sets of two points A and B where:
-            # - A is a spatial position (from stage)
-            # - B is the corresponding position in the picture (in pixels,
-            #   picked by the user)
-            # To each point we add a third coordinate, set to 1, which will
-            # allow us to work with translations.
-            #
-            # We want to find the 3x3 matrix T such as:
-            # T * B1 = A1
-            # T * B2 = A2
-            # T * B3 = A3
-            #
-            # Written differently, this gives:
-            # T * [B1, B2, B3] = [A1, A2, A3]
-            #
-            # Thus we have:
-            # T = [A1, A2, A3] * Inv([B1, B2, B3])
-            points_a = list(p[0] + (1,) for p in self.pins)
-            points_b = list(p[1] + (1,) for p in self.pins)
-            mat_a = np.matrix(points_a).transpose()
-            mat_b = np.matrix(points_b).transpose()
-            mat = mat_a * np.linalg.inv(mat_b)
-            # Convert to QTransform
-            # QTransform uses m31, m32 and m33 for translation, and not
-            # m13, m23 and m33. Using the transposed version of mat seems
-            # to fix the compatibility.
-            qtrans = QTransform(*mat.flatten().tolist()[0]).transposed()
-            pic.resetTransform()
-            pic.setTransform(qtrans)
-            # Clear pin points for future pinning, and leave pin mode.
-            self.pins.clear()
+            bg_pins = [
+                BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins
+            ]
+            self.commit_background_alignment(bg_pins)
             self.mode = self.Mode.NONE
         else:
             # Go to stage mode.
@@ -1001,6 +1102,15 @@ class Viewer(QGraphicsView):
             data["background_picture_path"] = self.background_picture_path
         if (pic := self.__picture_item) is not None:
             data["background_picture_transform"] = qtransform_to_yaml(pic.transform())
+            data["background_picture_opacity"] = self._background_opacity
+            if self._background_committed_pins:
+                data["background_alignment_pins"] = [
+                    {
+                        "image_px": list(pin.image_px),
+                        "stage_xy": list(pin.stage_xy),
+                    }
+                    for pin in self._background_committed_pins
+                ]
             data["background_picture_transform_pins"] = [
                 [m.pos().x(), m.pos().y()] for m in self.pin_markers
             ]
@@ -1013,10 +1123,23 @@ class Viewer(QGraphicsView):
             self.marker_size(marker_size)
         if (path := data.get("background_picture_path")) is not None:
             self.load_picture(path)
+            if (opacity := data.get("background_picture_opacity")) is not None:
+                self.set_background_opacity(int(round(float(opacity) * 100)))
             if (transform := data.get("background_picture_transform")) is not None and (
                 pic := self.__picture_item
             ) is not None:
                 pic.setTransform(yaml_to_qtransform(transform))
+            if (raw_pins := data.get("background_alignment_pins")) is not None:
+                committed = [
+                    BackgroundPin(
+                        image_px=(float(p["image_px"][0]), float(p["image_px"][1])),
+                        stage_xy=(float(p["stage_xy"][0]), float(p["stage_xy"][1])),
+                    )
+                    for p in raw_pins
+                ]
+                if len(committed) == 3:
+                    self._background_committed_pins = committed
+                    self.background_changed.emit()
             if (pins := data.get("background_picture_transform_pins")) is not None:
                 for i, pin in enumerate(pins):
                     self.pin_markers[i].setPos(pin[0], pin[1])

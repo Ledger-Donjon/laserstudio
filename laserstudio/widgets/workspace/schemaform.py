@@ -18,14 +18,17 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
-from PyQt6.QtCore import QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QComboBox,
     QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -68,6 +71,131 @@ def effective_properties(
             required |= set(branch.get("required", []))
             break
     return props, required
+
+
+def oneof_type_options(node: dict) -> list[tuple[str, str]]:
+    """Return (type const, display label) for each ``oneOf`` branch."""
+    options: list[tuple[str, str]] = []
+    for branch in node.get("oneOf", []):
+        if not isinstance(branch, dict):
+            continue
+        type_schema = branch.get("properties", {}).get("type", {})
+        const = type_schema.get("const")
+        if const is None:
+            continue
+        label = branch.get("title", str(const))
+        options.append((str(const), str(label)))
+    return options
+
+
+# Segmented type picker — scoped to beat the global orange :checked rule.
+_TYPE_SEG_SS = f"""
+QWidget#ls-type-seg {{
+    background: {theme.BG_TABS};
+    border: 1px solid {theme.BORDER_SUBTLE};
+    border-radius: 6px;
+}}
+QWidget#ls-type-seg QPushButton {{
+    background-color: transparent;
+    color: {theme.TAB_INACTIVE};
+    border: none;
+    border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-weight: 700;
+    font-size: 11px;
+    padding: 6px 10px;
+    min-height: 0;
+    max-height: {theme.CONTROL_MIN_H}px;
+}}
+QWidget#ls-type-seg QPushButton:hover {{
+    background-color: rgba(255,255,255,0.06);
+    color: {theme.TEXT};
+}}
+QWidget#ls-type-seg QPushButton:checked {{
+    background-color: {theme.PURPLE};
+    color: #0A0A0A;
+}}
+"""
+
+
+class TypeSelector(QWidget):
+    """Exclusive button group for picking an instrument ``oneOf`` type."""
+
+    changed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        options: list[tuple[str, str]],
+        current: str | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._options = options
+        self.setObjectName("ls-type-seg")
+        self.setStyleSheet(_TYPE_SEG_SS)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(3, 3, 3, 3)
+        layout.setSpacing(2)
+
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
+        self._buttons: list[QPushButton] = []
+
+        for type_value, label in options:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.setProperty("type_value", type_value)
+            btn.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
+            btn.clicked.connect(
+                lambda _checked=False, v=type_value: self._select(v)
+            )
+            self._group.addButton(btn)
+            self._buttons.append(btn)
+            layout.addWidget(btn)
+
+        self._sync(current or (options[0][0] if options else ""))
+
+    def _select(self, type_value: str) -> None:
+        previous = self.value() if any(btn.isChecked() for btn in self._buttons) else None
+        self._sync(type_value)
+        if previous != type_value:
+            self.changed.emit(type_value)
+
+    def _sync(self, type_value: str) -> None:
+        for btn in self._buttons:
+            active = str(btn.property("type_value")) == type_value
+            btn.blockSignals(True)
+            btn.setChecked(active)
+            btn.blockSignals(False)
+
+    def value(self) -> str:
+        for btn in self._buttons:
+            if btn.isChecked():
+                return str(btn.property("type_value"))
+        return self._options[0][0] if self._options else ""
+
+
+def type_selector_field(
+    options: list[tuple[str, str]], current: str | None
+) -> tuple[TypeSelector, QWidget]:
+    """Wrap a :class:`TypeSelector` with the standard field label."""
+    selector = TypeSelector(options, current)
+    wrapper = QWidget()
+    wrapper.setStyleSheet("background: transparent;")
+    box = QVBoxLayout(wrapper)
+    box.setContentsMargins(0, 0, 0, 0)
+    box.setSpacing(6)
+    label = QLabel("TYPE")
+    label.setStyleSheet(
+        f"color: {theme.TEXT_DIM}; font-family: monospace; font-size: 10px;"
+        " letter-spacing: 1px; background: transparent;"
+    )
+    box.addWidget(label)
+    box.addWidget(selector)
+    return selector, wrapper
 
 
 # ── Interactive toggle ─────────────────────────────────────────────────────────
@@ -116,7 +244,7 @@ QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
     border: 1px solid {theme.BORDER};
     border-radius: 5px;
     color: {theme.TEXT};
-    padding: 7px 10px;
+    padding: 5px 10px;
     font-size: 12px;
     selection-background-color: {theme.PURPLE_BG};
 }}

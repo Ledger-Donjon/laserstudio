@@ -1,28 +1,99 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // Run and Debug / Test and Run — launch LaserStudio with a selectable config file.
+    // https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "LaserStudio Dummy",
+            "name": "LaserStudio — pick config",
             "type": "debugpy",
             "request": "launch",
             "module": "laserstudio",
-            "args": ["--config", "config.dummy.example.yaml"]
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "${input:laserstudioConfig}"]
         },
-
         {
-            "name": "LaserStudio",
+            "name": "LaserStudio — custom config",
             "type": "debugpy",
             "request": "launch",
-            "module": "laserstudio"
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "${input:laserstudioConfigCustom}"]
+        },
+        {
+            "name": "LaserStudio — dummy",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "config.dummy.example.yaml"]
+        },
+        {
+            "name": "LaserStudio — laser1",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "config.laser1.example.yaml"]
+        },
+        {
+            "name": "LaserStudio — laser2",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "config.laser2.example.yaml"]
+        },
+        {
+            "name": "LaserStudio — cncbench",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "config.cncbench.example.yaml"]
+        },
+        {
+            "name": "LaserStudio — config.yaml (default)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "laserstudio",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": ["--config", "config.yaml"]
         },
         {
             "name": "Chipscan",
             "type": "debugpy",
             "request": "launch",
-            "module": "laserstudio.utils.chipscan"
+            "module": "laserstudio.utils.chipscan",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "laserstudioConfig",
+            "type": "pickString",
+            "description": "LaserStudio configuration file",
+            "options": [
+                "config.dummy.example.yaml",
+                "config.laser1.example.yaml",
+                "config.laser2.example.yaml",
+                "config.cncbench.example.yaml",
+                "config.yaml"
+            ],
+            "default": "config.dummy.example.yaml"
+        },
+        {
+            "id": "laserstudioConfigCustom",
+            "type": "promptString",
+            "description": "Configuration file path (relative to project root or absolute)",
+            "default": "config.yaml"
         }
     ]
 }

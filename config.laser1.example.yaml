@@ -5,9 +5,12 @@ camera:
   type: NIT
   pixel_size_in_um: [15.115, 15.115]
   refresh_interval_ms: 50
-  nuc_filepath: "/home/mmo/Work/Gits/***REMOVED***/donjon/laserstudio/nuc/25mhz/NUCFactory_2000us.yml"
-  bpr_filepath: "/home/mmo/Work/Gits/***REMOVED***/donjon/laserstudio/nuc/25mhz/BPM.yml"
+  nuc_filepath: "/home/leash/nuc/25mhz/NUCFactory_2000us.yml"
+  bpr_filepath: "/home/leash/nuc/25mhz/BPM.yml"
   objective: 20.0
+  shutter:
+    type: TIC
+    label: "Shutter Camera"
 stage:
   enable: true
   label: "Main Stage"
@@ -21,10 +24,31 @@ lasers:
     type: PDM
     num: 1
     dev:
-      sn: "FTA1BR1D"
+      sn: "FTA1BWEV"
+
   - enable: true
     label: "Laser 1064nm"
     type: PDM
     num: 2
     dev:
       sn: "FTA1BWEV"
+lighting:
+  type: Hayashi
+  dev:
+    vid: "0403"
+    pid: "6014"
+    location: "1-1.4.4.4.4"
+
+focus:
+  coarse:
+    span: 1600
+    steps: 20
+    averaging: 5
+    multi_peaks: true
+    best_is_highest_z: true
+  fine:
+    span: 500
+    steps: 20
+    averaging: 10
+    multi_peaks: false
+    best_is_highest_z: true

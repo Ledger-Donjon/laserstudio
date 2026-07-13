@@ -18,10 +18,11 @@ classifiers = [
 ]
 dependencies = [
     "pyqt6",
-    "pystages>=1.4.2",
+    "pystages>=1.4.2b",
     "pillow>=10.4.0",
     "opencv-python>=4.9.0.80",
     "pyyaml",
+    "jsonschema>=4.0",
     "shapely",
     "triangle",
     "requests>=2.32.3,<3.0.0",

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QSplitterHandle,
@@ -42,11 +43,35 @@ PURPLE_BORDER = "rgba(212,160,255,0.40)"
 GREEN = "#6EC85C"
 GREEN_BG = "rgba(110,200,92,0.12)"
 
+# Sidebar panel layout — vertical Minimum (never Maximum) prevents Qt from
+# crushing controls when the column is resized.
+PANEL_INNER = "ls-panel-inner"
+SIDEBAR_CONTENT_MIN = 288
+# Compact sidebar controls — design uses padding-only sizing (~28px total).
+# Do not stack min-height + vertical padding (Qt doubles the effective height).
+CONTROL_MIN_H = 28
+BTN_MIN_H = 28
+
+SIDEBAR_SS = f"""
+QStackedWidget#ls-sidebar {{
+    background: {BG_PANEL};
+}}
+QStackedWidget#ls-sidebar QLineEdit,
+QStackedWidget#ls-sidebar QComboBox,
+QStackedWidget#ls-sidebar QSpinBox,
+QStackedWidget#ls-sidebar QDoubleSpinBox {{
+    min-height: 0;
+    max-height: {CONTROL_MIN_H}px;
+    padding: 5px 10px;
+}}
+"""
+
 # ── Reusable stylesheets ─────────────────────────────────────────────────────
 # Segmented-control tab: active = purple fill + black text (per design).
+# Scoped under #ls-tabs-bg to override the global ledger QPushButton:checked rule.
 TAB_SS = f"""
-QPushButton {{
-    background: transparent;
+QWidget#ls-tabs-bg QPushButton {{
+    background-color: transparent;
     color: {TAB_INACTIVE};
     border: none;
     border-radius: 6px;
@@ -56,12 +81,12 @@ QPushButton {{
     padding: 0 15px;
     min-height: 34px;
 }}
-QPushButton:hover {{
-    background: rgba(255,255,255,0.06);
+QWidget#ls-tabs-bg QPushButton:hover {{
+    background-color: rgba(255,255,255,0.06);
     color: {TEXT};
 }}
-QPushButton:checked {{
-    background: {PURPLE};
+QWidget#ls-tabs-bg QPushButton:checked {{
+    background-color: {PURPLE};
     color: #0A0A0A;
 }}
 """
@@ -74,8 +99,9 @@ QPushButton {{
     border-radius: 5px;
     font-family: "Brut Grotesque";
     font-size: 11px;
-    padding: 8px 0;
+    padding: 6px 12px;
     min-height: 0;
+    max-height: {BTN_MIN_H}px;
 }}
 QPushButton:hover {{
     background: rgba(255,255,255,0.09);
@@ -96,8 +122,9 @@ QPushButton {{
     border-radius: 5px;
     font-family: "Brut Grotesque";
     font-size: 12px;
-    padding: 9px 0;
+    padding: 6px 12px;
     min-height: 0;
+    max-height: {BTN_MIN_H}px;
 }}
 QPushButton:hover {{
     background: rgba(212,160,255,0.20);
@@ -180,6 +207,51 @@ def section_title(text: str, icon_name: str = "folder") -> QWidget:
     hl.addWidget(lbl)
     hl.addStretch()
     return row
+
+
+def panel_inner() -> QWidget:
+    """Scroll-area content root — refuses vertical compression."""
+    inner = QWidget()
+    inner.setObjectName(PANEL_INNER)
+    inner.setStyleSheet(f"background: {BG_PANEL};")
+    inner.setMinimumWidth(SIDEBAR_CONTENT_MIN)
+    inner.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+    return inner
+
+
+class SidebarScroll(QScrollArea):
+    """Sidebar scroll: natural content height, minimum readable width."""
+
+    def __init__(self, inner: QWidget) -> None:
+        super().__init__()
+        self._inner = inner
+        self.setWidget(inner)
+        self.setWidgetResizable(False)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setStyleSheet(f"QScrollArea {{ border: none; background: {BG_PANEL}; }}")
+        self._sync_width()
+
+    def _sync_width(self) -> None:
+        viewport = self.viewport()
+        if viewport is None:
+            return
+        viewport_w = max(viewport.width(), 1)
+        content_w = max(SIDEBAR_CONTENT_MIN, viewport_w)
+        self._inner.setFixedWidth(content_w)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            if viewport_w < SIDEBAR_CONTENT_MIN
+            else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._sync_width()
+
+    def showEvent(self, event) -> None:  # type: ignore[override]
+        super().showEvent(event)
+        self._sync_width()
 
 
 def param_row(label_text: str, value_text: str) -> QWidget:

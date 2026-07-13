@@ -1,11 +1,11 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.analysis.stubPaths": ["${workspaceFolder}/typings"],
     "cursorpyright.analysis.stubPaths": ["${workspaceFolder}/typings"],
     "cursorpyright.analysis.diagnosticSeverityOverrides": {
         "reportTypeCommentUsage": "none"
     },
     "python-envs.defaultEnvManager": "ms-python.python:venv",
-    "python-envs.pythonProjects": [],
     "python.testing.pytestArgs": [
         "tests"
     ],

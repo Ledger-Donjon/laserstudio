@@ -51,7 +51,9 @@ from .schemaform import (
     SchemaField,
     ToggleSwitch,
     effective_properties,
+    oneof_type_options,
     resolved_config_schema,
+    type_selector_field,
 )
 from .workspace import Workspace
 
@@ -61,7 +63,7 @@ _DELETE_BTN_SS = (
     "QPushButton {"
     "  background: rgba(240,79,82,0.10);"
     "  border: 1px solid rgba(240,79,82,0.35);"
-    "  border-radius: 5px; padding: 9px 0; }"
+    "  border-radius: 5px; padding: 6px 12px; }"
     "QPushButton:hover { background: rgba(240,79,82,0.18); }"
     "QPushButton:disabled {"
     "  background: rgba(255,255,255,0.02);"
@@ -304,6 +306,7 @@ class ConfigWorkspace(Workspace):
         self._current_entry: dict | None = None
         self._update_btn: QPushButton | None = None
         self._revert_btn: QPushButton | None = None
+        self._form_draft: dict[str, object] = {}
 
         self._folder_name_lbl: QLabel | None = None
         self._folder_path_lbl: QLabel | None = None
@@ -432,8 +435,7 @@ class ConfigWorkspace(Workspace):
             f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
         )
 
-        inner = QWidget()
-        inner.setStyleSheet(f"background: {theme.BG_PANEL};")
+        inner = theme.panel_inner()
         layout = QVBoxLayout(inner)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(16)
@@ -654,6 +656,8 @@ class ConfigWorkspace(Workspace):
         if not self._entries:
             return
         index = max(0, min(index, len(self._entries) - 1))
+        if index != self._selected:
+            self._form_draft = {}
         self._selected = index
         for j, card in enumerate(self._cards):
             card.setSelected(j == index)
@@ -668,6 +672,7 @@ class ConfigWorkspace(Workspace):
         self._update_btn = None
         self._revert_btn = None
         entry = self._entries[self._selected]
+        self._current_entry = entry
         if entry["kind"] == "app":
             widget = self._build_app_page()
         else:
@@ -681,8 +686,7 @@ class ConfigWorkspace(Workspace):
         scroll.setStyleSheet(
             f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
         )
-        inner = QWidget()
-        inner.setStyleSheet(f"background: {theme.BG_PANEL};")
+        inner = theme.panel_inner()
         col = QVBoxLayout(inner)
         col.setContentsMargins(18, 18, 18, 18)
         col.setSpacing(14)
@@ -771,11 +775,27 @@ class ConfigWorkspace(Workspace):
         col.addWidget(theme.eyebrow("PARAMETERS"))
 
         node = entry.get("schema")
+        type_options = (
+            oneof_type_options(node) if isinstance(node, dict) else []
+        )
+        effective_type = self._param_value(entry, "type")
+        if effective_type is None:
+            effective_type = entry.get("type")
+
         props, _req = (
-            effective_properties(node, entry.get("type"))
+            effective_properties(node, effective_type)
             if isinstance(node, dict)
             else ({}, set())
         )
+
+        if len(type_options) > 1:
+            type_sel, type_wrap = type_selector_field(
+                type_options, str(effective_type or "")
+            )
+            committed_type = entry["params"].get("type")
+            self._field_specs.append(("type", type_sel.value, committed_type))
+            type_sel.changed.connect(self._on_instrument_type_changed)
+            col.addWidget(type_wrap)
 
         skip = {"enable"} | entry.get("subkeys", set())
         ordered: list[str] = []
@@ -786,10 +806,12 @@ class ConfigWorkspace(Workspace):
         ordered += [k for k in params if k not in ordered and k not in skip]
 
         for key in ordered:
+            if key == "type" and len(type_options) > 1:
+                continue
             subschema = props.get(key)
             if subschema is None:
                 subschema = {"type": "string"} if key == "label" else {}
-            field = SchemaField(key, subschema, params.get(key))
+            field = SchemaField(key, subschema, self._param_value(entry, key))
             if field.editable:
                 init = field.value()
                 self._field_specs.append((key, field.value, init))
@@ -844,6 +866,34 @@ class ConfigWorkspace(Workspace):
         col.addLayout(actions)
         return scroll
 
+    def _param_value(self, entry: dict, key: str) -> object:
+        if key in self._form_draft:
+            return self._form_draft[key]
+        return entry["params"].get(key)
+
+    def _collect_form_draft(self) -> None:
+        for key, getter, _init in self._field_specs:
+            self._form_draft[key] = getter()
+
+    def _on_instrument_type_changed(self, new_type: str) -> None:
+        self._collect_form_draft()
+        self._form_draft["type"] = new_type
+        self._refresh_instrument_form()
+
+    def _refresh_instrument_form(self) -> None:
+        if self._detail_layout is None or self._current_entry is None:
+            return
+        entry = self._current_entry
+        if entry["kind"] == "app":
+            return
+        _clear_layout(self._detail_layout)
+        self._field_specs = []
+        self._update_btn = None
+        self._revert_btn = None
+        widget = self._build_instrument_form(entry)
+        self._detail_layout.addWidget(widget)
+        self._recompute_dirty()
+
     # ── Per-instrument editing (pending edits) ────────────────────────────────
 
     def _recompute_dirty(self) -> None:
@@ -864,10 +914,12 @@ class ConfigWorkspace(Workspace):
         self._recompute_file_modified()
         self._rebuild_model()
         self._refresh_tree()
+        self._form_draft = {}
         self.select_card(self._selected)  # rebuilds the form -> pending cleared
 
     def _revert_instrument(self) -> None:
         # Rebuild the form from the (unchanged) working config, dropping edits.
+        self._form_draft = {}
         self._show_detail()
 
     def _delete_instrument(self, entry: dict) -> None:

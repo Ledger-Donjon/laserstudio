@@ -48,8 +48,7 @@ def placeholder_panel(label: str) -> QWidget:
     scroll.setStyleSheet(
         f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
     )
-    inner = QWidget()
-    inner.setStyleSheet(f"background: {theme.BG_PANEL};")
+    inner = theme.panel_inner()
     layout = QVBoxLayout(inner)
     layout.setContentsMargins(18, 18, 18, 18)
     layout.setSpacing(16)
