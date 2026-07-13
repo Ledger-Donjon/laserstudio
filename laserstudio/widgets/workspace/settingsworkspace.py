@@ -10,11 +10,13 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDoubleSpinBox,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSlider,
     QStackedWidget,
@@ -34,7 +36,7 @@ from ..viewer import Viewer
 from .schemaform import ToggleSwitch, _INPUT_SS
 from .workspace import Workspace
 
-# Layout policy lives in theme.py (PANEL_INNER + SidebarScroll).
+# Fixed tabs header + scrollable sub-panel content; see build_panel.
 _DPAD_CELL = 44
 _DPAD_GAP = 6
 _DPAD_MIN_WIDTH = _DPAD_CELL * 3 + _DPAD_GAP * 2
@@ -212,8 +214,9 @@ PANEL_SPACING = 12
 _SLIDER_ROW_H = 38
 
 
-def _finish_sidebar_panel(layout: QVBoxLayout) -> None:
-    """Keep content top-aligned when QStackedWidget is taller than this page."""
+def _compact_panel(layout: QVBoxLayout) -> None:
+    """Absorb spare vertical space at the bottom so controls stay packed at the
+    top and never spread apart, whatever height the panel is given."""
     layout.addStretch(1)
 
 
@@ -517,7 +520,7 @@ class _SubPanelStack(QStackedWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
 
     def sizeHint(self) -> QSize:  # type: ignore[override]
@@ -760,12 +763,18 @@ class SettingsWorkspace(Workspace):
         self._distortion_wired = False
 
     def build_panel(self) -> QWidget:
-        inner = theme.panel_inner()
-        layout = QVBoxLayout(inner)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(PANEL_SPACING)
+        # Fixed header (eyebrow + sub-category tabs) that never scrolls, so the
+        # sub-category selection stays visible; only the panel content below
+        # lives inside the scroll area.
+        root = QWidget()
+        root.setObjectName(theme.PANEL_INNER)
+        root.setStyleSheet(f"background: {theme.BG_PANEL};")
+        root.setMinimumWidth(theme.SIDEBAR_CONTENT_MIN)
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(18, 18, 18, 0)
+        root_layout.setSpacing(PANEL_SPACING)
 
-        layout.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
+        root_layout.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
 
         tabs = list(self._SUB_TABS)
         if self._window.instruments.lasers:
@@ -773,13 +782,10 @@ class SettingsWorkspace(Workspace):
         self._sub_keys = [t[0] for t in tabs]
 
         self._sub_bar = SubCategoryBar(tabs, self._select_sub)
-        layout.addWidget(self._sub_bar)
-        layout.addWidget(theme.separator())
+        root_layout.addWidget(self._sub_bar)
+        root_layout.addWidget(theme.separator())
 
         self._sub_stack = _SubPanelStack()
-        self._sub_stack.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
-        )
         self._sub_stack.addWidget(self._build_camera_panel())
         self._sub_stack.addWidget(self._build_positioning_panel())
         self._sub_stack.addWidget(self._build_focus_panel())
@@ -787,14 +793,32 @@ class SettingsWorkspace(Workspace):
         if self._window.instruments.lasers:
             self._sub_stack.addWidget(self._build_lasers_panel())
 
-        layout.addWidget(self._sub_stack)
+        # Content wrapper: sub-stack pinned to the top (never stretched
+        # vertically), spare height absorbed by a single trailing stretch.
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet(f"background: {theme.BG_PANEL};")
+        sc_layout = QVBoxLayout(scroll_content)
+        sc_layout.setContentsMargins(0, 0, 0, 18)
+        sc_layout.setSpacing(0)
+        sc_layout.addWidget(self._sub_stack, 0, Qt.AlignmentFlag.AlignTop)
+        sc_layout.addStretch(1)
 
-        scroll = theme.SidebarScroll(inner)
+        scroll = QScrollArea()
+        scroll.setWidget(scroll_content)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet(
+            f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
+        )
+        root_layout.addWidget(scroll, 1)
+
         self._select_sub("camera")
         viewer = self._window.viewer
         if viewer is not None:
             viewer.background_changed.connect(self._sync_reference_panel)
-        return scroll
+        return root
 
     def build_content(self) -> QWidget | None:
         return None
@@ -815,7 +839,7 @@ class SettingsWorkspace(Workspace):
     def _build_camera_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -826,7 +850,7 @@ class SettingsWorkspace(Workspace):
         camera = self._window.instruments.camera
         if camera is None:
             layout.addWidget(self._placeholder("No camera configured"))
-            _finish_sidebar_panel(layout)
+            _compact_panel(layout)
             return panel
 
         # Objective + pixel size — compact 2-column grid (design).
@@ -906,7 +930,7 @@ class SettingsWorkspace(Workspace):
             layout.addWidget(theme.separator())
             layout.addWidget(_ShutterSection(camera.shutter))
 
-        _finish_sidebar_panel(layout)
+        _compact_panel(layout)
         return panel
 
     def _on_objective_changed(self, _index: int) -> None:
@@ -951,7 +975,7 @@ class SettingsWorkspace(Workspace):
     def _build_positioning_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1025,7 +1049,7 @@ class SettingsWorkspace(Workspace):
         save_btn.setStyleSheet(theme.GHOST_BTN)
         save_btn.clicked.connect(self._save_memory_point)
         layout.addWidget(save_btn)
-        _finish_sidebar_panel(layout)
+        _compact_panel(layout)
         return panel
 
     # ── Focus / Reference / Lasers placeholders ─────────────────────────────
@@ -1033,7 +1057,7 @@ class SettingsWorkspace(Workspace):
     def _build_focus_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1043,13 +1067,13 @@ class SettingsWorkspace(Workspace):
         layout.addWidget(theme.separator())
         layout.addWidget(theme.section_title("Magic focus", "scan-eye"))
         layout.addWidget(self._placeholder("Magic focus — coming soon"))
-        _finish_sidebar_panel(layout)
+        _compact_panel(layout)
         return panel
 
     def _build_reference_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1156,14 +1180,14 @@ class SettingsWorkspace(Workspace):
         )
         layout.addWidget(hint)
 
-        _finish_sidebar_panel(layout)
+        _compact_panel(layout)
         self._sync_reference_panel()
         return panel
 
     def _build_lasers_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -1174,7 +1198,7 @@ class SettingsWorkspace(Workspace):
             layout.addWidget(self._placeholder("Laser controls — coming soon"))
             if i < len(self._window.instruments.lasers) - 1:
                 layout.addWidget(theme.separator())
-        _finish_sidebar_panel(layout)
+        _compact_panel(layout)
         return panel
 
     @staticmethod

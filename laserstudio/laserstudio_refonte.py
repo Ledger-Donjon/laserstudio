@@ -236,8 +236,7 @@ class LaserStudioRefonte(QMainWindow):
                 instr.camera,
                 instr.probes + [*instr.lasers],
             )
-            area.viewer.reset_camera()
-        area.update_scale_from_viewer()
+        area.fit_view()
         return area
 
     # ── Status / HUD wiring ─────────────────────────────────────────────────────
@@ -268,9 +267,6 @@ class LaserStudioRefonte(QMainWindow):
 
     def _update_position_display(self, coords: list[float]) -> None:
         self._status_bar.set_position(coords)
-        x = coords[0] if len(coords) > 0 else 0.0
-        y = coords[1] if len(coords) > 1 else 0.0
-        self._viewer_area.hud.set_coords(x, y)
 
     def set_laser_armed(self, armed: bool) -> None:
         self.laser_armed = armed

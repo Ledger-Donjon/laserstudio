@@ -14,10 +14,10 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
     QSizePolicy,
     QSplitter,
     QSplitterHandle,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -210,48 +210,15 @@ def section_title(text: str, icon_name: str = "folder") -> QWidget:
 
 
 def panel_inner() -> QWidget:
-    """Scroll-area content root — refuses vertical compression."""
+    """Scroll-area content root — grows vertically with the viewport; use one
+    trailing ``addStretch(1)`` on the root layout so spare height stays below
+    all controls (never between them)."""
     inner = QWidget()
     inner.setObjectName(PANEL_INNER)
     inner.setStyleSheet(f"background: {BG_PANEL};")
     inner.setMinimumWidth(SIDEBAR_CONTENT_MIN)
     inner.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
     return inner
-
-
-class SidebarScroll(QScrollArea):
-    """Sidebar scroll: natural content height, minimum readable width."""
-
-    def __init__(self, inner: QWidget) -> None:
-        super().__init__()
-        self._inner = inner
-        self.setWidget(inner)
-        self.setWidgetResizable(False)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setStyleSheet(f"QScrollArea {{ border: none; background: {BG_PANEL}; }}")
-        self._sync_width()
-
-    def _sync_width(self) -> None:
-        viewport = self.viewport()
-        if viewport is None:
-            return
-        viewport_w = max(viewport.width(), 1)
-        content_w = max(SIDEBAR_CONTENT_MIN, viewport_w)
-        self._inner.setFixedWidth(content_w)
-        self.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAsNeeded
-            if viewport_w < SIDEBAR_CONTENT_MIN
-            else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-
-    def resizeEvent(self, event) -> None:  # type: ignore[override]
-        super().resizeEvent(event)
-        self._sync_width()
-
-    def showEvent(self, event) -> None:  # type: ignore[override]
-        super().showEvent(event)
-        self._sync_width()
 
 
 def param_row(label_text: str, value_text: str) -> QWidget:

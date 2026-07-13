@@ -167,15 +167,29 @@ class ViewerArea(QWidget):
             self._scale_sync = _ViewerScaleSync(self)
             vp.installEventFilter(self._scale_sync)
 
+        self.viewer.mouse_moved.connect(self.hud.set_coords)
+
+    def fit_view(self) -> None:
+        """Frame the stage sight, or the full scene when a reference image exists."""
+        self.viewer.fit_view()
+        self.update_scale_from_viewer()
+
     def resizeEvent(self, a0) -> None:  # noqa: N802
         super().resizeEvent(a0)
         self.viewer.setGeometry(self.rect())
         self.hud.setGeometry(self.rect())
         if self._distortion_overlay is not None:
             self._distortion_overlay.setGeometry(self.rect())
-            self._distortion_overlay.raise_()
-        self.hud.raise_()
+            if self._distortion_overlay.isVisible():
+                self._distortion_overlay.raise_()
+            else:
+                self.hud.raise_()
+        else:
+            self.hud.raise_()
         self.update_scale_from_viewer()
+
+    def showEvent(self, a0) -> None:  # noqa: N802
+        super().showEvent(a0)
 
     def show_distortion_overlay(self):
         from .distortion_overlay import DistortionOverlay
@@ -183,6 +197,7 @@ class ViewerArea(QWidget):
         if self._distortion_overlay is None:
             self._distortion_overlay = DistortionOverlay(self.viewer, self)
         self._distortion_overlay.setGeometry(self.rect())
+        self.hud.hide()
         self._distortion_overlay.open()
         self._distortion_overlay.raise_()
         return self._distortion_overlay

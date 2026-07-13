@@ -175,6 +175,37 @@ class Viewer(QGraphicsView):
 
         self.setMouseTracking(True)
 
+        # Refit on show/resize until the user zooms with the wheel. Early
+        # reset_camera() calls often run before the viewport has its real size.
+        self._auto_fit_view = True
+        self.background_changed.connect(self._fit_view_if_auto)
+
+    def _fit_view_if_auto(self) -> None:
+        if self._auto_fit_view:
+            self.fit_view()
+
+    def fit_view(self) -> None:
+        """Frame the stage sight, or the full scene when a reference image exists."""
+        if self.stage_sight is None:
+            return
+        viewport = self.viewport()
+        if viewport is None or viewport.width() < 50 or viewport.height() < 50:
+            return
+        if self.has_background_picture:
+            self.reset_camera()
+        else:
+            self.reset_camera_to_stage_sight()
+
+    def showEvent(self, event) -> None:  # type: ignore[override]
+        super().showEvent(event)
+        if self._auto_fit_view:
+            self.fit_view()
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        if self._auto_fit_view:
+            self.fit_view()
+
     @property
     def markers(self) -> list[IdMarker]:
         return list(self.__markers)
@@ -217,24 +248,42 @@ class Viewer(QGraphicsView):
         """Resets the camera to show all elements of the scene"""
         if item is not None:
             all_elements_rect = item.sceneTransform().mapRect(item.boundingRect())
+            if all_elements_rect.width() <= 0 or all_elements_rect.height() <= 0:
+                self.reset_camera_to_stage_sight()
+                return
         else:
             all_elements_rect = self.__scene.itemsBoundingRect()
-        viewport = self.viewport()
-        viewport_size = (
-            viewport.size() if viewport is not None else all_elements_rect.size()
-        )
-        w_ratio = viewport_size.width() / (all_elements_rect.width() * 1.2)
-        h_ratio = viewport_size.height() / (all_elements_rect.height() * 1.2)
-        self.cam_pos_zoom = (
-            all_elements_rect.center(),
-            min(w_ratio, h_ratio),
-        )
+        self._apply_camera_fit(all_elements_rect)
 
     def reset_camera_to_stage_sight(self):
         """Resets the camera to show the stage sight"""
         if self.stage_sight is None:
             return
-        self.reset_camera(self.stage_sight.image)
+        ss = self.stage_sight
+        all_elements_rect = ss.mapRectToScene(ss.boundingRect())
+        if all_elements_rect.width() <= 0 or all_elements_rect.height() <= 0:
+            w, h = float(ss.size.width()), float(ss.size.height())
+            if w <= 0 or h <= 0:
+                return
+            center = ss.mapToScene(QPointF(0, 0))
+            all_elements_rect = QRectF(
+                center.x() - w / 2, center.y() - h / 2, w, h
+            )
+        self._apply_camera_fit(all_elements_rect)
+
+    def _apply_camera_fit(self, all_elements_rect: QRectF) -> None:
+        viewport = self.viewport()
+        viewport_size = (
+            viewport.size() if viewport is not None else all_elements_rect.size()
+        )
+        w = max(all_elements_rect.width() * 1.2, 1e-9)
+        h = max(all_elements_rect.height() * 1.2, 1e-9)
+        w_ratio = viewport_size.width() / w
+        h_ratio = viewport_size.height() / h
+        self.cam_pos_zoom = (
+            all_elements_rect.center(),
+            min(w_ratio, h_ratio),
+        )
 
     def __place_picture_item(self, at_stage_sight: bool = False):
         item = self.__picture_item
@@ -607,6 +656,7 @@ class Viewer(QGraphicsView):
         """
         if event is None:
             return
+        self._auto_fit_view = False
         # Get current position and zoom factor of camera
         pos, zoom = self.cam_pos_zoom
         # The zoom factor to apply
