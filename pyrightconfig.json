@@ -1,4 +1,5 @@
 {
   "stubPath": "typings",
-  "include": ["laserstudio", "tests", "typings"]
+  "include": ["laserstudio", "tests", "typings"],
+  "reportTypeCommentUsage": "none"
 }
