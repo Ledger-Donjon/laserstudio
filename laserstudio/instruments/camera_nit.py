@@ -37,6 +37,8 @@ class CameraNITInstrument(CameraInstrument):
         width, height, _, data = self.pynit.get_last_image()
         if data is None:
             return None
+        if width != self.width or height != self.height:
+            self.set_resolution(width, height)
         # get_last_image returns Tuple always 'L' for the 'mode'
         frame = frombuffer(data, dtype=uint8)
         frame = resize(frame, width * height)

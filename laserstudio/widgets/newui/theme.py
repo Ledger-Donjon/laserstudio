@@ -1,0 +1,282 @@
+"""
+Ledger design-system tokens and shared UI helpers for the new Laser Studio UI.
+
+Colors, spacing and typography come from the official Ledger design system
+handoff. Keeping them here (rather than in ``laserstudio_refonte``) lets both
+the main window and the individual workspace panels share one source of truth
+without a circular import.
+"""
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QSplitter,
+    QSplitterHandle,
+    QWidget,
+)
+
+from . import lucide
+
+# ── Color tokens ───────────────────────────────────────────────────────────────
+BG_ROOT = "#060607"
+BG_MAIN = "#0A0A0A"
+BG_PANEL = "#0C0C0D"
+BG_TABS = "#131214"
+BG_CARD = "#131214"
+BORDER = "rgba(255,255,255,0.10)"
+BORDER_SUBTLE = "rgba(255,255,255,0.08)"
+BORDER_HOVER = "rgba(255,255,255,0.22)"
+TEXT = "#F1F1F1"
+TEXT_MUTED = "#A3A3A3"
+TEXT_DIM = "#6A6A6A"
+TAB_INACTIVE = "#8A8A8A"
+ACCENT = "#FF5300"
+PURPLE = "#D4A0FF"
+PURPLE_BG = "rgba(212,160,255,0.12)"
+PURPLE_BORDER = "rgba(212,160,255,0.40)"
+GREEN = "#6EC85C"
+GREEN_BG = "rgba(110,200,92,0.12)"
+
+# ── Reusable stylesheets ─────────────────────────────────────────────────────
+# Segmented-control tab: active = purple fill + black text (per design).
+TAB_SS = f"""
+QPushButton {{
+    background: transparent;
+    color: {TAB_INACTIVE};
+    border: none;
+    border-radius: 6px;
+    font-family: "Brut Grotesque";
+    font-weight: 700;
+    font-size: 13px;
+    padding: 0 15px;
+    min-height: 34px;
+}}
+QPushButton:hover {{
+    background: rgba(255,255,255,0.06);
+    color: {TEXT};
+}}
+QPushButton:checked {{
+    background: {PURPLE};
+    color: #0A0A0A;
+}}
+"""
+
+GHOST_BTN = f"""
+QPushButton {{
+    background: rgba(255,255,255,0.05);
+    color: {TEXT};
+    border: 1px solid {BORDER};
+    border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-size: 11px;
+    padding: 8px 0;
+    min-height: 0;
+}}
+QPushButton:hover {{
+    background: rgba(255,255,255,0.09);
+    color: white;
+}}
+QPushButton:disabled {{
+    color: {TEXT_DIM};
+    background: rgba(255,255,255,0.02);
+    border-color: rgba(255,255,255,0.06);
+}}
+"""
+
+PURPLE_BTN = f"""
+QPushButton {{
+    background: {PURPLE_BG};
+    color: {PURPLE};
+    border: 1px solid {PURPLE_BORDER};
+    border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-size: 12px;
+    padding: 9px 0;
+    min-height: 0;
+}}
+QPushButton:hover {{
+    background: rgba(212,160,255,0.20);
+}}
+QPushButton:disabled {{
+    color: {TEXT_DIM};
+    background: rgba(255,255,255,0.02);
+    border-color: rgba(255,255,255,0.06);
+}}
+"""
+
+
+# ── Parameter value formatting ────────────────────────────────────────────────
+SKIP_PROPS = {"enable", "label"}
+
+KEY_LABELS: dict[str, str] = {
+    "type": "type",
+    "refresh_interval_ms": "refresh interval",
+    "spot_size_um": "spot size",
+    "pixel_size_in_um": "pixel size",
+    "num_axis": "axes",
+    "unit_factor": "unit factor",
+    "objective": "objective",
+    "index": "device index",
+    "width": "width",
+    "height": "height",
+}
+
+_VALUE_FMT: dict[str, object] = {
+    "refresh_interval_ms": lambda v: f"{v} ms",
+    "spot_size_um": lambda v: f"{v} µm",
+    "pixel_size_in_um": lambda v: (
+        f"{v[0]} × {v[1]} µm" if isinstance(v, list) and len(v) == 2 else str(v)
+    ),
+    "objective": lambda v: f"{v}×",
+    "width": lambda v: f"{v} px",
+    "height": lambda v: f"{v} px",
+}
+
+
+def fmt_value(key: str, val: object) -> str:
+    fmt = _VALUE_FMT.get(key)
+    if fmt is not None:
+        return fmt(val)  # type: ignore[operator]
+    if isinstance(val, bool):
+        return "Yes" if val else "No"
+    if isinstance(val, list):
+        return ", ".join(str(x) for x in val)
+    if isinstance(val, float):
+        return f"{val:g}"
+    return str(val)
+
+
+# ── Widget helpers ────────────────────────────────────────────────────────────
+def eyebrow(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setStyleSheet(
+        f"color: {TEXT_DIM}; font-family: monospace; font-size: 10px;"
+        "letter-spacing: 2px; background: transparent;"
+    )
+    return lbl
+
+
+def section_title(text: str, icon_name: str = "folder") -> QWidget:
+    row = QWidget()
+    row.setStyleSheet("background: transparent;")
+    hl = QHBoxLayout(row)
+    hl.setContentsMargins(0, 0, 0, 0)
+    hl.setSpacing(9)
+    icon = QLabel()
+    icon.setPixmap(lucide.pixmap(icon_name, 16, PURPLE))
+    icon.setFixedWidth(20)
+    icon.setStyleSheet("background: transparent;")
+    hl.addWidget(icon)
+    lbl = QLabel(text)
+    lbl.setStyleSheet(
+        f"color: {TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
+        " font-size: 15px; background: transparent;"
+    )
+    hl.addWidget(lbl)
+    hl.addStretch()
+    return row
+
+
+def param_row(label_text: str, value_text: str) -> QWidget:
+    row = QFrame()
+    row.setObjectName("ls-param-row")
+    row.setStyleSheet(
+        f"QFrame#ls-param-row {{ background: {BG_CARD};"
+        f" border: 1px solid {BORDER}; border-radius: 5px; }}"
+    )
+    hl = QHBoxLayout(row)
+    hl.setContentsMargins(12, 9, 12, 9)
+    hl.setSpacing(12)
+    key = QLabel(label_text)
+    key.setStyleSheet(f"color: {TEXT_MUTED}; font-size: 12px; background: transparent;")
+    hl.addWidget(key)
+    hl.addStretch()
+    val = QLabel(value_text)
+    val.setStyleSheet(
+        f"color: {TEXT}; font-family: monospace; font-size: 11px;"
+        " background: transparent;"
+    )
+    val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    hl.addWidget(val)
+    return row
+
+
+def separator() -> QFrame:
+    line = QFrame()
+    line.setFixedHeight(1)
+    line.setStyleSheet("QFrame { background: rgba(255,255,255,0.08); }")
+    line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    return line
+
+
+def hline() -> QFrame:
+    line = QFrame()
+    line.setFixedHeight(1)
+    line.setStyleSheet(f"QFrame {{ background: {BORDER}; }}")
+    line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    return line
+
+
+def vline() -> QFrame:
+    line = QFrame()
+    line.setFixedWidth(1)
+    line.setStyleSheet(f"QFrame {{ background: {BORDER}; }}")
+    line.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+    return line
+
+
+# ── Resizable splitter with a thin 1px handle ─────────────────────────────────
+_SPLIT_BG = QColor(10, 10, 10)              # ~BG_MAIN, near-black
+_SPLIT_LINE = QColor(255, 255, 255, 28)     # matches the 1px border
+_SPLIT_LINE_HOVER = QColor(212, 160, 255, 150)  # purple accent on hover
+
+
+class _SplitHandle(QSplitterHandle):
+    """A wide (grabbable) splitter handle that paints a 1px centered line."""
+
+    def __init__(self, orientation, parent) -> None:
+        super().__init__(orientation, parent)
+        self._hover = False
+
+    def enterEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        painter = QPainter(self)
+        rect = self.rect()
+        painter.fillRect(rect, _SPLIT_BG)
+        color = _SPLIT_LINE_HOVER if self._hover else _SPLIT_LINE
+        if self.orientation() == Qt.Orientation.Horizontal:
+            x = (rect.width() - 1) // 2
+            painter.fillRect(x, 0, 1, rect.height(), color)
+        else:
+            y = (rect.height() - 1) // 2
+            painter.fillRect(0, y, rect.width(), 1, color)
+        painter.end()
+
+
+class LineSplitter(QSplitter):
+    """
+    QSplitter whose handles look like the design's 1px dividers but expose a
+    wider grab zone for resizing. Children never collapse to zero.
+    """
+
+    def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None) -> None:
+        super().__init__(orientation, parent)
+        self.setHandleWidth(7)
+        self.setChildrenCollapsible(False)
+
+    def createHandle(self) -> QSplitterHandle:  # noqa: N802 (Qt override)
+        return _SplitHandle(self.orientation(), self)

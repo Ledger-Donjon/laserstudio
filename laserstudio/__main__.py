@@ -8,11 +8,12 @@ import sys
 import yaml
 
 from PyQt6.QtCore import QLocale
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QFontDatabase, QIcon
 from PyQt6.QtWidgets import QApplication
 
 from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 from .laserstudio import LaserStudio
+from .laserstudio_refonte import LaserStudioRefonte
 from .utils.util import resource_path
 from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 from .instruments.list_serials import list_devices
@@ -54,6 +55,11 @@ def main() -> int:
     app.setApplicationName("Laser Studio")
     app.setApplicationDisplayName("Laser Studio")
     app.setWindowIcon(QIcon(resource_path(":/icons/logo.svg")))
+    # Load Brut Grotesque fonts from the bundled fonts directory
+    _fonts_dir = pathlib.Path(__file__).parent / "fonts"
+    for _font_file in sorted(_fonts_dir.glob("*.otf")):
+        QFontDatabase.addApplicationFont(str(_font_file))
+
     app.setStyle(LedgerStyle)
     app.setPalette(LedgerPalette)
     app.setStyleSheet(ledger_stylesheet())
@@ -101,8 +107,17 @@ def main() -> int:
         logger.info("Configuration generated successfully")
 
     win = LaserStudio(yaml_config)
-    win.setWindowTitle(app.applicationDisplayName())
+    win.setWindowTitle(app.applicationDisplayName() + " (Classic)")
     win.show()
+
+    win_new = LaserStudioRefonte(
+        win.instruments,
+        config_path=pathlib.Path(args.config),
+        config_loaded=yaml_config is not None,
+        yaml_config=yaml_config,
+    )
+    win_new.show()
+
     return app.exec()
 
 

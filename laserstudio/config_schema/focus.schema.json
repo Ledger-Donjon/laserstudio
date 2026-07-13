@@ -1,0 +1,22 @@
+{
+  "$id": "focus.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Focus",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "instrument.schema.json"
+    }
+  ],
+  "description": "Autofocus helper (requires both a camera and a stage).",
+  "properties": {
+    "coarse": {
+      "allOf": [{ "$ref": "focussearch.schema.json" }],
+      "description": "Coarse focus-search settings (wide span, fewer steps)."
+    },
+    "fine": {
+      "allOf": [{ "$ref": "focussearch.schema.json" }],
+      "description": "Fine focus-search settings (narrow span, more steps)."
+    }
+  }
+}

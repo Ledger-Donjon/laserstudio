@@ -18,6 +18,38 @@
         "suffix": "um/unit",
         "default": 1.0
       }
+    },
+    "unit_factor": {
+      "description": "Conversion factor for the stage's units. A single value applied to all axes (scalar alias of 'unit_factors').",
+      "type": "number",
+      "default": 1.0,
+      "suffix": "um/unit"
+    },
+    "guardrail_um": {
+      "description": "Maximum allowed move distance, in micrometers, as a safety guardrail.",
+      "type": "number",
+      "default": 20000.0,
+      "minimum": 0.0,
+      "suffix": "um"
+    },
+    "backlashes_um": {
+      "description": "Backlash compensation for each axis, in micrometers.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "suffix": "um"
+      }
+    },
+    "shear": {
+      "description": "Shear correction factors applied to the X and Y axes.",
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "default": [0.0, 0.0],
+      "items": {
+        "type": "number"
+      }
     }
   },
   "oneOf": [
@@ -95,8 +127,15 @@
         "type": {
           "const": "Dummy",
           "description": "A Dummy Stage."
+        },
+        "num_axis": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Number of axes of the dummy stage."
         }
-      }
+      },
+      "required": ["num_axis"]
     },
     {
       "title": "REST",

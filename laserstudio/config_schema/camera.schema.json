@@ -74,6 +74,11 @@
           "type": "integer",
           "default": 0,
           "description": "Index of the camera (as used in OpenCV)."
+        },
+        "probe_resolutions_thorough": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, probe the camera's supported resolutions thoroughly at startup (slower)."
         }
       }
     },

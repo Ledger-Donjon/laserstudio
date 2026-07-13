@@ -194,7 +194,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
             raise ConnectionFailure() from e
 
         # Because of the ratio being wrong (v4l to cv2 conversion)
-        self.width = self.width // 2
+        super(CameraUSBInstrument, self).set_resolution(self.width // 2, self.height)
 
         self.last_frame_number = 0
 

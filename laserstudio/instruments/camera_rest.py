@@ -26,4 +26,7 @@ class CameraRESTInstrument(RestInstrument, CameraInstrument):
             return 0, 0, "L", None
         im = Image.open(io.BytesIO(response.content))
         im_rgb = im.convert("RGB")
-        return *im_rgb.size, "RGB", im.tobytes()
+        width, height = im_rgb.size
+        if width != self.width or height != self.height:
+            self.set_resolution(width, height)
+        return width, height, "RGB", im_rgb.tobytes()

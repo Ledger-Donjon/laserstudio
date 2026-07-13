@@ -151,7 +151,7 @@ class StageSight(QGraphicsItemGroup):
             self._probe_markers.append(marker)
 
     def camera_parameter_changed(self, parameter: str, value: Any):
-        if parameter == "objective":
+        if parameter in ("objective", "resolution"):
             self.update_size()
 
     def update_size(self, in_pixels: bool | None = None):

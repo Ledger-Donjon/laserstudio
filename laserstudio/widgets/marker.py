@@ -235,7 +235,7 @@ class ProbeMarker(Marker):
         self.update_pos()
 
     def __camera_parameter_changed(self, parameter: str, value: Any):
-        if parameter == "objective":
+        if parameter in ("objective", "resolution"):
             self.update_pos()
             self.update_size()
 

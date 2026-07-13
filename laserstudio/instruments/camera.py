@@ -94,6 +94,27 @@ class CameraInstrument(Instrument):
         # Objective
         self.objective = cast(float, config.get("objective", 1.0))
 
+    def set_resolution(self, width: int, height: int) -> tuple[int, int]:
+        """Update the image size in pixels and notify listeners."""
+        if width == self.width and height == self.height:
+            return width, height
+
+        self.width = width
+        self.height = height
+        self._reset_resolution_buffers()
+        logging.getLogger("laserstudio").info(
+            f"Camera resolution set to {width}x{height}"
+        )
+        self.parameter_changed.emit("resolution", [width, height])
+        return width, height
+
+    def _reset_resolution_buffers(self) -> None:
+        self._last_frame_accumulator = None
+        self._last_frames = []
+        self.number_of_averaged_images = 0
+        self._last_pos = numpy.zeros((self.width, self.height), dtype=numpy.uint8)
+        self.reference_image_accumulators = {}
+
     @property
     def reference_image_accumulator(self) -> NDArray[Any] | None:
         """
@@ -569,6 +590,8 @@ class CameraInstrument(Instrument):
         settings["image_averaging"] = self.image_averaging
         settings["windowed_averaging"] = self.windowed_averaging
         settings["objective"] = self.objective
+        settings["width"] = self.width
+        settings["height"] = self.height
 
         return settings
 
@@ -602,6 +625,10 @@ class CameraInstrument(Instrument):
             )
         if "objective" in data and isinstance(data["objective"], (float, int)):
             self.select_objective(float(data["objective"]))
+        width = data.get("width")
+        height = data.get("height")
+        if isinstance(width, int) and isinstance(height, int):
+            self.set_resolution(width, height)
 
     @property
     def laplacian_std_dev(self) -> float:

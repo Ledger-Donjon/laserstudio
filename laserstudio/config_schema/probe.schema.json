@@ -19,6 +19,13 @@
         "type": "number",
         "suffix": "px"
       }
+    },
+    "spot_size_um": {
+      "type": "number",
+      "default": 10.0,
+      "exclusiveMinimum": 0.0,
+      "suffix": "um",
+      "description": "The diameter of the probe spot, in micrometers. (Legacy alias: 'spot_size'.)"
     }
   }
 }

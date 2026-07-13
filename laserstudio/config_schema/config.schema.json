@@ -50,6 +50,16 @@
         }
       ]
     },
+    "focus": {
+      "allOf": [
+        {
+          "$ref": "focus.schema.json"
+        },
+        {
+          "description": "Autofocus helper configuration."
+        }
+      ]
+    },
     "restserver": {
       "allOf": [
         {

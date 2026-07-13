@@ -11,7 +11,7 @@
         },
         "open_is_slidein": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "If true, the LMS controller 'open' state corresponds to a 'slide-in' motor position state."
         },
         "motor": {
