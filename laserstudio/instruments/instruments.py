@@ -12,6 +12,7 @@ from .focus import FocusInstrument
 from .instrument import Instrument
 from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
+from .laser_dummy import LaserDummy
 from .laserdriver import LaserDriverInstrument
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
@@ -92,6 +93,8 @@ class Instruments:
                         self.lasers.append(PDMInstrument(config=laser_config))
                     elif device_type == "DonjonLaser":
                         self.lasers.append(LaserDriverInstrument(config=laser_config))
+                    elif device_type == "Dummy":
+                        self.lasers.append(LaserDummy(config=laser_config))
                     else:
                         logging.getLogger("laserstudio").error(
                             f"Laser {i + 1} is enabled but has an unknown type {device_type}... Skipping device."

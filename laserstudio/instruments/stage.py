@@ -161,7 +161,10 @@ class StageInstrument(Instrument):
     # Signal emitted when a new position is fetched
     position_changed = pyqtSignal(Vector)
     grbl_alarm = pyqtSignal(str)
-    # Signal emitted when the software limits (min, max, enabled) change
+    # Signal emitted when the "Max move distance" guardrail (value or enabled
+    # state) changes.
+    guardrail_changed = pyqtSignal()
+    # Signal emitted when the "Stage area limit" (bounds or enabled state) change
     soft_limits_changed = pyqtSignal()
     # Signal emitted when a move is rejected because it falls outside the limits
     soft_limit_violation = pyqtSignal(str)
@@ -178,8 +181,10 @@ class StageInstrument(Instrument):
         # To refresh stage position in the view, in real-time
         self.refresh_interval = cast(int | None, config.get("refresh_interval_ms"))
 
-        self.guardrail = cast(float, config.get("guardrail_um", 20000.0))
-        self.guardrail_enabled = True
+        # "Max move distance" guardrail: block any single move whose amplitude
+        # exceeds this distance (per axis), in stage µm. Independently toggleable.
+        self._guardrail = float(cast(float, config.get("guardrail_um", 20000.0)))
+        self._guardrail_enabled = bool(config.get("guardrail_enabled", True))
 
         self.backlashes = cast(list[float], config.get("backlashes_um"))
 
@@ -368,6 +373,36 @@ class StageInstrument(Instrument):
                 minimum[i], maximum[i] = maximum[i], minimum[i]
         self._soft_limits_min = minimum
         self._soft_limits_max = maximum
+
+    @property
+    def guardrail(self) -> float:
+        """Maximum allowed amplitude of a single move (per axis), in stage µm.
+
+        This is the "Max move distance" guardrail: any move longer than this on
+        any axis is blocked when :attr:`guardrail_enabled` is True.
+        """
+        return self._guardrail
+
+    @guardrail.setter
+    def guardrail(self, value: float) -> None:
+        value = max(0.0, float(value))
+        if value == self._guardrail:
+            return
+        self._guardrail = value
+        self.guardrail_changed.emit()
+
+    @property
+    def guardrail_enabled(self) -> bool:
+        """Whether the "Max move distance" guardrail is enforced on moves."""
+        return self._guardrail_enabled
+
+    @guardrail_enabled.setter
+    def guardrail_enabled(self, value: bool) -> None:
+        value = bool(value)
+        if value == self._guardrail_enabled:
+            return
+        self._guardrail_enabled = value
+        self.guardrail_changed.emit()
 
     @property
     def soft_limits_enabled(self) -> bool:
@@ -695,6 +730,10 @@ class StageInstrument(Instrument):
         """
         super_settings = super().settings
         super_settings["offset_origin"] = self.offset_origin
+        # "Max move distance" guardrail
+        super_settings["guardrail_enabled"] = self._guardrail_enabled
+        super_settings["guardrail_um"] = self._guardrail
+        # "Stage area limit" guardrail
         super_settings["soft_limits_enabled"] = self._soft_limits_enabled
         if self._soft_limits_min is not None and self._soft_limits_max is not None:
             super_settings["soft_limits_min"] = list(self._soft_limits_min)
@@ -717,6 +756,11 @@ class StageInstrument(Instrument):
                 "Please check your settings file"
             )
             self.offset_origin = cast(list[float], data["offset_origin"])
+        if "guardrail_um" in data and isinstance(data["guardrail_um"], (int, float)):
+            self._guardrail = max(0.0, float(data["guardrail_um"]))
+        if "guardrail_enabled" in data:
+            self._guardrail_enabled = bool(data["guardrail_enabled"])
+        self.guardrail_changed.emit()
         soft_min = data.get("soft_limits_min")
         soft_max = data.get("soft_limits_max")
         if soft_min is not None and soft_max is not None:

@@ -26,11 +26,44 @@
       "suffix": "um/unit"
     },
     "guardrail_um": {
-      "description": "Maximum allowed move distance, in micrometers, as a safety guardrail.",
+      "title": "Max move distance",
+      "description": "Maximum allowed distance for a single move, per axis, in micrometers. Any move longer than this is blocked when 'guardrail_enabled' is true.",
       "type": "number",
       "default": 20000.0,
       "minimum": 0.0,
       "suffix": "um"
+    },
+    "guardrail_enabled": {
+      "title": "Enable max move distance",
+      "description": "Enable the 'Max move distance' guardrail (block any single move longer than 'guardrail_um').",
+      "type": "boolean",
+      "default": true
+    },
+    "soft_limits_enabled": {
+      "title": "Stage area limit",
+      "description": "Confine every move to a rectangular area ('Stage area limit'). Moves whose target is outside the area are blocked. The area can be resized in the viewer.",
+      "type": "boolean",
+      "default": false
+    },
+    "soft_limits_min": {
+      "title": "Stage area limit lower bounds",
+      "description": "Lower bounds of the stage area limit, per axis, in micrometers.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "suffix": "um"
+      }
+    },
+    "soft_limits_max": {
+      "title": "Stage area limit upper bounds",
+      "description": "Upper bounds of the stage area limit, per axis, in micrometers.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "suffix": "um"
+      }
     },
     "backlashes_um": {
       "description": "Backlash compensation for each axis, in micrometers.",

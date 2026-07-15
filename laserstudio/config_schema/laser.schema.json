@@ -40,6 +40,15 @@
           "description": "Donjon's Laser Driver."
         }
       }
+    },
+    {
+      "title": "Dummy",
+      "properties": {
+        "type": {
+          "const": "Dummy",
+          "description": "Dummy laser keeping its state in memory, for testing without hardware."
+        }
+      }
     }
   ],
   "properties": {
