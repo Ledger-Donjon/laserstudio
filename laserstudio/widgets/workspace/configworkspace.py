@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Callable
 
 import yaml
-from PyQt6.QtCore import QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -61,9 +61,11 @@ _ERROR_RED = "#F04F52"
 
 _DELETE_BTN_SS = (
     "QPushButton {"
+    "  color: #F04F52;"
     "  background: rgba(240,79,82,0.10);"
     "  border: 1px solid rgba(240,79,82,0.35);"
-    "  border-radius: 5px; padding: 6px 12px; }"
+    "  border-radius: 5px; padding: 6px 12px;"
+    '  font-family: "Brut Grotesque"; font-size: 11px; max-height: 28px; }'
     "QPushButton:hover { background: rgba(240,79,82,0.18); }"
     "QPushButton:disabled {"
     "  background: rgba(255,255,255,0.02);"
@@ -306,7 +308,12 @@ class ConfigWorkspace(Workspace):
         self._current_entry: dict | None = None
         self._update_btn: QPushButton | None = None
         self._revert_btn: QPushButton | None = None
+        self._done_btn: QPushButton | None = None
+        self._editing_marker: QLabel | None = None
         self._form_draft: dict[str, object] = {}
+        # Per-instrument edit mode: fields are locked until the user hits "Edit".
+        self._editing = False
+        self._dirty = False
 
         self._folder_name_lbl: QLabel | None = None
         self._folder_path_lbl: QLabel | None = None
@@ -428,12 +435,7 @@ class ConfigWorkspace(Workspace):
     # ── Left panel ────────────────────────────────────────────────────────────
 
     def build_panel(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(
-            f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
-        )
+        scroll = theme.setup_scroll_area(QScrollArea())
 
         inner = theme.panel_inner()
         layout = QVBoxLayout(inner)
@@ -609,10 +611,7 @@ class ConfigWorkspace(Workspace):
         outer.setContentsMargins(24, 46, 24, 24)
         outer.setSpacing(0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll = theme.setup_scroll_area(QScrollArea(), background="transparent")
         scroll.viewport().setStyleSheet("background: transparent;")
 
         holder = QWidget()
@@ -656,12 +655,49 @@ class ConfigWorkspace(Workspace):
         if not self._entries:
             return
         index = max(0, min(index, len(self._entries) - 1))
+        # Leaving an instrument that is being edited: force the user to apply
+        # or discard the pending edits first (cancel keeps them on it).
+        if index != self._selected and self._editing:
+            if not self._resolve_pending_edits():
+                return
         if index != self._selected:
             self._form_draft = {}
         self._selected = index
         for j, card in enumerate(self._cards):
             card.setSelected(j == index)
         self._show_detail()
+
+    def _resolve_pending_edits(self) -> bool:
+        """Prompt when leaving an instrument with unsaved edits. Returns False to
+        cancel navigation (stay on the instrument), True to proceed."""
+        if self._dirty:
+            entry = self._current_entry
+            label = entry["label"] if entry else "this instrument"
+            box = QMessageBox(self._window)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("Unsaved edits")
+            box.setText(f"You are still editing “{label}”.")
+            box.setInformativeText(
+                "Apply your changes or discard them before leaving."
+            )
+            apply_btn = box.addButton(
+                "Apply", QMessageBox.ButtonRole.AcceptRole
+            )
+            box.addButton("Discard", QMessageBox.ButtonRole.DestructiveRole)
+            cancel_btn = box.addButton(
+                "Cancel", QMessageBox.ButtonRole.RejectRole
+            )
+            box.setDefaultButton(apply_btn)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is cancel_btn:
+                return False
+            if clicked is apply_btn:
+                self._apply_edits()
+            else:
+                self._form_draft = {}
+        self._editing = False
+        return True
 
     def _show_detail(self) -> None:
         if self._detail_layout is None:
@@ -671,6 +707,8 @@ class ConfigWorkspace(Workspace):
         self._current_entry = None
         self._update_btn = None
         self._revert_btn = None
+        self._done_btn = None
+        self._editing_marker = None
         entry = self._entries[self._selected]
         self._current_entry = entry
         if entry["kind"] == "app":
@@ -680,12 +718,7 @@ class ConfigWorkspace(Workspace):
         self._detail_layout.addWidget(widget)
 
     def _form_shell(self) -> tuple[QScrollArea, QVBoxLayout]:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(
-            f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
-        )
+        scroll = theme.setup_scroll_area(QScrollArea())
         inner = theme.panel_inner()
         col = QVBoxLayout(inner)
         col.setContentsMargins(18, 18, 18, 18)
@@ -694,8 +727,15 @@ class ConfigWorkspace(Workspace):
         return scroll, col
 
     def _title_row(
-        self, pixmap, name: str, chip_text: str = "",
-        chip_fg: str = "", chip_bg: str = ""
+        self,
+        pixmap,
+        name: str,
+        chip_text: str = "",
+        chip_fg: str = "",
+        chip_bg: str = "",
+        *,
+        enable_toggle: ToggleSwitch | None = None,
+        title_dim: bool = False,
     ) -> QHBoxLayout:
         row = QHBoxLayout()
         row.setSpacing(10)
@@ -706,12 +746,16 @@ class ConfigWorkspace(Workspace):
         row.addWidget(icon, 0, Qt.AlignmentFlag.AlignVCenter)
         name_lbl = QLabel(name)
         name_lbl.setStyleSheet(
-            f"color: {theme.TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
+            f"color: {theme.TEXT_DIM if title_dim else theme.TEXT};"
+            " font-family: 'Brut Grotesque'; font-weight: 700;"
             " font-size: 18px; background: transparent;"
         )
         row.addWidget(name_lbl)
         row.addStretch()
-        if chip_text:
+        if enable_toggle is not None:
+            enable_toggle.setToolTip("Enabled at startup")
+            row.addWidget(enable_toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+        elif chip_text:
             chip = QLabel(chip_text)
             chip.setStyleSheet(
                 f"color: {chip_fg}; background: {chip_bg};"
@@ -759,18 +803,42 @@ class ConfigWorkspace(Workspace):
     def _build_instrument_form(self, entry: dict) -> QWidget:
         scroll, col = self._form_shell()
         self._current_entry = entry
+        editing = self._editing
         enabled = entry["enabled"]
         params: dict = entry["params"]
 
+        # Accent left-strip while editing — a persistent "edits in progress" cue.
+        inner = scroll.widget()
+        if inner is not None:
+            if editing:
+                inner.setStyleSheet(
+                    f"QWidget#{theme.PANEL_INNER} {{ background: {theme.BG_PANEL};"
+                    f" border-left: 2px solid {theme.ACCENT}; }}"
+                )
+            else:
+                inner.setStyleSheet(
+                    f"QWidget#{theme.PANEL_INNER} {{ background: {theme.BG_PANEL}; }}"
+                )
+
         col.addWidget(theme.eyebrow(self._instrument_eyebrow(entry)))
+        enable_toggle = ToggleSwitch(enabled)
+        enable_toggle.setEnabled(editing)
+        self._field_specs.append(("enable", enable_toggle.isChecked, enabled))
+        enable_toggle.toggled.connect(self._recompute_dirty)
         col.addLayout(
             self._title_row(
                 lucide.pixmap(
                     entry["icon"], 24, theme.PURPLE if enabled else theme.TEXT_DIM
                 ),
                 entry["label"],
+                enable_toggle=enable_toggle,
+                title_dim=not enabled,
             )
         )
+
+        # Top action bar: Edit / Delete (view) or Done / Revert + marker (editing).
+        col.addLayout(self._build_form_actions(entry))
+
         col.addSpacing(2)
         col.addWidget(theme.eyebrow("PARAMETERS"))
 
@@ -792,6 +860,7 @@ class ConfigWorkspace(Workspace):
             type_sel, type_wrap = type_selector_field(
                 type_options, str(effective_type or "")
             )
+            type_sel.setEnabled(editing)
             committed_type = entry["params"].get("type")
             self._field_specs.append(("type", type_sel.value, committed_type))
             type_sel.changed.connect(self._on_instrument_type_changed)
@@ -816,55 +885,63 @@ class ConfigWorkspace(Workspace):
                 init = field.value()
                 self._field_specs.append((key, field.value, init))
                 field.changed.connect(self._recompute_dirty)
+            field.set_editing(editing)
             col.addWidget(field)
 
-        # "Enabled at startup" — interactive toggle bound to `enable`.
-        toggle_box = QFrame()
-        toggle_box.setObjectName("ls-card")
-        toggle_box.setStyleSheet(
-            f"QFrame#ls-card {{ background: {theme.BG_CARD};"
-            f" border: 1px solid {theme.BORDER}; border-radius: 5px; }}"
-        )
-        tl = QHBoxLayout(toggle_box)
-        tl.setContentsMargins(12, 9, 12, 9)
-        tlabel = QLabel("Enabled at startup")
-        tlabel.setStyleSheet(
-            f"color: {theme.TEXT}; font-size: 12px; background: transparent;"
-        )
-        tl.addWidget(tlabel)
-        tl.addStretch()
-        enable_toggle = ToggleSwitch(enabled)
-        self._field_specs.append(("enable", enable_toggle.isChecked, enabled))
-        enable_toggle.toggled.connect(self._recompute_dirty)
-        tl.addWidget(enable_toggle)
-        col.addWidget(toggle_box)
-
         col.addStretch()
+        self._recompute_dirty()
+        return scroll
 
-        # Bottom actions: Update / Revert (pending edits) + Delete.
+    def _build_form_actions(self, entry: dict) -> QHBoxLayout:
+        """Top action bar. View mode: Edit + Delete. Edit mode: Done + Revert
+        plus an 'editing' marker."""
         actions = QHBoxLayout()
         actions.setSpacing(8)
-        self._update_btn = QPushButton("Update")
-        self._update_btn.setStyleSheet(theme.PURPLE_BTN)
-        self._update_btn.setEnabled(False)
-        self._update_btn.setToolTip("Apply these edits to the working configuration")
-        self._update_btn.clicked.connect(self._commit_update)
-        self._revert_btn = QPushButton("Revert")
-        self._revert_btn.setStyleSheet(theme.GHOST_BTN)
-        self._revert_btn.setEnabled(False)
-        self._revert_btn.setToolTip("Discard pending edits for this instrument")
-        self._revert_btn.clicked.connect(self._revert_instrument)
-        delete_btn = QPushButton()
-        delete_btn.setIcon(lucide.icon("trash-2", 15, _ERROR_RED))
-        delete_btn.setFixedWidth(40)
-        delete_btn.setToolTip("Delete this instrument from the configuration")
-        delete_btn.setStyleSheet(_DELETE_BTN_SS)
-        delete_btn.clicked.connect(lambda: self._delete_instrument(entry))
-        actions.addWidget(self._update_btn, 1)
-        actions.addWidget(self._revert_btn, 1)
-        actions.addWidget(delete_btn)
-        col.addLayout(actions)
-        return scroll
+        self._update_btn = None
+        self._revert_btn = None
+        self._done_btn = None
+        self._editing_marker = None
+
+        if self._editing:
+            done_btn = QPushButton("Done")
+            done_btn.setStyleSheet(theme.PURPLE_BTN)
+            done_btn.setIcon(lucide.icon("check", 14, theme.PURPLE))
+            done_btn.setIconSize(QSize(14, 14))
+            done_btn.setToolTip("Apply your edits and leave edit mode")
+            done_btn.clicked.connect(lambda: self._finish_edit(commit=True))
+            revert_btn = QPushButton("Revert")
+            revert_btn.setStyleSheet(theme.GHOST_BTN)
+            revert_btn.setToolTip("Discard your edits and leave edit mode")
+            revert_btn.clicked.connect(lambda: self._finish_edit(commit=False))
+            self._done_btn = done_btn
+            self._revert_btn = revert_btn
+            actions.addWidget(done_btn)
+            actions.addWidget(revert_btn)
+            actions.addStretch()
+            marker = QLabel("● EDITING")
+            marker.setStyleSheet(
+                f"color: {theme.ACCENT}; font-family: monospace; font-size: 10px;"
+                " letter-spacing: 1px; background: transparent;"
+            )
+            self._editing_marker = marker
+            actions.addWidget(marker, 0, Qt.AlignmentFlag.AlignVCenter)
+        else:
+            edit_btn = QPushButton("Edit")
+            edit_btn.setStyleSheet(theme.PURPLE_BTN)
+            edit_btn.setIcon(lucide.icon("sliders-horizontal", 14, theme.PURPLE))
+            edit_btn.setIconSize(QSize(14, 14))
+            edit_btn.setToolTip("Unlock these fields for editing")
+            edit_btn.clicked.connect(self._enter_edit_mode)
+            delete_btn = QPushButton("Delete")
+            delete_btn.setStyleSheet(_DELETE_BTN_SS)
+            delete_btn.setIcon(lucide.icon("trash-2", 14, _ERROR_RED))
+            delete_btn.setIconSize(QSize(14, 14))
+            delete_btn.setToolTip("Delete this instrument from the configuration")
+            delete_btn.clicked.connect(lambda: self._delete_instrument(entry))
+            actions.addWidget(edit_btn)
+            actions.addWidget(delete_btn)
+            actions.addStretch()
+        return actions
 
     def _param_value(self, entry: dict, key: str) -> object:
         if key in self._form_draft:
@@ -890,6 +967,8 @@ class ConfigWorkspace(Workspace):
         self._field_specs = []
         self._update_btn = None
         self._revert_btn = None
+        self._done_btn = None
+        self._editing_marker = None
         widget = self._build_instrument_form(entry)
         self._detail_layout.addWidget(widget)
         self._recompute_dirty()
@@ -897,13 +976,33 @@ class ConfigWorkspace(Workspace):
     # ── Per-instrument editing (pending edits) ────────────────────────────────
 
     def _recompute_dirty(self) -> None:
-        dirty = any(getter() != init for _key, getter, init in self._field_specs)
-        if self._update_btn is not None:
-            self._update_btn.setEnabled(dirty)
-        if self._revert_btn is not None:
-            self._revert_btn.setEnabled(dirty)
+        self._dirty = any(
+            getter() != init for _key, getter, init in self._field_specs
+        )
+        if self._editing_marker is not None:
+            self._editing_marker.setText(
+                "● EDITING · UNSAVED" if self._dirty else "● EDITING"
+            )
 
-    def _commit_update(self) -> None:
+    def _enter_edit_mode(self) -> None:
+        """Unlock the current instrument's fields for editing."""
+        self._editing = True
+        self._show_detail()
+
+    def _finish_edit(self, commit: bool) -> None:
+        """Leave edit mode, applying or discarding the pending edits."""
+        if commit:
+            self._apply_edits()
+        else:
+            self._form_draft = {}
+        self._editing = False
+        # _apply_edits rebuilds the tree cards, so re-assert the selection.
+        for j, card in enumerate(self._cards):
+            card.setSelected(j == self._selected)
+        self._show_detail()
+
+    def _apply_edits(self) -> None:
+        """Write the current field values into the working configuration."""
         entry = self._current_entry
         if entry is None:
             return
@@ -915,12 +1014,6 @@ class ConfigWorkspace(Workspace):
         self._rebuild_model()
         self._refresh_tree()
         self._form_draft = {}
-        self.select_card(self._selected)  # rebuilds the form -> pending cleared
-
-    def _revert_instrument(self) -> None:
-        # Rebuild the form from the (unchanged) working config, dropping edits.
-        self._form_draft = {}
-        self._show_detail()
 
     def _delete_instrument(self, entry: dict) -> None:
         reply = QMessageBox.question(

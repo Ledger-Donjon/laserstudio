@@ -3,6 +3,7 @@ from typing import cast, Any
 from numpy import frombuffer, resize, uint8, zeros, float32
 from numpy.typing import NDArray
 from .camera import CameraInstrument
+from ..utils.util import expand_path
 from ..utils.yaml_types import Config
 
 
@@ -26,6 +27,9 @@ class CameraNITInstrument(CameraInstrument):
             raise ValueError("nuc_filepath must be a string")
         if not isinstance(bpr_filepath, str):
             raise ValueError("bpr_filepath must be a string")
+
+        nuc_filepath = expand_path(nuc_filepath)
+        bpr_filepath = expand_path(bpr_filepath)
 
         self.pynit = PyNIT(nuc_filepath, bpr_filepath)
 

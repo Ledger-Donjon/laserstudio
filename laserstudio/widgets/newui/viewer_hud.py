@@ -1,7 +1,7 @@
 """HUD overlay drawn on top of the spatial viewer."""
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, Qt
+from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QWidget
 
@@ -171,8 +171,8 @@ class ViewerArea(QWidget):
 
     def fit_view(self) -> None:
         """Frame the stage sight, or the full scene when a reference image exists."""
-        self.viewer.fit_view()
-        self.update_scale_from_viewer()
+        self.viewer.schedule_fit_view()
+        QTimer.singleShot(0, self.update_scale_from_viewer)
 
     def resizeEvent(self, a0) -> None:  # noqa: N802
         super().resizeEvent(a0)
@@ -186,10 +186,11 @@ class ViewerArea(QWidget):
                 self.hud.raise_()
         else:
             self.hud.raise_()
-        self.update_scale_from_viewer()
+        QTimer.singleShot(0, self.update_scale_from_viewer)
 
     def showEvent(self, a0) -> None:  # noqa: N802
         super().showEvent(a0)
+        self.fit_view()
 
     def show_distortion_overlay(self):
         from .distortion_overlay import DistortionOverlay

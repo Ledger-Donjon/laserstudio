@@ -42,12 +42,7 @@ class Workspace:
 
 def placeholder_panel(label: str) -> QWidget:
     """A simple 'not yet implemented' left panel, used by unfinished workspaces."""
-    scroll = QScrollArea()
-    scroll.setWidgetResizable(True)
-    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    scroll.setStyleSheet(
-        f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
-    )
+    scroll = theme.setup_scroll_area(QScrollArea())
     inner = theme.panel_inner()
     layout = QVBoxLayout(inner)
     layout.setContentsMargins(18, 18, 18, 18)

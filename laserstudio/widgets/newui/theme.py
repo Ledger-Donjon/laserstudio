@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QSplitterHandle,
@@ -46,11 +47,43 @@ GREEN_BG = "rgba(110,200,92,0.12)"
 # Sidebar panel layout — vertical Minimum (never Maximum) prevents Qt from
 # crushing controls when the column is resized.
 PANEL_INNER = "ls-panel-inner"
-SIDEBAR_CONTENT_MIN = 288
+SIDEBAR_MARGIN_H = 18
+SCROLLBAR_WIDTH = 8
+# Usable content in the 320 px design column: 320 − margins − scrollbar.
+SIDEBAR_CONTENT_MIN = 320 - 2 * SIDEBAR_MARGIN_H - SCROLLBAR_WIDTH
+SIDEBAR_MIN_WIDTH = SIDEBAR_CONTENT_MIN + 2 * SIDEBAR_MARGIN_H + SCROLLBAR_WIDTH
 # Compact sidebar controls — design uses padding-only sizing (~28px total).
 # Do not stack min-height + vertical padding (Qt doubles the effective height).
 CONTROL_MIN_H = 28
 BTN_MIN_H = 28
+
+_SCROLLBAR_SS = f"""
+QScrollBar:vertical {{
+    background: transparent;
+    width: {SCROLLBAR_WIDTH}px;
+    margin: 6px 0;
+    border: none;
+}}
+QScrollBar::handle:vertical {{
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    min-height: 32px;
+}}
+QScrollBar::handle:vertical:hover {{
+    background: rgba(255, 255, 255, 0.24);
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+    border: none;
+    background: none;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
+}}
+QScrollBar:horizontal {{
+    height: 0;
+}}
+"""
 
 SIDEBAR_SS = f"""
 QStackedWidget#ls-sidebar {{
@@ -64,7 +97,28 @@ QStackedWidget#ls-sidebar QDoubleSpinBox {{
     max-height: {CONTROL_MIN_H}px;
     padding: 5px 10px;
 }}
+QStackedWidget#ls-sidebar {_SCROLLBAR_SS}
 """
+
+
+def scroll_area_stylesheet(*, background: str = BG_PANEL) -> str:
+    """Stylesheet for sidebar scroll areas — thin dark scrollbar, no arrows."""
+    return (
+        f"QScrollArea {{ border: none; background: {background}; }}"
+        f"{_SCROLLBAR_SS}"
+    )
+
+
+def setup_scroll_area(
+    scroll: QScrollArea, *, background: str = BG_PANEL
+) -> QScrollArea:
+    """Configure a sidebar scroll area with consistent scrollbar styling."""
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    scroll.setStyleSheet(scroll_area_stylesheet(background=background))
+    return scroll
 
 # ── Reusable stylesheets ─────────────────────────────────────────────────────
 # Segmented-control tab: active = purple fill + black text (per design).

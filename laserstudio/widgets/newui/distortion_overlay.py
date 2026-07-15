@@ -35,6 +35,7 @@ from . import lucide, theme
 
 if TYPE_CHECKING:
     from ...instruments.camera import CameraInstrument
+    from ..stagesight import StageSight
     from ..viewer import Viewer
 
 _SIDEBAR_W = 300
@@ -58,8 +59,6 @@ QPushButton {{
     color: {theme.TEXT};
     border: 1px solid {theme.BORDER};
     border-radius: 5px;
-    min-width: {_MODAL_CELL}px;
-    max-width: {_MODAL_CELL}px;
     min-height: {_MODAL_CELL}px;
     max-height: {_MODAL_CELL}px;
     padding: 0;
@@ -75,8 +74,6 @@ QPushButton {{
     border-radius: 5px;
     font-family: monospace;
     font-size: 10px;
-    min-width: {_MODAL_CELL}px;
-    max-width: {_MODAL_CELL}px;
     min-height: {_MODAL_CELL}px;
     max-height: {_MODAL_CELL}px;
     padding: 0;
@@ -111,7 +108,9 @@ class _AspectRatioHost(QWidget):
     def __init__(self, ratio_w: int, ratio_h: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._ratio = ratio_w / ratio_h
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
 
     def hasHeightForWidth(self) -> bool:
         return True
@@ -120,7 +119,18 @@ class _AspectRatioHost(QWidget):
         return max(1, int(width / self._ratio))
 
     def sizeHint(self) -> QSize:
-        return QSize(280, int(280 / self._ratio))
+        w = self.width() if self.width() > 0 else 280
+        return QSize(w, self.heightForWidth(w))
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, self.heightForWidth(120))
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        w = max(self.width(), 1)
+        target_h = self.heightForWidth(w)
+        if self.height() != target_h:
+            self.setFixedHeight(target_h)
+        super().resizeEvent(event)
 
 
 _ZOOM_MIN = 0.25
@@ -309,12 +319,40 @@ class _CameraFeedPane(_ZoomPanViewport):
     """Live camera preview with design crosshair — does not steal stage_sight from viewer."""
 
     def __init__(
-        self, camera: CameraInstrument | None, parent: QWidget | None = None
+        self,
+        camera: CameraInstrument | None,
+        stage_sight: StageSight | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(cover=True, padding=0, bg_color=_CAMERA_BG, parent=parent)
         self._camera = camera
         if camera is not None:
             camera.new_image.connect(self._on_image)
+        self.seed_from_stage_sight(stage_sight)
+
+    def seed_from_stage_sight(self, stage_sight: StageSight | None) -> None:
+        """Show the last frame already displayed in the main viewer."""
+        if stage_sight is None:
+            return
+        pix = stage_sight.image.pixmap()
+        if pix is not None and not pix.isNull():
+            self._pixmap = pix.copy()
+            self._zoom = 1.0
+            self._pan = QPointF(0.0, 0.0)
+            self.update()
+            return
+        camera = stage_sight.camera
+        if camera is None:
+            return
+        try:
+            from PIL import ImageQt
+
+            pil = camera.get_last_pil_image()
+            qimage = ImageQt.ImageQt(pil)
+            if isinstance(qimage, QImage):
+                self.set_pixmap(QPixmap.fromImage(qimage.copy()))
+        except Exception:
+            return
 
     def _on_image(self, image: QImage) -> None:
         if self._pixmap is None:
@@ -322,6 +360,25 @@ class _CameraFeedPane(_ZoomPanViewport):
         else:
             self._pixmap = QPixmap.fromImage(image.copy())
             self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(self._bg_color))
+        area = self._content_area()
+        img_rect = self._image_rect()
+
+        painter.save()
+        painter.setClipRect(area)
+        if self._pixmap is not None and not self._pixmap.isNull() and img_rect is not None:
+            x, y, w, h = img_rect
+            painter.drawPixmap(
+                QRectF(x, y, w, h),
+                self._pixmap,
+                QRectF(0, 0, self._pixmap.width(), self._pixmap.height()),
+            )
+        self._paint_overlay(painter, img_rect)
+        painter.restore()
+        painter.end()
 
     def _restore_cursor(self) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -331,14 +388,28 @@ class _CameraFeedPane(_ZoomPanViewport):
         painter: QPainter,
         img_rect: tuple[float, float, float, float] | None,
     ) -> None:
-        cx, cy = self.width() / 2, self.height() / 2
+        # Reticle tracks the camera image centre (moves with zoom/pan), not the
+        # widget centre — so panning the view drags image + crosshair together.
+        if img_rect is not None:
+            x, y, w, h = img_rect
+            cx = x + w / 2
+            cy = y + h / 2
+            arm = max(14.0, min(w, h) * 0.07)
+            radius = arm * 0.45
+        else:
+            area = self._content_area()
+            cx = area.x() + area.width() / 2
+            cy = area.y() + area.height() / 2
+            arm = 20.0
+            radius = 9.0
+
         pen = QPen(QColor(_CAMERA_BLUE))
         pen.setWidth(1)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawLine(int(cx - 20), int(cy), int(cx + 20), int(cy))
-        painter.drawLine(int(cx), int(cy - 20), int(cx), int(cy + 20))
-        painter.drawEllipse(QPointF(cx, cy), 9, 9)
+        painter.drawLine(int(cx - arm), int(cy), int(cx + arm), int(cy))
+        painter.drawLine(int(cx), int(cy - arm), int(cx), int(cy + arm))
+        painter.drawEllipse(QPointF(cx, cy), radius, radius)
 
 
 class _ReferenceImagePane(_ZoomPanViewport):
@@ -434,12 +505,15 @@ class _ModalJogPanel(QWidget):
         grid.setHorizontalSpacing(_MODAL_GAP)
         grid.setVerticalSpacing(_MODAL_GAP)
 
+        btn_policy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        btn_size = QSize(_MODAL_CELL, _MODAL_CELL)
+
         if self._num_axis > 1:
             grid.addWidget(self._arrow_btn("arrow-up", Direction.up), 0, 1)
         if self._num_axis > 0:
             grid.addWidget(self._arrow_btn("arrow-left", Direction.left), 1, 0)
             spacer = QWidget()
-            spacer.setFixedSize(_MODAL_CELL, _MODAL_CELL)
+            spacer.setFixedSize(btn_size)
             spacer.setStyleSheet("background: transparent;")
             grid.addWidget(spacer, 1, 1)
             grid.addWidget(self._arrow_btn("arrow-right", Direction.right), 1, 2)
@@ -448,6 +522,15 @@ class _ModalJogPanel(QWidget):
         if self._num_axis > 2:
             grid.addWidget(self._z_btn("Z+", Direction.zup), 0, 2)
             grid.addWidget(self._z_btn("Z−", Direction.zdown), 2, 2)
+
+        for i in range(grid.count()):
+            item = grid.itemAt(i)
+            if item is None:
+                continue
+            widget = item.widget()
+            if isinstance(widget, QPushButton):
+                widget.setFixedSize(btn_size)
+                widget.setSizePolicy(btn_policy)
 
         root.addWidget(pad, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -643,7 +726,7 @@ class DistortionOverlay(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        title = QLabel("Distortion — Quad-to-Quad alignment")
+        title = QLabel("Reference alignment — 3-point affine")
         title.setStyleSheet(
             f"color: {theme.TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
             " font-size: 15px; background: transparent;"
@@ -672,13 +755,8 @@ class DistortionOverlay(QWidget):
         return row
 
     def _build_sidebar(self) -> QScrollArea:
-        scroll = QScrollArea()
+        scroll = theme.setup_scroll_area(QScrollArea(), background="transparent")
         scroll.setFixedWidth(_SIDEBAR_W)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(
-            "QScrollArea { border: none; background: transparent; }"
-        )
 
         side = QWidget()
         side.setStyleSheet("background: transparent;")
@@ -707,8 +785,9 @@ class DistortionOverlay(QWidget):
         )
         self._camera_pane: _CameraFeedPane | None = None
         if camera is not None:
-            self._camera_pane = _CameraFeedPane(camera, cam_frame)
-            cam_inner.addWidget(self._camera_pane)
+            stage_sight = self._viewer.stage_sight
+            self._camera_pane = _CameraFeedPane(camera, stage_sight, cam_frame)
+            cam_inner.addWidget(self._camera_pane, 1)
         else:
             ph = QLabel("No camera available")
             ph.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -804,7 +883,7 @@ class DistortionOverlay(QWidget):
 
         layout.addStretch()
 
-        self._apply_btn = QPushButton("Apply distortion")
+        self._apply_btn = QPushButton("Apply alignment")
         self._apply_btn.setFixedHeight(theme.BTN_MIN_H)
         self._apply_btn.setIcon(lucide.icon("check", 14, theme.GREEN))
         self._apply_btn.setStyleSheet(
@@ -838,6 +917,7 @@ class DistortionOverlay(QWidget):
             return
         self._ref_pane.set_pixmap(viewer.background_pixmap())
         if self._camera_pane is not None:
+            self._camera_pane.seed_from_stage_sight(viewer.stage_sight)
             self._camera_pane.reset_view()
         self._working.clear()
         self._saved_transform = viewer.background_picture_transform()

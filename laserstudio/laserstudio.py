@@ -96,7 +96,7 @@ class LaserStudio(QMainWindow):
                 self.instruments.camera,
                 self.instruments.probes + [*self.instruments.lasers],
             )
-            self.viewer.fit_view()
+            self.viewer.schedule_fit_view()
 
         # Create group of buttons for Viewer mode selection
         self.viewer_buttons_group = group = QButtonGroup(self)

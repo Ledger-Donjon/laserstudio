@@ -252,6 +252,12 @@ QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
     border: 1px solid {theme.PURPLE_BORDER};
 }}
 QLineEdit:read-only {{ color: {theme.TEXT_MUTED}; }}
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled,
+QComboBox:disabled {{
+    color: {theme.TEXT_MUTED};
+    background: rgba(255,255,255,0.02);
+    border: 1px solid {theme.BORDER_SUBTLE};
+}}
 QComboBox::drop-down {{ border: none; width: 20px; }}
 QComboBox QAbstractItemView {{
     background: {theme.BG_CARD};
@@ -297,6 +303,7 @@ class SchemaField(QWidget):
         box.addWidget(label)
 
         control = self._build_control(subschema, value)
+        self._control = control
         box.addWidget(control)
 
     # ── control construction ────────────────────────────────────────────────
@@ -401,6 +408,12 @@ class SchemaField(QWidget):
 
     def value(self) -> Any:
         return self._getter()
+
+    def set_editing(self, editing: bool) -> None:
+        """Enable interaction only in edit mode. Read-only fields (const,
+        unsupported types) stay as they are — displayed but never editable."""
+        if self.editable:
+            self._control.setEnabled(editing)
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────

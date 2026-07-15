@@ -1,6 +1,7 @@
 """Settings workspace — sub-category panels (camera, positioning, focus, …)."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Callable
 
@@ -32,9 +33,18 @@ from ...instruments.shutter import ShutterInstrument
 from ...instruments.stage import StageInstrument, Vector
 from ..keyboardbox import Direction
 from ..newui import lucide, theme
+from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..viewer import Viewer
 from .schemaform import ToggleSwitch, _INPUT_SS
 from .workspace import Workspace
+
+# PDM lasers are optional (require the pypdm driver); import defensively so the
+# whole Settings UI still loads if the driver is unavailable.
+try:
+    from ...instruments.pdm import PDMInstrument, InterlockStatus
+except Exception:  # pragma: no cover - pypdm is an optional dependency
+    PDMInstrument = None  # type: ignore[assignment,misc]
+    InterlockStatus = None  # type: ignore[assignment,misc]
 
 # Fixed tabs header + scrollable sub-panel content; see build_panel.
 _DPAD_CELL = 44
@@ -50,9 +60,7 @@ QPushButton {{
     color: {theme.TEXT};
     border: 1px solid {theme.BORDER};
     border-radius: 5px;
-    min-width: {_DPAD_CELL}px;
     min-height: 40px;
-    max-width: {_DPAD_CELL}px;
     padding: 0;
 }}
 QPushButton:hover {{ background: rgba(255,255,255,0.09); }}
@@ -72,9 +80,7 @@ QPushButton {{
     border-radius: 5px;
     font-family: monospace;
     font-size: 11px;
-    min-width: {_DPAD_CELL}px;
     min-height: 40px;
-    max-width: {_DPAD_CELL}px;
     padding: 0;
 }}
 QPushButton:hover {{ background: rgba(212,160,255,0.20); }}
@@ -140,12 +146,51 @@ _SHUTTER_CLOSED = theme.ACCENT
 _SHUTTER_CLOSED_BG = "rgba(255,83,0,0.12)"
 _SHUTTER_CLOSED_BORDER = "rgba(255,83,0,0.40)"
 
-_SHUTTER_BTN_SS = f"""
-QWidget#ls-shutter-row QPushButton {{
-    background-color: {theme.BG_CARD};
-    color: {theme.TEXT_MUTED};
-    border: 1px solid {theme.BORDER};
+# Laser ARM button — subtle accent when safe, filled accent when armed.
+_LASER_ARM_SAFE_SS = f"""
+QPushButton {{
+    background: rgba(255,83,0,0.10);
+    color: {theme.ACCENT};
+    border: 1px solid rgba(255,83,0,0.50);
     border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-weight: 700;
+    font-size: 12px;
+    padding: 6px 14px;
+    min-height: 0;
+    max-height: {theme.BTN_MIN_H}px;
+}}
+QPushButton:hover {{ background: rgba(255,83,0,0.18); }}
+"""
+_LASER_ARM_ARMED_SS = f"""
+QPushButton {{
+    background: {theme.ACCENT};
+    color: #0A0A0A;
+    border: 1px solid {theme.ACCENT};
+    border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-weight: 700;
+    font-size: 12px;
+    padding: 6px 14px;
+    min-height: 0;
+    max-height: {theme.BTN_MIN_H}px;
+}}
+QPushButton:hover {{ background: #FF6A26; }}
+"""
+
+# Segmented control (design): a rounded container holding two borderless
+# buttons that fill with a tint when active.
+_SHUTTER_BTN_SS = f"""
+QWidget#ls-shutter-row {{
+    background-color: {theme.BG_CARD};
+    border: 1px solid {theme.BORDER};
+    border-radius: 6px;
+}}
+QWidget#ls-shutter-row QPushButton {{
+    background-color: transparent;
+    color: {theme.TEXT_MUTED};
+    border: none;
+    border-radius: 4px;
     font-family: "Brut Grotesque";
     font-weight: 700;
     font-size: 11px;
@@ -154,18 +199,16 @@ QWidget#ls-shutter-row QPushButton {{
     max-height: {theme.CONTROL_MIN_H}px;
 }}
 QWidget#ls-shutter-row QPushButton:hover {{
-    background-color: rgba(255,255,255,0.06);
+    background-color: rgba(255,255,255,0.05);
     color: {theme.TEXT};
 }}
 QWidget#ls-shutter-row QPushButton#ls-shutter-open:checked {{
     background-color: {_SHUTTER_OPEN_BG};
     color: {_SHUTTER_OPEN};
-    border: 1px solid {_SHUTTER_OPEN_BORDER};
 }}
 QWidget#ls-shutter-row QPushButton#ls-shutter-closed:checked {{
     background-color: {_SHUTTER_CLOSED_BG};
     color: {_SHUTTER_CLOSED};
-    border: 1px solid {_SHUTTER_CLOSED_BORDER};
 }}
 """
 
@@ -448,8 +491,8 @@ class _ShutterSection(QWidget):
         row.setObjectName("ls-shutter-row")
         row.setStyleSheet(_SHUTTER_BTN_SS)
         btn_layout = QHBoxLayout(row)
-        btn_layout.setContentsMargins(0, 0, 0, 0)
-        btn_layout.setSpacing(8)
+        btn_layout.setContentsMargins(3, 3, 3, 3)
+        btn_layout.setSpacing(6)
 
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
@@ -459,20 +502,14 @@ class _ShutterSection(QWidget):
         self._open_btn = QPushButton("Open")
         self._open_btn.setObjectName("ls-shutter-open")
         self._open_btn.setCheckable(True)
-        self._open_btn.setIcon(
-            lucide.svg_file_icon(str(_ICONS_DIR / "shutter-open.svg"), 14)
-        )
-        self._open_btn.setIconSize(QSize(14, 14))
+        self._open_btn.setIconSize(QSize(13, 13))
         self._open_btn.setFixedHeight(_FIELD_CONTROL_H)
         self._open_btn.setSizePolicy(btn_policy)
 
         self._closed_btn = QPushButton("Closed")
         self._closed_btn.setObjectName("ls-shutter-closed")
         self._closed_btn.setCheckable(True)
-        self._closed_btn.setIcon(
-            lucide.svg_file_icon(str(_ICONS_DIR / "shutter-closed.svg"), 14)
-        )
-        self._closed_btn.setIconSize(QSize(14, 14))
+        self._closed_btn.setIconSize(QSize(13, 13))
         self._closed_btn.setFixedHeight(_FIELD_CONTROL_H)
         self._closed_btn.setSizePolicy(btn_policy)
 
@@ -500,6 +537,22 @@ class _ShutterSection(QWidget):
             btn.blockSignals(True)
             btn.setChecked(checked)
             btn.blockSignals(False)
+        # Icons follow the active state colour (green open / orange closed),
+        # muted otherwise — matching the button text colour like the design.
+        self._open_btn.setIcon(
+            lucide.icon(
+                "circle-dot",
+                13,
+                _SHUTTER_OPEN if open_state else theme.TEXT_MUTED,
+            )
+        )
+        self._closed_btn.setIcon(
+            lucide.icon(
+                "circle",
+                13,
+                _SHUTTER_CLOSED if not open_state else theme.TEXT_MUTED,
+            )
+        )
         if open_state:
             self._status_lbl.setText("OPEN")
             self._status_lbl.setStyleSheet(
@@ -512,6 +565,269 @@ class _ShutterSection(QWidget):
                 f"color: {_SHUTTER_CLOSED}; font-family: monospace; font-size: 10px;"
                 " letter-spacing: 1px; background: transparent;"
             )
+
+
+class _LaserSection(QWidget):
+    """Controls for one laser: ARM (on/off), pulse power, offset current,
+    pulse width and delay, plus read-only interlock status and temperature.
+
+    Behaviour mirrors the classic PDM dock (``PDMDockWidget``): editable numeric
+    values are applied on Enter (not on every keystroke) to avoid flooding the
+    device, and the widgets track the instrument via ``parameter_changed``.
+    Sweep controls are intentionally omitted for now.
+    """
+
+    def __init__(self, laser: Any, index: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._laser = laser
+        self._is_pdm = PDMInstrument is not None and isinstance(laser, PDMInstrument)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(PANEL_SPACING)
+
+        # Header: zap icon + name + driver tag.
+        header = QWidget()
+        header.setStyleSheet("background: transparent;")
+        head = QHBoxLayout(header)
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(9)
+        icon = QLabel()
+        icon.setPixmap(lucide.pixmap("zap", 16, theme.PURPLE))
+        icon.setFixedWidth(20)
+        icon.setStyleSheet("background: transparent;")
+        head.addWidget(icon)
+        title = QLabel(laser.label or f"Laser {index + 1}")
+        title.setStyleSheet(
+            f"color: {theme.TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
+            " font-size: 15px; background: transparent;"
+        )
+        head.addWidget(title)
+        head.addStretch()
+        driver = type(laser).__name__.replace("Instrument", "").upper()
+        driver_lbl = QLabel(driver)
+        driver_lbl.setStyleSheet(_MONO_DIM)
+        head.addWidget(driver_lbl)
+        root.addWidget(header)
+
+        if not self._is_pdm:
+            note = QLabel("This laser type is managed in the classic interface.")
+            note.setWordWrap(True)
+            note.setStyleSheet(
+                f"color: {theme.TEXT_DIM}; font-size: 11px; background: transparent;"
+            )
+            root.addWidget(note)
+            return
+
+        # ARM status + toggle (the on/off of the classic UI).
+        arm_row = QWidget()
+        arm_row.setStyleSheet("background: transparent;")
+        arm_layout = QHBoxLayout(arm_row)
+        arm_layout.setContentsMargins(0, 0, 0, 0)
+        arm_layout.setSpacing(9)
+        self._arm_status = QLabel("ARM · SAFE")
+        arm_layout.addWidget(self._arm_status)
+        arm_layout.addStretch()
+        self._arm_btn = QPushButton("ARM")
+        self._arm_btn.setCheckable(True)
+        self._arm_btn.setIconSize(QSize(14, 14))
+        self._arm_btn.setToolTip("Arm / disarm the laser (ON / OFF)")
+        self._arm_btn.clicked.connect(self._on_arm_clicked)
+        arm_layout.addWidget(self._arm_btn)
+        root.addWidget(arm_row)
+
+        # Interlock status (read-only).
+        self._interlock_val = QLabel("—")
+        root.addWidget(self._status_card("INTERLOCK", self._interlock_val))
+
+        # Pulse power (%) + offset current (mA).
+        self._power_spin = self._double_field(0.0, 100.0, 2, "\xa0%")
+        self._power_spin.returnPressed2.connect(
+            lambda: self._apply("current_percentage", self._power_spin.value())
+        )
+        self._offset_spin = self._double_field(0.0, 150.0, 3, "\xa0mA")
+        self._offset_spin.returnPressed2.connect(
+            lambda: self._apply("offset_current", self._offset_spin.value())
+        )
+        root.addWidget(
+            _two_col_param_grid([
+                ("PULSE POWER", self._power_spin),
+                ("OFFSET CURRENT", self._offset_spin),
+            ])
+        )
+
+        # Pulse width (ps) + delay (ps).
+        self._pw_spin = self._int_field(0, 1275000, "\xa0ps")
+        self._pw_spin.returnPressed2.connect(
+            lambda: self._apply("pulse_width", self._pw_spin.value())
+        )
+        self._delay_spin = self._int_field(0, 15000, "\xa0ps")
+        self._delay_spin.returnPressed2.connect(
+            lambda: self._apply("delay", self._delay_spin.value())
+        )
+        root.addWidget(
+            _two_col_param_grid([
+                ("PULSE WIDTH", self._pw_spin),
+                ("DELAY", self._delay_spin),
+            ])
+        )
+
+        # Temperature (read-only).
+        self._temp_field = _readout_field("—")
+        root.addWidget(_param_grid_cell("TEMPERATURE", self._temp_field))
+
+        hint = QLabel("Numeric values are applied when you press Enter.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
+        )
+        root.addWidget(hint)
+
+        laser.parameter_changed.connect(self._on_param)
+        self._refresh_all()
+
+    # ── construction helpers ──────────────────────────────────────────────────
+    def _status_card(self, label: str, value_lbl: QLabel) -> QWidget:
+        card = QWidget()
+        card.setFixedHeight(theme.BTN_MIN_H)
+        card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        card.setStyleSheet(
+            f"background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
+            " border-radius: 5px;"
+        )
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(10, 0, 10, 0)
+        key = QLabel(label)
+        key.setStyleSheet(_MONO_MUTED)
+        lay.addWidget(key)
+        lay.addStretch()
+        value_lbl.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-family: monospace; font-size: 11px;"
+            " background: transparent;"
+        )
+        lay.addWidget(value_lbl)
+        return card
+
+    def _double_field(
+        self, minimum: float, maximum: float, decimals: int, suffix: str
+    ) -> ReturnDoubleSpinBox:
+        spin = ReturnDoubleSpinBox()
+        spin.setStyleSheet(_INPUT_SS)
+        spin.setFixedHeight(_FIELD_CONTROL_H)
+        spin.setMinimum(minimum)
+        spin.setMaximum(maximum)
+        spin.setDecimals(decimals)
+        spin.setSuffix(suffix)
+        spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        return spin
+
+    def _int_field(
+        self, minimum: int, maximum: int, suffix: str
+    ) -> ReturnSpinBox:
+        spin = ReturnSpinBox()
+        spin.setStyleSheet(_INPUT_SS)
+        spin.setFixedHeight(_FIELD_CONTROL_H)
+        spin.setMinimum(minimum)
+        spin.setMaximum(maximum)
+        spin.setSuffix(suffix)
+        spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        return spin
+
+    # ── device interaction ────────────────────────────────────────────────────
+    def _apply(self, attr: str, value: float) -> None:
+        try:
+            setattr(self._laser, attr, value)
+        except Exception as exc:  # keep the UI responsive on device errors
+            logging.getLogger("laserstudio").warning(
+                f"Failed to set laser {attr}: {exc}"
+            )
+
+    def _on_arm_clicked(self) -> None:
+        try:
+            self._laser.on_off = self._arm_btn.isChecked()
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                f"Failed to toggle laser: {exc}"
+            )
+        self._sync_arm()
+
+    def _sync_arm(self, on: bool | None = None) -> None:
+        if on is None:
+            on = bool(self._arm_btn.isChecked())
+        self._arm_btn.blockSignals(True)
+        self._arm_btn.setChecked(on)
+        self._arm_btn.blockSignals(False)
+        self._arm_btn.setText("ARMED" if on else "ARM")
+        self._arm_btn.setStyleSheet(
+            _LASER_ARM_ARMED_SS if on else _LASER_ARM_SAFE_SS
+        )
+        self._arm_btn.setIcon(
+            lucide.icon("zap", 14, "#0A0A0A" if on else theme.ACCENT)
+        )
+        self._arm_status.setText(f"ARM · {'ARMED' if on else 'SAFE'}")
+        self._arm_status.setStyleSheet(
+            f"color: {theme.ACCENT if on else theme.GREEN};"
+            " font-family: monospace; font-size: 10px; letter-spacing: 1px;"
+            " background: transparent;"
+        )
+
+    def _set_interlock(self, status: Any) -> None:
+        is_open = InterlockStatus is not None and status == InterlockStatus.OPEN
+        self._interlock_val.setText("OPEN" if is_open else "CLOSED")
+        self._interlock_val.setStyleSheet(
+            f"color: {theme.ACCENT if is_open else theme.GREEN};"
+            " font-family: monospace; font-size: 11px; background: transparent;"
+        )
+        self._interlock_val.setToolTip("Laser safety interlock loop status")
+
+    def _set_spin(self, spin: ReturnDoubleSpinBox | ReturnSpinBox, value: Any) -> None:
+        if value is None:
+            return
+        spin.blockSignals(True)
+        spin.setValue(value)
+        spin.blockSignals(False)
+        spin.reset()
+
+    def _refresh_temperature(self) -> None:
+        try:
+            self._temp_field.setText(f"{self._laser.temperature:.2f}\xa0°C")
+        except Exception:
+            pass
+
+    def _on_param(self, name: str, value: Any) -> None:
+        if name == "on_off":
+            self._sync_arm(bool(value))
+        elif name == "current_percentage":
+            self._set_spin(self._power_spin, value)
+        elif name == "offset_current":
+            self._set_spin(self._offset_spin, value)
+        elif name == "pulse_width":
+            self._set_spin(self._pw_spin, value)
+        elif name == "delay":
+            self._set_spin(self._delay_spin, value)
+        elif name == "interlock_status":
+            self._set_interlock(value)
+        # Temperature has no dedicated signal; refresh it opportunistically.
+        self._refresh_temperature()
+
+    def _refresh_all(self) -> None:
+        def safe(getter: Callable[[], Any]) -> Any:
+            try:
+                return getter()
+            except Exception:
+                return None
+
+        laser = self._laser
+        on = safe(lambda: laser.on_off)
+        self._sync_arm(bool(on) if on is not None else False)
+        self._set_spin(self._power_spin, safe(lambda: laser.current_percentage))
+        self._set_spin(self._offset_spin, safe(lambda: laser.offset_current))
+        self._set_spin(self._pw_spin, safe(lambda: laser.pulse_width))
+        self._set_spin(self._delay_spin, safe(lambda: laser.delay))
+        interlock = safe(lambda: laser.interlock_status)
+        if interlock is not None:
+            self._set_interlock(interlock)
+        self._refresh_temperature()
 
 
 class _SubPanelStack(QStackedWidget):
@@ -611,9 +927,8 @@ class DpadWidget(QWidget):
         self._num_axis = stage.num_axis
         self._displacement_xy = 100.0
         self._displacement_z = 10.0
-        self.setMinimumWidth(_DPAD_MIN_WIDTH)
         self.setSizePolicy(
-            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
 
         root = QVBoxLayout(self)
@@ -622,9 +937,11 @@ class DpadWidget(QWidget):
 
         pad = QWidget()
         pad.setStyleSheet("background: transparent;")
-        pad.setMinimumWidth(_DPAD_MIN_WIDTH)
+        # +2 keeps a 1px margin around the grid so the outermost buttons'
+        # borders are never clipped at the pad's edge.
+        pad.setFixedWidth(_DPAD_MIN_WIDTH + 2)
         grid = QGridLayout(pad)
-        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setContentsMargins(1, 1, 1, 1)
         grid.setHorizontalSpacing(_DPAD_GAP)
         grid.setVerticalSpacing(_DPAD_GAP)
 
@@ -660,6 +977,7 @@ class DpadWidget(QWidget):
 
         pad_wrap = QHBoxLayout()
         pad_wrap.setContentsMargins(0, 0, 0, 0)
+        pad_wrap.addStretch()
         pad_wrap.addWidget(pad)
         pad_wrap.addStretch()
         root.addLayout(pad_wrap)
@@ -760,6 +1078,7 @@ class SettingsWorkspace(Workspace):
         self._ref_set_dist_btn: QPushButton | None = None
         self._ref_reset_btn: QPushButton | None = None
         self._ref_status_val: QLabel | None = None
+        self._ref_cam_status_val: QLabel | None = None
         self._distortion_wired = False
 
     def build_panel(self) -> QWidget:
@@ -769,9 +1088,12 @@ class SettingsWorkspace(Workspace):
         root = QWidget()
         root.setObjectName(theme.PANEL_INNER)
         root.setStyleSheet(f"background: {theme.BG_PANEL};")
-        root.setMinimumWidth(theme.SIDEBAR_CONTENT_MIN)
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(18, 18, 18, 0)
+        # Right margin is slightly smaller — the scroll area's thin scrollbar
+        # occupies the remaining edge without clipping panel controls.
+        root_layout.setContentsMargins(
+            theme.SIDEBAR_MARGIN_H, 18, theme.SIDEBAR_MARGIN_H - 6, 0
+        )
         root_layout.setSpacing(PANEL_SPACING)
 
         root_layout.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
@@ -798,20 +1120,13 @@ class SettingsWorkspace(Workspace):
         scroll_content = QWidget()
         scroll_content.setStyleSheet(f"background: {theme.BG_PANEL};")
         sc_layout = QVBoxLayout(scroll_content)
-        sc_layout.setContentsMargins(0, 0, 0, 18)
+        sc_layout.setContentsMargins(0, 0, 4, 18)
         sc_layout.setSpacing(0)
         sc_layout.addWidget(self._sub_stack, 0, Qt.AlignmentFlag.AlignTop)
         sc_layout.addStretch(1)
 
-        scroll = QScrollArea()
+        scroll = theme.setup_scroll_area(QScrollArea())
         scroll.setWidget(scroll_content)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setStyleSheet(
-            f"QScrollArea {{ border: none; background: {theme.BG_PANEL}; }}"
-        )
         root_layout.addWidget(scroll, 1)
 
         self._select_sub("camera")
@@ -854,14 +1169,17 @@ class SettingsWorkspace(Workspace):
             return panel
 
         # Objective + pixel size — compact 2-column grid (design).
+        # Each entry carries a microscope-objective icon whose coloured band is
+        # the physical magnification ring (kept identical to the classic UI).
         self._objective_combo = combo = QComboBox()
         combo.setStyleSheet(_INPUT_SS)
         combo.setFixedHeight(_FIELD_CONTROL_H)
+        combo.setIconSize(QSize(20, 20))
         combo.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
         for mag in available_objectives(camera):
-            combo.addItem(f"{mag:g}×", mag)
+            combo.addItem(lucide.objective_icon(mag, 20), f"{mag:g}×", mag)
             if abs(mag - camera.objective) < 0.01:
                 combo.setCurrentIndex(combo.count() - 1)
         combo.currentIndexChanged.connect(self._on_objective_changed)
@@ -1120,7 +1438,7 @@ class SettingsWorkspace(Workspace):
         layout.addWidget(self._ref_opacity)
 
         layout.addWidget(theme.separator())
-        layout.addWidget(theme.section_title("Distortion", "spline"))
+        layout.addWidget(theme.section_title("Reference alignment", "move-3d"))
 
         status_row = QWidget()
         status_row.setFixedHeight(theme.BTN_MIN_H)
@@ -1133,7 +1451,7 @@ class SettingsWorkspace(Workspace):
         )
         status_layout = QHBoxLayout(status_row)
         status_layout.setContentsMargins(10, 0, 10, 0)
-        key = QLabel("TRANSFORM")
+        key = QLabel("ALIGNMENT")
         key.setStyleSheet(_MONO_MUTED)
         status_layout.addWidget(key)
         status_layout.addStretch()
@@ -1154,31 +1472,94 @@ class SettingsWorkspace(Workspace):
         dist_layout.setContentsMargins(0, 0, 0, 0)
         dist_layout.setSpacing(8)
 
-        set_btn = _sidebar_btn(QPushButton("Set distortion"))
+        set_btn = _sidebar_btn(QPushButton("Align image…"))
         set_btn.setObjectName("ls-dist-set")
-        set_btn.setIcon(lucide.icon("spline", 14, theme.PURPLE))
+        set_btn.setIcon(lucide.icon("move-3d", 14, theme.PURPLE))
         set_btn.setStyleSheet(_DIST_SET_BTN)
+        set_btn.setToolTip(
+            "Place 3 matching points to align the reference image with the stage."
+        )
         set_btn.clicked.connect(self._open_distortion_overlay)
         self._ref_set_dist_btn = set_btn
         dist_layout.addWidget(set_btn, stretch=1)
 
-        reset_btn = _sidebar_btn(QPushButton("Reset"))
+        reset_btn = _sidebar_btn(QPushButton("Reset alignment"))
         reset_btn.setStyleSheet(theme.GHOST_BTN)
+        reset_btn.setToolTip("Remove the reference image alignment transform.")
         reset_btn.clicked.connect(self._reset_reference_distortion)
         self._ref_reset_btn = reset_btn
         dist_layout.addWidget(reset_btn)
         layout.addWidget(dist_row)
 
-        hint = QLabel(
-            "Affine alignment from 3 matching points between the reference "
-            "image and the stage (or scene coordinates without hardware)."
+        align_hint = QLabel(
+            "Maps the reference image onto the stage using 3 matching points "
+            "(affine transform). Does not correct the live camera feed."
         )
-        hint.setWordWrap(True)
-        hint.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        hint.setStyleSheet(
+        align_hint.setWordWrap(True)
+        align_hint.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
+        align_hint.setStyleSheet(
             f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
         )
-        layout.addWidget(hint)
+        layout.addWidget(align_hint)
+
+        camera = self._window.instruments.camera
+        if camera is not None:
+            layout.addWidget(theme.separator())
+            layout.addWidget(
+                theme.section_title("Camera distortion correction", "grid-3x3")
+            )
+
+            cam_status_row = QWidget()
+            cam_status_row.setFixedHeight(theme.BTN_MIN_H)
+            cam_status_row.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+            )
+            cam_status_row.setStyleSheet(
+                f"background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
+                " border-radius: 5px;"
+            )
+            cam_status_layout = QHBoxLayout(cam_status_row)
+            cam_status_layout.setContentsMargins(10, 0, 10, 0)
+            cam_key = QLabel("CORRECTION")
+            cam_key.setStyleSheet(_MONO_MUTED)
+            cam_status_layout.addWidget(cam_key)
+            cam_status_layout.addStretch()
+            self._ref_cam_status_val = QLabel("NONE")
+            self._ref_cam_status_val.setStyleSheet(
+                f"color: {theme.TEXT_DIM}; font-family: monospace;"
+                " font-size: 11px; background: transparent;"
+            )
+            cam_status_layout.addWidget(self._ref_cam_status_val)
+            layout.addWidget(cam_status_row)
+
+            wizard_btn = _sidebar_btn(
+                QPushButton("Launch distortion wizard")
+            )
+            wizard_btn.setIcon(lucide.icon("grid-3x3", 14, theme.TEXT_DIM))
+            wizard_btn.setStyleSheet(theme.GHOST_BTN)
+            wizard_btn.setEnabled(False)
+            wizard_btn.setToolTip(
+                "Corrects optical distortion on the live camera feed when the "
+                "sensor is tilted off-axis. Available in the classic UI "
+                "(Camera dock → Distortion Wizard)."
+            )
+            layout.addWidget(wizard_btn)
+
+            cam_hint = QLabel(
+                "Separate from reference alignment: this corrects the camera "
+                "image itself (quad-to-quad), not the overlay image."
+            )
+            cam_hint.setWordWrap(True)
+            cam_hint.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+            )
+            cam_hint.setStyleSheet(
+                f"color: {theme.TEXT_DIM}; font-size: 10px;"
+                " background: transparent;"
+            )
+            layout.addWidget(cam_hint)
 
         _compact_panel(layout)
         self._sync_reference_panel()
@@ -1192,11 +1573,10 @@ class SettingsWorkspace(Workspace):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
-        for i, laser in enumerate(self._window.instruments.lasers):
-            name = laser.label or f"Laser {i + 1}"
-            layout.addWidget(theme.section_title(name, "zap"))
-            layout.addWidget(self._placeholder("Laser controls — coming soon"))
-            if i < len(self._window.instruments.lasers) - 1:
+        lasers = self._window.instruments.lasers
+        for i, laser in enumerate(lasers):
+            layout.addWidget(_LaserSection(laser, i))
+            if i < len(lasers) - 1:
                 layout.addWidget(theme.separator())
         _compact_panel(layout)
         return panel
@@ -1290,7 +1670,7 @@ class SettingsWorkspace(Workspace):
 
         if self._ref_status_val is not None:
             if aligned:
-                self._ref_status_val.setText("CORRECTED · AFFINE")
+                self._ref_status_val.setText("ALIGNED · AFFINE")
                 self._ref_status_val.setStyleSheet(
                     f"color: {theme.GREEN}; font-family: monospace; font-size: 11px;"
                     " background: transparent;"
@@ -1300,4 +1680,22 @@ class SettingsWorkspace(Workspace):
                 self._ref_status_val.setStyleSheet(
                     f"color: {theme.TEXT_DIM}; font-family: monospace; font-size: 11px;"
                     " background: transparent;"
+                )
+
+        if self._ref_cam_status_val is not None:
+            camera = self._window.instruments.camera
+            cam_corrected = (
+                camera is not None and camera.correction_matrix is not None
+            )
+            if cam_corrected:
+                self._ref_cam_status_val.setText("CORRECTED · QUAD-TO-QUAD")
+                self._ref_cam_status_val.setStyleSheet(
+                    f"color: {theme.GREEN}; font-family: monospace;"
+                    " font-size: 11px; background: transparent;"
+                )
+            else:
+                self._ref_cam_status_val.setText("NONE")
+                self._ref_cam_status_val.setStyleSheet(
+                    f"color: {theme.TEXT_DIM}; font-family: monospace;"
+                    " font-size: 11px; background: transparent;"
                 )

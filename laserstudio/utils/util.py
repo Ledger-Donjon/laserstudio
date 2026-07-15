@@ -32,6 +32,20 @@ def resource_path(path: str) -> str:
     return os.path.join(__dirname, path[2:])
 
 
+def expand_path(path: str) -> str:
+    """Resolve a user-provided filesystem path from the configuration.
+
+    Expands ``~`` / ``~user`` (home directory) and environment variables
+    (``$VAR`` / ``${VAR}``), then normalises the result to an absolute path so
+    relative fragments such as ``../../`` are resolved (relative to the current
+    working directory).
+
+    :param path: The raw path string from the configuration file.
+    :return: An absolute, expanded filesystem path.
+    """
+    return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
+
+
 def qtransform_to_yaml(transform: QTransform) -> Config:
     """:return: Dict for yaml serialization from a QTransform."""
     result: Config = {}

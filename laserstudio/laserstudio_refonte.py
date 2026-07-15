@@ -93,7 +93,7 @@ class LaserStudioRefonte(QMainWindow):
 
         # Left column: one panel per workspace.
         self._sidebar = QStackedWidget()
-        self._sidebar.setMinimumWidth(280)
+        self._sidebar.setMinimumWidth(theme.SIDEBAR_MIN_WIDTH)
         self._sidebar.setObjectName("ls-sidebar")
         self._sidebar.setStyleSheet(theme.SIDEBAR_SS)
         for ws in self._workspaces:
@@ -236,7 +236,7 @@ class LaserStudioRefonte(QMainWindow):
                 instr.camera,
                 instr.probes + [*instr.lasers],
             )
-        area.fit_view()
+        area.viewer.schedule_fit_view()
         return area
 
     # ── Status / HUD wiring ─────────────────────────────────────────────────────

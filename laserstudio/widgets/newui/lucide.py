@@ -177,6 +177,18 @@ _PATHS: dict[str, str] = {
         '<path d="M3 17c3-6 6-6 9 0s6 6 9 0"/>'
         '<path d="M3 7c3-6 6-6 9 0s6 6 9 0"/>'
     ),
+    "grid-3x3": (
+        '<rect width="18" height="18" x="3" y="3" rx="2"/>'
+        '<path d="M3 9h18"/>'
+        '<path d="M3 15h18"/>'
+        '<path d="M9 3v18"/>'
+        '<path d="M15 3v18"/>'
+    ),
+    "circle": ('<circle cx="12" cy="12" r="10"/>'),
+    "circle-dot": (
+        '<circle cx="12" cy="12" r="10"/>'
+        '<circle cx="12" cy="12" r="1"/>'
+    ),
 }
 
 
@@ -304,3 +316,82 @@ def svg_file_pixmap(path: str, size: int) -> QPixmap:
 def svg_file_icon(path: str, size: int) -> QIcon:
     """Return a QIcon rendered from an SVG file on disk."""
     return QIcon(svg_file_pixmap(path, size))
+
+
+# ── Microscope objective icon ─────────────────────────────────────────────────
+# A stroked microscope-objective silhouette (new-UI style) with a coloured
+# magnification band, following the standard manufacturer objective colour code
+# (Nikon/Olympus/Leica/Zeiss, "Table 3"):
+#     1/2x none · 1-1.5x black · 2-2.5x brown · 4-5x red · 10x yellow
+#     16-20x green · 25-32x turquoise · 40-50x light blue · 60-63x cobalt blue
+#     100-250x white
+# The four objectives physically present on the bench (5x, 10x, 20x, 50x) keep
+# the *exact* ring colour sampled from the classic-UI icons (obj-{mag}x.png) so
+# the on-screen band matches the real objective the user handles.
+_OBJECTIVE_RING_COLORS: dict[float, str | None] = {
+    0.5: None,          # no colour assigned
+    1.0: "#000000",     # black
+    1.25: "#000000",    # black
+    1.5: "#000000",     # black
+    2.0: "#8B5A2B",     # brown
+    2.5: "#8B5A2B",     # brown
+    4.0: "#FF0000",     # red
+    5.0: "#FF0000",     # red         (bench objective — sampled from obj-5x.png)
+    10.0: "#FFED00",    # yellow      (bench objective — sampled from obj-10x.png)
+    16.0: "#14FF00",    # green
+    20.0: "#14FF00",    # green       (bench objective — sampled from obj-20x.png)
+    25.0: "#2FD4C4",    # turquoise
+    32.0: "#2FD4C4",    # turquoise
+    40.0: "#7CB9FF",    # light blue
+    50.0: "#0066FF",    # light blue  (bench objective — sampled from obj-50x.png)
+    60.0: "#0047AB",    # cobalt blue
+    63.0: "#0047AB",    # cobalt blue
+    100.0: "#F5F5F5",   # white
+    150.0: "#F5F5F5",   # white
+    250.0: "#F5F5F5",   # white
+}
+
+# Objective silhouette (pointing down), viewBox 0 0 24 24: narrow mount on top,
+# a straight-walled barrel, then a taper to the front lens.
+_OBJECTIVE_BODY = "M9 3H15V5.5H17V13L14.5 20H9.5L7 13V5.5H9Z"
+_OBJECTIVE_BODY_FILL = "#2A2A2E"
+
+
+def objective_ring_color(mag: float) -> str | None:
+    """Standard magnification-ring colour for the objective, or None if the code
+    assigns no colour. Bench objectives keep their exact sampled colour."""
+    if mag in _OBJECTIVE_RING_COLORS:
+        return _OBJECTIVE_RING_COLORS[mag]
+    # Nearest known magnification, so unusual values still get a sensible band.
+    nearest = min(_OBJECTIVE_RING_COLORS, key=lambda m: abs(m - mag))
+    return _OBJECTIVE_RING_COLORS[nearest]
+
+
+def objective_pixmap(
+    mag: float, size: int = 18, color: str = "#A3A3A3"
+) -> QPixmap:
+    """Render a microscope-objective icon with the magnification colour band."""
+    ring = objective_ring_color(mag)
+    parts = [
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">',
+        f'<path d="{_OBJECTIVE_BODY}" fill="{_OBJECTIVE_BODY_FILL}"'
+        ' stroke="none"/>',
+    ]
+    if ring is not None:
+        # A hairline rim around the band keeps dark codes (black, brown, cobalt)
+        # legible against the dark barrel while staying subtle on bright codes.
+        parts.append(
+            f'<rect x="7" y="8" width="10" height="3.2" fill="{ring}"'
+            ' stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="0.5"/>'
+        )
+    parts.append(
+        f'<path d="{_OBJECTIVE_BODY}" fill="none" stroke="{color}"'
+        ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    )
+    parts.append("</svg>")
+    return _render_filled("".join(parts), size)
+
+
+def objective_icon(mag: float, size: int = 18, color: str = "#A3A3A3") -> QIcon:
+    """Return a QIcon for a microscope objective at the given magnification."""
+    return QIcon(objective_pixmap(mag, size, color))

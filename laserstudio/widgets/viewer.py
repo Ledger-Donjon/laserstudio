@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -40,7 +40,7 @@ from .stagesight import (
 from .marker import IdMarker, Marker
 from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
-from ..instruments.stage import MoveFor
+from ..instruments.stage import MoveFor, Vector
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
 from ..utils.background_align import BackgroundPin, compute_affine_transform
@@ -178,11 +178,17 @@ class Viewer(QGraphicsView):
         # Refit on show/resize until the user zooms with the wheel. Early
         # reset_camera() calls often run before the viewport has its real size.
         self._auto_fit_view = True
+        self._camera_fit_pending = False
+        self._stage_fit_pending = False
         self.background_changed.connect(self._fit_view_if_auto)
 
     def _fit_view_if_auto(self) -> None:
         if self._auto_fit_view:
             self.fit_view()
+
+    def schedule_fit_view(self) -> None:
+        """Defer fit until after the current layout pass (viewport has real size)."""
+        QTimer.singleShot(0, self._fit_view_if_auto)
 
     def fit_view(self) -> None:
         """Frame the stage sight, or the full scene when a reference image exists."""
@@ -199,12 +205,12 @@ class Viewer(QGraphicsView):
     def showEvent(self, event) -> None:  # type: ignore[override]
         super().showEvent(event)
         if self._auto_fit_view:
-            self.fit_view()
+            self.schedule_fit_view()
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
         if self._auto_fit_view:
-            self.fit_view()
+            self.schedule_fit_view()
 
     @property
     def markers(self) -> list[IdMarker]:
@@ -255,27 +261,43 @@ class Viewer(QGraphicsView):
             all_elements_rect = self.__scene.itemsBoundingRect()
         self._apply_camera_fit(all_elements_rect)
 
-    def reset_camera_to_stage_sight(self):
-        """Resets the camera to show the stage sight"""
-        if self.stage_sight is None:
-            return
+    def _stage_sight_fit_rect(self) -> QRectF | None:
+        """Declared camera field of view in scene coordinates (µm)."""
         ss = self.stage_sight
-        all_elements_rect = ss.mapRectToScene(ss.boundingRect())
-        if all_elements_rect.width() <= 0 or all_elements_rect.height() <= 0:
-            w, h = float(ss.size.width()), float(ss.size.height())
-            if w <= 0 or h <= 0:
-                return
-            center = ss.mapToScene(QPointF(0, 0))
-            all_elements_rect = QRectF(
-                center.x() - w / 2, center.y() - h / 2, w, h
-            )
-        self._apply_camera_fit(all_elements_rect)
+        if ss is None:
+            return None
+        w, h = float(ss.size.width()), float(ss.size.height())
+        if w <= 0 or h <= 0:
+            return None
+        center = ss.mapToScene(QPointF(0, 0))
+        return QRectF(center.x() - w / 2, center.y() - h / 2, w, h)
+
+    def reset_camera_to_stage_sight(self):
+        """Resets the camera to show the stage sight field of view."""
+        rect = self._stage_sight_fit_rect()
+        if rect is None:
+            return
+        self._apply_camera_fit(rect)
 
     def _apply_camera_fit(self, all_elements_rect: QRectF) -> None:
         viewport = self.viewport()
-        viewport_size = (
-            viewport.size() if viewport is not None else all_elements_rect.size()
-        )
+        if viewport is None:
+            return
+        viewport_size = viewport.size()
+        if viewport_size.width() < 50 or viewport_size.height() < 50:
+            return
+
+        # Scene bounding boxes can be near-zero before the first camera frame
+        # (crosshair only), which would yield an extreme zoom factor.
+        sight_rect = self._stage_sight_fit_rect()
+        if sight_rect is not None:
+            min_expected = min(sight_rect.width(), sight_rect.height()) * 0.5
+            if (
+                all_elements_rect.width() < min_expected
+                or all_elements_rect.height() < min_expected
+            ):
+                all_elements_rect = sight_rect
+
         w = max(all_elements_rect.width() * 1.2, 1e-9)
         h = max(all_elements_rect.height() * 1.2, 1e-9)
         w_ratio = viewport_size.width() / w
@@ -494,9 +516,36 @@ class Viewer(QGraphicsView):
         self.stage_sight.setZValue(1)
         self.__scene.addItem(self.stage_sight)
 
+        self._camera_fit_pending = camera is not None
+        if camera is not None:
+            camera.new_image.connect(self._on_camera_new_image)
+            camera.parameter_changed.connect(self._on_camera_parameter_changed)
+
+        self._stage_fit_pending = stage is not None
         if stage is not None:
             stage.soft_limits_changed.connect(self.refresh_soft_limits_item)
             self.refresh_soft_limits_item()
+            stage.position_changed.connect(self._on_stage_position_for_fit)
+            # Place the sight on the first known hardware position before fitting.
+            self.stage_sight.update_pos()
+
+        self.schedule_fit_view()
+
+    def _on_stage_position_for_fit(self, _position: Vector) -> None:
+        if not self._auto_fit_view or not self._stage_fit_pending:
+            return
+        self._stage_fit_pending = False
+        self.schedule_fit_view()
+
+    def _on_camera_parameter_changed(self, parameter: str, _value: Any) -> None:
+        if self._auto_fit_view and parameter in ("objective", "resolution"):
+            self.schedule_fit_view()
+
+    def _on_camera_new_image(self, _image: Any) -> None:
+        if not self._auto_fit_view or not self._camera_fit_pending:
+            return
+        self._camera_fit_pending = False
+        self.schedule_fit_view()
 
     def refresh_soft_limits_item(self):
         """Synchronize the soft-limits box in the view with the stage model."""

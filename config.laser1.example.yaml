@@ -5,8 +5,8 @@ camera:
   type: NIT
   pixel_size_in_um: [15.115, 15.115]
   refresh_interval_ms: 50
-  nuc_filepath: "/home/leash/nuc/25mhz/NUCFactory_2000us.yml"
-  bpr_filepath: "/home/leash/nuc/25mhz/BPM.yml"
+  nuc_filepath: "~/nuc/25mhz/NUCFactory_2000us.yml"
+  bpr_filepath: "~/nuc/25mhz/BPM.yml"
   objective: 20.0
   shutter:
     type: TIC
