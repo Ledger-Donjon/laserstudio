@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 from typing import cast, Any, SupportsIndex, overload
 from enum import Enum, auto
 from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
@@ -628,12 +629,16 @@ class StageInstrument(Instrument):
         logging.getLogger("laserstudio").debug(f"Moving to {position}...")
         if self.guardrail_enabled:
             displacement = self.position - position
-            for i, displacement_i in enumerate(displacement.data):
-                if abs(displacement_i) > self.guardrail:
-                    logging.getLogger("laserstudio").error(
-                        f"Do not move!! One axis ({i}) moves further than {self.guardrail}\xa0µm: {displacement}\xa0µm"
-                    )
-                    return
+            # "Max move distance" guardrail: the move is blocked if its Euclidean
+            # amplitude exceeds the guardrail radius (represented as a circle in
+            # the viewer).
+            distance = math.sqrt(sum(d * d for d in displacement.data))
+            if distance > self.guardrail:
+                logging.getLogger("laserstudio").error(
+                    f"Do not move!! Move distance {distance:.1f}\xa0µm exceeds the "
+                    f"max move distance of {self.guardrail}\xa0µm: {displacement}\xa0µm"
+                )
+                return
 
         within_limits, violated_axis = self._is_within_soft_limits(position)
         if not within_limits and violated_axis is not None:

@@ -40,6 +40,7 @@ from .stagesight import (
 from .marker import IdMarker, Marker
 from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
+from .maxdistance import MaxDistanceItem
 from ..instruments.stage import MoveFor, Vector
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
@@ -172,6 +173,13 @@ class Viewer(QGraphicsView):
         self.__scene.addItem(self.soft_limits_item)
         self.soft_limits_item.hide()
         self.soft_limits_item.edit_finished.connect(self._push_soft_limits_to_stage)
+
+        # "Max move distance" guardrail circle, centered on the stage position
+        # and editable in the view.
+        self.max_distance_item = MaxDistanceItem()
+        self.__scene.addItem(self.max_distance_item)
+        self.max_distance_item.hide()
+        self.max_distance_item.edit_finished.connect(self._push_max_distance_to_stage)
 
         self.setMouseTracking(True)
 
@@ -525,6 +533,12 @@ class Viewer(QGraphicsView):
         if stage is not None:
             stage.soft_limits_changed.connect(self.refresh_soft_limits_item)
             self.refresh_soft_limits_item()
+            stage.guardrail_changed.connect(self.refresh_max_distance_item)
+            # Recenter the circle from the stage sight scene position, which does
+            # not have the side effect of re-emitting stage.position_changed
+            # (reading StageInstrument.position emits that signal).
+            self.stage_sight.position_changed.connect(self._on_stage_sight_moved)
+            self.refresh_max_distance_item()
             stage.position_changed.connect(self._on_stage_position_for_fit)
             # Place the sight on the first known hardware position before fitting.
             self.stage_sight.update_pos()
@@ -575,6 +589,38 @@ class Viewer(QGraphicsView):
         stage.set_soft_limits_xy(
             rect.left(), rect.top(), rect.right(), rect.bottom()
         )
+
+    def _on_stage_sight_moved(self, scene_pos: QPointF) -> None:
+        """Recenter the max-distance circle on the stage sight scene position."""
+        self.max_distance_item.set_center(scene_pos.x(), scene_pos.y())
+
+    def refresh_max_distance_item(self):
+        """Synchronize the max-distance circle with the stage guardrail.
+
+        The center is taken from the stage sight scene position to avoid reading
+        ``StageInstrument.position`` (which emits ``position_changed``).
+        """
+        stage = self.stage_sight.stage if self.stage_sight is not None else None
+        if stage is None:
+            return
+        center = self.stage_sight.pos()
+        self.max_distance_item.set_center(center.x(), center.y())
+        self.max_distance_item.set_radius(stage.guardrail)
+
+    def set_max_distance_editable(self, editable: bool):
+        """Show or hide the editable max-distance circle in the view."""
+        if editable:
+            self.refresh_max_distance_item()
+            self.max_distance_item.show()
+        else:
+            self.max_distance_item.hide()
+
+    def _push_max_distance_to_stage(self, radius: float):
+        """Write the radius edited in the view back to the stage guardrail."""
+        stage = self.stage_sight.stage if self.stage_sight is not None else None
+        if stage is None:
+            return
+        stage.guardrail = float(radius)
 
     @property
     def mode(self) -> Mode:
@@ -852,6 +898,8 @@ class Viewer(QGraphicsView):
             threshold = 24.0 / max(self.zoom, 1e-9)
             if self.soft_limits_item.isVisible():
                 self.soft_limits_item.update_cursor_proximity(scene_pos, threshold)
+            if self.max_distance_item.isVisible():
+                self.max_distance_item.update_cursor_proximity(scene_pos, threshold)
             self.scan_geometry.update_cursor_proximity(scene_pos, threshold)
 
             if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
@@ -949,6 +997,7 @@ class Viewer(QGraphicsView):
     def leaveEvent(self, event: Any):
         """Hide the edit handles when the cursor leaves the view."""
         self.soft_limits_item.update_cursor_proximity(None, 0.0)
+        self.max_distance_item.update_cursor_proximity(None, 0.0)
         self.scan_geometry.update_cursor_proximity(None, 0.0)
         super().leaveEvent(event)
 

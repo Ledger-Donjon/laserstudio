@@ -1158,6 +1158,9 @@ class _SafetyLimitsSection(QWidget):
         if self._updating:
             return
         self._stage.guardrail_enabled = on
+        viewer = self._window.viewer
+        if viewer is not None:
+            viewer.set_max_distance_editable(on)
 
     def _on_distance_changed(self, value: float) -> None:
         if self._updating:
@@ -1171,6 +1174,9 @@ class _SafetyLimitsSection(QWidget):
             self._distance_spin.setValue(self._stage.guardrail)
         finally:
             self._updating = False
+        viewer = self._window.viewer
+        if viewer is not None:
+            viewer.set_max_distance_editable(self._stage.guardrail_enabled)
 
     # ── Stage area limit ───────────────────────────────────────────────────
     def _on_area_enabled(self, on: bool) -> None:
