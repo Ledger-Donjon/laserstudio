@@ -4,10 +4,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import (
+    QEvent,
+    QObject,
+    QPointF,
+    QRect,
+    QRectF,
+    QSize,
+    Qt,
+    QTimer,
+    pyqtSignal,
+)
 from PyQt6.QtGui import (
     QColor,
+    QFocusEvent,
     QImage,
+    QKeyEvent,
     QMouseEvent,
     QPainter,
     QPen,
@@ -30,7 +42,7 @@ from PyQt6.QtWidgets import (
 
 from ...instruments.stage import StageInstrument, Vector
 from ...utils.background_align import BackgroundPin
-from ..keyboardbox import Direction
+from ..keyboardbox import Direction, arrow_key_direction, direction_axis
 from . import lucide, theme
 
 if TYPE_CHECKING:
@@ -532,6 +544,27 @@ class _ModalJogPanel(QWidget):
                 widget.setFixedSize(btn_size)
                 widget.setSizePolicy(btn_policy)
 
+        # Keyboard control toggle, anchored to the bottom-right of the pad.
+        self._pad = pad
+        self._kbd_btn = QPushButton(pad)
+        self._kbd_btn.setIcon(lucide.icon("keyboard", 13, theme.TEXT_DIM))
+        self._kbd_btn.setFixedSize(20, 20)
+        self._kbd_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._kbd_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._kbd_btn.setToolTip(
+            "Keyboard control: click, then move with the arrow keys "
+            "(Z with Page Up / Page Down). Shift ×10, Ctrl ×0.1."
+        )
+        self._kbd_btn.setStyleSheet(
+            f"QPushButton {{ background: {theme.BG_CARD}; border: 1px solid"
+            f" {theme.BORDER}; border-radius: 5px; }}"
+            f" QPushButton:hover {{ border-color: {theme.PURPLE}; }}"
+        )
+        self._kbd_btn.clicked.connect(self._toggle_keyboard)
+        pad.installEventFilter(self)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        QTimer.singleShot(0, self._reposition_keyboard_button)
+
         root.addWidget(pad, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         step_row = QHBoxLayout()
@@ -591,6 +624,57 @@ class _ModalJogPanel(QWidget):
         position = self._stage.position
         position[axe] += displacement
         self._stage.move_to(position, wait=False)
+
+    # ── Keyboard control ────────────────────────────────────────────────────
+    def _toggle_keyboard(self) -> None:
+        if self.hasFocus():
+            self.clearFocus()
+        else:
+            self.setFocus(Qt.FocusReason.MouseFocusReason)
+
+    def _reposition_keyboard_button(self) -> None:
+        btn, pad = self._kbd_btn, self._pad
+        btn.move(pad.width() - btn.width(), pad.height() - btn.height())
+        btn.raise_()
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if (
+            obj is self._pad
+            and event is not None
+            and event.type() == QEvent.Type.Resize
+        ):
+            self._reposition_keyboard_button()
+        return super().eventFilter(obj, event)
+
+    def _set_keyboard_active(self, active: bool) -> None:
+        color = theme.PURPLE if active else theme.TEXT_DIM
+        self._kbd_btn.setIcon(lucide.icon("keyboard", 13, color))
+        self._pad.setStyleSheet(
+            "background: transparent;"
+            + (
+                f" border: 1px solid {theme.PURPLE}; border-radius: 6px;"
+                if active
+                else ""
+            )
+        )
+        self._reposition_keyboard_button()
+
+    def focusInEvent(self, a0: QFocusEvent | None) -> None:
+        super().focusInEvent(a0)
+        self._set_keyboard_active(True)
+
+    def focusOutEvent(self, a0: QFocusEvent | None) -> None:
+        super().focusOutEvent(a0)
+        self._set_keyboard_active(False)
+
+    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
+        direction = arrow_key_direction(a0.key()) if a0 is not None else None
+        if direction is not None and direction_axis(direction) < self._num_axis:
+            self._move(direction)
+            if a0 is not None:
+                a0.accept()
+            return
+        super().keyPressEvent(a0)
 
 
 class _PinRow(QWidget):

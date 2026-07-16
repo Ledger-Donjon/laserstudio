@@ -24,6 +24,32 @@ class Direction(str, Enum):
     zdown = "Z-"
 
 
+# Mapping of arrow / page keys to a movement direction, shared by the keyboard
+# control feature of the various D-pads.
+_ARROW_KEY_DIRECTIONS: dict[int, Direction] = {
+    Qt.Key.Key_Up: Direction.up,
+    Qt.Key.Key_Down: Direction.down,
+    Qt.Key.Key_Left: Direction.left,
+    Qt.Key.Key_Right: Direction.right,
+    Qt.Key.Key_PageUp: Direction.zup,
+    Qt.Key.Key_PageDown: Direction.zdown,
+}
+
+
+def arrow_key_direction(key: int) -> Direction | None:
+    """Return the movement Direction bound to a keyboard key, or None."""
+    return _ARROW_KEY_DIRECTIONS.get(key)
+
+
+def direction_axis(direction: Direction) -> int:
+    """Return the stage axis index (0=X, 1=Y, 2=Z) for a Direction."""
+    if direction in (Direction.left, Direction.right):
+        return 0
+    if direction in (Direction.up, Direction.down):
+        return 1
+    return 2
+
+
 class KeyboardBox(QGroupBox):
     """
     Creates a control Box, associated to a Stage or StageSight.

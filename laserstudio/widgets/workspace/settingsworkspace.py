@@ -5,7 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer
+from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -31,7 +32,7 @@ from ...instruments.camera_raptor import CameraRaptorInstrument
 from ...instruments.camera_usb import CameraUSBInstrument
 from ...instruments.shutter import ShutterInstrument
 from ...instruments.stage import StageInstrument, Vector
-from ..keyboardbox import Direction
+from ..keyboardbox import Direction, arrow_key_direction, direction_axis
 from ..newui import lucide, theme
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..viewer import Viewer
@@ -911,6 +912,26 @@ class SubCategoryBar(QWidget):
             )
 
 
+def _keyboard_toggle_button(parent: QWidget) -> QPushButton:
+    """Small keyboard-control toggle button for a D-pad (bottom-right corner)."""
+    btn = QPushButton(parent)
+    btn.setIcon(lucide.icon("keyboard", 14, theme.TEXT_DIM))
+    btn.setFixedSize(22, 22)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    # Must not steal focus from the D-pad (which needs it to receive key events).
+    btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    btn.setToolTip(
+        "Keyboard control: click, then move with the arrow keys "
+        "(Z with Page Up / Page Down). Shift ×10, Ctrl ×0.1."
+    )
+    btn.setStyleSheet(
+        f"QPushButton {{ background: {theme.BG_CARD}; border: 1px solid"
+        f" {theme.BORDER}; border-radius: 5px; }}"
+        f" QPushButton:hover {{ border-color: {theme.PURPLE}; }}"
+    )
+    return btn
+
+
 class DpadWidget(QWidget):
     """3×3 positioning pad wired to a stage instrument."""
 
@@ -974,6 +995,14 @@ class DpadWidget(QWidget):
             if isinstance(widget, QPushButton):
                 widget.setFixedSize(btn_size)
                 widget.setSizePolicy(btn_policy)
+
+        # Keyboard control toggle, anchored to the bottom-right of the pad.
+        self._pad = pad
+        self._kbd_btn = _keyboard_toggle_button(pad)
+        self._kbd_btn.clicked.connect(self._toggle_keyboard)
+        pad.installEventFilter(self)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        QTimer.singleShot(0, self._reposition_keyboard_button)
 
         pad_wrap = QHBoxLayout()
         pad_wrap.setContentsMargins(0, 0, 0, 0)
@@ -1049,6 +1078,57 @@ class DpadWidget(QWidget):
         position = self._stage.position
         position[axe] += displacement
         self._stage.move_to(position, wait=False)
+
+    # ── Keyboard control ────────────────────────────────────────────────────
+    def _toggle_keyboard(self) -> None:
+        if self.hasFocus():
+            self.clearFocus()
+        else:
+            self.setFocus(Qt.FocusReason.MouseFocusReason)
+
+    def _reposition_keyboard_button(self) -> None:
+        btn, pad = self._kbd_btn, self._pad
+        btn.move(pad.width() - btn.width(), pad.height() - btn.height())
+        btn.raise_()
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if (
+            obj is self._pad
+            and event is not None
+            and event.type() == QEvent.Type.Resize
+        ):
+            self._reposition_keyboard_button()
+        return super().eventFilter(obj, event)
+
+    def _set_keyboard_active(self, active: bool) -> None:
+        color = theme.PURPLE if active else theme.TEXT_DIM
+        self._kbd_btn.setIcon(lucide.icon("keyboard", 14, color))
+        self._pad.setStyleSheet(
+            "background: transparent;"
+            + (
+                f" border: 1px solid {theme.PURPLE}; border-radius: 6px;"
+                if active
+                else ""
+            )
+        )
+        self._reposition_keyboard_button()
+
+    def focusInEvent(self, a0: QFocusEvent | None) -> None:
+        super().focusInEvent(a0)
+        self._set_keyboard_active(True)
+
+    def focusOutEvent(self, a0: QFocusEvent | None) -> None:
+        super().focusOutEvent(a0)
+        self._set_keyboard_active(False)
+
+    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
+        direction = arrow_key_direction(a0.key()) if a0 is not None else None
+        if direction is not None and direction_axis(direction) < self._num_axis:
+            self._move(direction)
+            if a0 is not None:
+                a0.accept()
+            return
+        super().keyPressEvent(a0)
 
 
 class _SafetyLimitsSection(QWidget):
