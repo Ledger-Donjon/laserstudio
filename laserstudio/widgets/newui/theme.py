@@ -9,7 +9,7 @@ without a circular import.
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -240,6 +240,24 @@ def eyebrow(text: str) -> QLabel:
         "letter-spacing: 2px; background: transparent;"
     )
     return lbl
+
+
+def mono_font(size: int = 10) -> QFont:
+    """Return a real fixed-pitch (monospace) font.
+
+    Unlike the CSS ``font-family: monospace`` generic family (which Qt does not
+    reliably map to a fixed-pitch font in stylesheets), this sets the Monospace
+    style hint so Qt always substitutes a genuine monospace font, matching the
+    classic interface. Set it on a widget with ``setFont`` and make sure the
+    widget's stylesheet does not override ``font-family``.
+
+    :param size: Font size in pixels.
+    """
+    f = QFont("monospace")
+    f.setStyleHint(QFont.StyleHint.Monospace)
+    f.setFixedPitch(True)
+    f.setPixelSize(size)
+    return f
 
 
 def section_title(text: str, icon_name: str = "folder") -> QWidget:

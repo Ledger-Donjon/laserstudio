@@ -53,9 +53,9 @@ class ViewerHud(QWidget):
 
         self._tr = QLabel(self)
         self._tr.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-family: monospace; font-size: 10px;"
-            " background: transparent;"
+            f"color: {theme.TEXT_MUTED}; background: transparent;"
         )
+        self._tr.setFont(theme.mono_font(10))
 
         self._scale_lbl = QLabel(self)
         self._scale_lbl.setStyleSheet(

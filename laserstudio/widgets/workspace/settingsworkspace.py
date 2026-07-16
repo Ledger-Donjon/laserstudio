@@ -1506,10 +1506,11 @@ class SettingsWorkspace(Workspace):
         self._coord_label = QLabel("—")
         self._coord_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._coord_label.setStyleSheet(
-            f"color: {theme.TEXT}; font-family: monospace; font-size: 14px;"
+            f"color: {theme.TEXT};"
             f" background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
             " border-radius: 5px; padding: 11px;"
         )
+        self._coord_label.setFont(theme.mono_font(14))
         layout.addWidget(self._coord_label)
 
         if stage is not None:

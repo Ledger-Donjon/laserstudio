@@ -36,7 +36,10 @@ class StatusBar(QWidget):
         layout.addWidget(self._workspace)
 
         self._position = QLabel("X —  Y —  Z —")
-        self._position.setStyleSheet(_MONO)
+        self._position.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; background: transparent;"
+        )
+        self._position.setFont(theme.mono_font(10))
         layout.addWidget(self._position)
 
         self._laser = QLabel("LASER SAFE")
