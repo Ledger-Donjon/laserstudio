@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
+from PyQt6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsObject,
@@ -143,6 +143,13 @@ class MaxDistanceItem(QGraphicsObject):
             size,
             size,
         )
+
+    def shape(self) -> QPainterPath:
+        # The circle body is purely decorative and must not intercept clicks: its
+        # default (bounding-rect) shape is a filled square that would shadow
+        # underlying edit handles (e.g. the stage area limit handles) and swallow
+        # stage moves. Only the handles (separate child items) are interactive.
+        return QPainterPath()
 
     def paint(
         self,
