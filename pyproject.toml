@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "pyqt6",
-    "pystages>=1.4.2b",
+    "pystages>=1.4.2",
     "pillow>=10.4.0",
     "opencv-python>=4.9.0.80",
     "pyyaml",
@@ -26,7 +26,7 @@ dependencies = [
     "shapely",
     "triangle",
     "requests>=2.32.3,<3.0.0",
-    "numpy<2.0",
+    "numpy>=1.26",
     "pypdm>=2.0",
     "fastapi>=0.110",
     "uvicorn>=0.29",
@@ -35,7 +35,7 @@ dependencies = [
     "donjon_hyshlr",
     "scipy",
     "PyQt6-Charts",
-    "pylmscontroller>=1.0.2",
+    "pylmscontroller>=1.1",
 ]
 requires-python = ">=3.10,<3.13"
 
