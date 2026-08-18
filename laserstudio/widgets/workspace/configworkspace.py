@@ -30,7 +30,7 @@ from typing import Callable
 
 import yaml
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter
+from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -47,6 +47,12 @@ from PyQt6.QtWidgets import (
 from ... import __version__
 from ...utils.yaml_types import Config
 from ..newui import lucide, theme
+from ..newui.viewer_hud import (
+    LABEL_INSET,
+    make_hud_label,
+    paint_corner_brackets,
+    paint_grid_background,
+)
 from .schemaform import (
     SchemaField,
     ToggleSwitch,
@@ -227,39 +233,26 @@ class _TreeView(QWidget):
 class _GridCanvas(QWidget):
     """Viewer-like backdrop: 34px grid, corner brackets and a mono HUD label."""
 
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._corner_label = make_hud_label(self, "CONFIG · INSTRUMENT TREE")
+        self._corner_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._position_corner_label()
+
+    def _position_corner_label(self) -> None:
+        self._corner_label.move(LABEL_INSET, LABEL_INSET)
+        self._corner_label.adjustSize()
+        self._corner_label.raise_()
+
+    def resizeEvent(self, a0) -> None:  # noqa: N802 (Qt override)
+        super().resizeEvent(a0)
+        self._position_corner_label()
+
     def paintEvent(self, a0) -> None:  # noqa: N802 (Qt override)
         p = QPainter(self)
         w, h = self.width(), self.height()
-        p.fillRect(0, 0, w, h, QColor(theme.BG_MAIN))
-
-        p.setPen(QColor(255, 255, 255, 7))
-        step = 34
-        gx = 0
-        while gx <= w:
-            p.drawLine(gx, 0, gx, h)
-            gx += step
-        gy = 0
-        while gy <= h:
-            p.drawLine(0, gy, w, gy)
-            gy += step
-
-        p.setPen(QColor(255, 255, 255, 60))
-        m, side = 14, 16
-        p.drawLine(m, m, m + side, m)
-        p.drawLine(m, m, m, m + side)
-        p.drawLine(w - m - side, m, w - m, m)
-        p.drawLine(w - m, m, w - m, m + side)
-        p.drawLine(m, h - m, m + side, h - m)
-        p.drawLine(m, h - m, m, h - m - side)
-        p.drawLine(w - m - side, h - m, w - m, h - m)
-        p.drawLine(w - m, h - m, w - m, h - m - side)
-
-        p.setPen(QColor(255, 255, 255, 130))
-        font = QFont("monospace")
-        font.setPixelSize(10)
-        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.5)
-        p.setFont(font)
-        p.drawText(22, 30, "CONFIG · INSTRUMENT TREE")
+        paint_grid_background(p, w, h)
+        paint_corner_brackets(p, w, h)
         p.end()
 
 

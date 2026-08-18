@@ -5,14 +5,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import (
-    QEvent,
-    QObject,
     QPointF,
     QRect,
     QRectF,
     QSize,
     Qt,
-    QTimer,
     pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -544,28 +541,32 @@ class _ModalJogPanel(QWidget):
                 widget.setFixedSize(btn_size)
                 widget.setSizePolicy(btn_policy)
 
-        # Keyboard control toggle, anchored to the bottom-right of the pad.
         self._pad = pad
-        self._kbd_btn = QPushButton(pad)
+        root.addWidget(pad, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        # Keyboard control: a separate toggle below the pad. It is the only way to
+        # enable keyboard control (clicking the pad itself must not enable it), so
+        # the pad only accepts focus programmatically (TabFocus, not ClickFocus).
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self._kbd_btn = QPushButton("  Keyboard control")
+        self._kbd_btn.setCheckable(True)
         self._kbd_btn.setIcon(lucide.icon("keyboard", 13, theme.TEXT_DIM))
-        self._kbd_btn.setFixedSize(20, 20)
         self._kbd_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._kbd_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._kbd_btn.setToolTip(
-            "Keyboard control: click, then move with the arrow keys "
+            "Enable keyboard control, then move with the arrow keys "
             "(Z with Page Up / Page Down). Shift ×10, Ctrl ×0.1."
         )
         self._kbd_btn.setStyleSheet(
-            f"QPushButton {{ background: {theme.BG_CARD}; border: 1px solid"
-            f" {theme.BORDER}; border-radius: 5px; }}"
+            f"QPushButton {{ background: {theme.BG_CARD}; color: {theme.TEXT_DIM};"
+            f" border: 1px solid {theme.BORDER}; border-radius: 5px;"
+            " padding: 5px 10px; font-size: 11px; }"
             f" QPushButton:hover {{ border-color: {theme.PURPLE}; }}"
+            f" QPushButton:checked {{ color: {theme.PURPLE};"
+            f" border-color: {theme.PURPLE}; background: {theme.PURPLE_BG}; }}"
         )
-        self._kbd_btn.clicked.connect(self._toggle_keyboard)
-        pad.installEventFilter(self)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        QTimer.singleShot(0, self._reposition_keyboard_button)
-
-        root.addWidget(pad, alignment=Qt.AlignmentFlag.AlignHCenter)
+        self._kbd_btn.toggled.connect(self._on_keyboard_toggled)
+        root.addWidget(self._kbd_btn)
 
         step_row = QHBoxLayout()
         step_row.setSpacing(8)
@@ -590,12 +591,15 @@ class _ModalJogPanel(QWidget):
         btn = QPushButton()
         btn.setIcon(lucide.icon(icon, 14, theme.TEXT))
         btn.setStyleSheet(_MODAL_DPAD_SS)
+        # Do not steal focus from the pad, so keyboard control stays enabled.
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.clicked.connect(lambda: self._move(direction))
         return btn
 
     def _z_btn(self, label: str, direction: Direction) -> QPushButton:
         btn = QPushButton(label)
         btn.setStyleSheet(_MODAL_Z_SS)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.clicked.connect(lambda: self._move(direction))
         return btn
 
@@ -626,46 +630,27 @@ class _ModalJogPanel(QWidget):
         self._stage.move_to(position, wait=False)
 
     # ── Keyboard control ────────────────────────────────────────────────────
-    def _toggle_keyboard(self) -> None:
-        if self.hasFocus():
+    def _on_keyboard_toggled(self, checked: bool) -> None:
+        if checked:
+            self.setFocus(Qt.FocusReason.OtherFocusReason)
+        elif self.hasFocus():
             self.clearFocus()
-        else:
-            self.setFocus(Qt.FocusReason.MouseFocusReason)
-
-    def _reposition_keyboard_button(self) -> None:
-        btn, pad = self._kbd_btn, self._pad
-        btn.move(pad.width() - btn.width(), pad.height() - btn.height())
-        btn.raise_()
-
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        if (
-            obj is self._pad
-            and event is not None
-            and event.type() == QEvent.Type.Resize
-        ):
-            self._reposition_keyboard_button()
-        return super().eventFilter(obj, event)
-
-    def _set_keyboard_active(self, active: bool) -> None:
-        color = theme.PURPLE if active else theme.TEXT_DIM
-        self._kbd_btn.setIcon(lucide.icon("keyboard", 13, color))
         self._pad.setStyleSheet(
             "background: transparent;"
             + (
                 f" border: 1px solid {theme.PURPLE}; border-radius: 6px;"
-                if active
+                if checked
                 else ""
             )
         )
-        self._reposition_keyboard_button()
 
     def focusInEvent(self, a0: QFocusEvent | None) -> None:
         super().focusInEvent(a0)
-        self._set_keyboard_active(True)
+        self._kbd_btn.setChecked(True)
 
     def focusOutEvent(self, a0: QFocusEvent | None) -> None:
         super().focusOutEvent(a0)
-        self._set_keyboard_active(False)
+        self._kbd_btn.setChecked(False)
 
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
         direction = arrow_key_direction(a0.key()) if a0 is not None else None

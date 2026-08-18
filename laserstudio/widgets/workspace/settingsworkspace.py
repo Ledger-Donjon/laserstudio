@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable
 
-from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QApplication,
@@ -912,22 +912,29 @@ class SubCategoryBar(QWidget):
             )
 
 
-def _keyboard_toggle_button(parent: QWidget) -> QPushButton:
-    """Small keyboard-control toggle button for a D-pad (bottom-right corner)."""
-    btn = QPushButton(parent)
+def _keyboard_toggle_button() -> QPushButton:
+    """Checkable keyboard-control toggle button placed below a D-pad.
+
+    Keyboard control is enabled/disabled *only* through this button (checked =
+    enabled). It must not steal focus from the D-pad, which needs it to receive
+    the arrow-key events while enabled.
+    """
+    btn = QPushButton("  Keyboard control")
+    btn.setCheckable(True)
     btn.setIcon(lucide.icon("keyboard", 14, theme.TEXT_DIM))
-    btn.setFixedSize(22, 22)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    # Must not steal focus from the D-pad (which needs it to receive key events).
     btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     btn.setToolTip(
-        "Keyboard control: click, then move with the arrow keys "
+        "Enable keyboard control, then move with the arrow keys "
         "(Z with Page Up / Page Down). Shift ×10, Ctrl ×0.1."
     )
     btn.setStyleSheet(
-        f"QPushButton {{ background: {theme.BG_CARD}; border: 1px solid"
-        f" {theme.BORDER}; border-radius: 5px; }}"
+        f"QPushButton {{ background: {theme.BG_CARD}; color: {theme.TEXT_DIM};"
+        f" border: 1px solid {theme.BORDER}; border-radius: 5px; padding: 5px 10px;"
+        " font-size: 11px; }"
         f" QPushButton:hover {{ border-color: {theme.PURPLE}; }}"
+        f" QPushButton:checked {{ color: {theme.PURPLE};"
+        f" border-color: {theme.PURPLE}; background: {theme.PURPLE_BG}; }}"
     )
     return btn
 
@@ -996,13 +1003,7 @@ class DpadWidget(QWidget):
                 widget.setFixedSize(btn_size)
                 widget.setSizePolicy(btn_policy)
 
-        # Keyboard control toggle, anchored to the bottom-right of the pad.
         self._pad = pad
-        self._kbd_btn = _keyboard_toggle_button(pad)
-        self._kbd_btn.clicked.connect(self._toggle_keyboard)
-        pad.installEventFilter(self)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        QTimer.singleShot(0, self._reposition_keyboard_button)
 
         pad_wrap = QHBoxLayout()
         pad_wrap.setContentsMargins(0, 0, 0, 0)
@@ -1010,6 +1011,14 @@ class DpadWidget(QWidget):
         pad_wrap.addWidget(pad)
         pad_wrap.addStretch()
         root.addLayout(pad_wrap)
+
+        # Keyboard control: a separate toggle below the pad. It is the only way to
+        # enable keyboard control (clicking the pad itself must not enable it), so
+        # the pad only accepts focus programmatically (TabFocus, not ClickFocus).
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self._kbd_btn = _keyboard_toggle_button()
+        self._kbd_btn.toggled.connect(self._on_keyboard_toggled)
+        root.addWidget(self._kbd_btn)
 
         if self._num_axis > 0:
             xy_field, self._xy_spin = _step_field(
@@ -1032,12 +1041,15 @@ class DpadWidget(QWidget):
         btn = QPushButton()
         btn.setIcon(lucide.icon(icon, 16, theme.TEXT))
         btn.setStyleSheet(_DPAN_BTN)
+        # Do not steal focus from the pad, so keyboard control stays enabled.
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.clicked.connect(lambda: self._move(direction))
         return btn
 
     def _z_btn(self, label: str, direction: Direction) -> QPushButton:
         btn = QPushButton(label)
         btn.setStyleSheet(_Z_BTN)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.clicked.connect(lambda: self._move(direction))
         return btn
 
@@ -1045,6 +1057,7 @@ class DpadWidget(QWidget):
         btn = QPushButton()
         btn.setIcon(lucide.icon("home", 16, theme.TEXT_DIM))
         btn.setStyleSheet(_DPAN_BTN)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setEnabled(self._num_axis > 0)
         btn.clicked.connect(self._go_origin)
         return btn
@@ -1080,46 +1093,27 @@ class DpadWidget(QWidget):
         self._stage.move_to(position, wait=False)
 
     # ── Keyboard control ────────────────────────────────────────────────────
-    def _toggle_keyboard(self) -> None:
-        if self.hasFocus():
+    def _on_keyboard_toggled(self, checked: bool) -> None:
+        if checked:
+            self.setFocus(Qt.FocusReason.OtherFocusReason)
+        elif self.hasFocus():
             self.clearFocus()
-        else:
-            self.setFocus(Qt.FocusReason.MouseFocusReason)
-
-    def _reposition_keyboard_button(self) -> None:
-        btn, pad = self._kbd_btn, self._pad
-        btn.move(pad.width() - btn.width(), pad.height() - btn.height())
-        btn.raise_()
-
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        if (
-            obj is self._pad
-            and event is not None
-            and event.type() == QEvent.Type.Resize
-        ):
-            self._reposition_keyboard_button()
-        return super().eventFilter(obj, event)
-
-    def _set_keyboard_active(self, active: bool) -> None:
-        color = theme.PURPLE if active else theme.TEXT_DIM
-        self._kbd_btn.setIcon(lucide.icon("keyboard", 14, color))
         self._pad.setStyleSheet(
             "background: transparent;"
             + (
                 f" border: 1px solid {theme.PURPLE}; border-radius: 6px;"
-                if active
+                if checked
                 else ""
             )
         )
-        self._reposition_keyboard_button()
 
     def focusInEvent(self, a0: QFocusEvent | None) -> None:
         super().focusInEvent(a0)
-        self._set_keyboard_active(True)
+        self._kbd_btn.setChecked(True)
 
     def focusOutEvent(self, a0: QFocusEvent | None) -> None:
         super().focusOutEvent(a0)
-        self._set_keyboard_active(False)
+        self._kbd_btn.setChecked(False)
 
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
         direction = arrow_key_direction(a0.key()) if a0 is not None else None
@@ -1681,13 +1675,16 @@ class SettingsWorkspace(Workspace):
         layout.addWidget(theme.section_title("Reference alignment", "move-3d"))
 
         status_row = QWidget()
+        status_row.setObjectName("ls-ref-status-row")
         status_row.setFixedHeight(theme.BTN_MIN_H)
         status_row.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
+        # Scope the border to the row itself so it does not cascade onto the
+        # child labels (an unselectored border applies to descendants too).
         status_row.setStyleSheet(
-            f"background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
-            " border-radius: 5px;"
+            f"QWidget#ls-ref-status-row {{ background: {theme.BG_CARD};"
+            f" border: 1px solid {theme.BORDER}; border-radius: 5px; }}"
         )
         status_layout = QHBoxLayout(status_row)
         status_layout.setContentsMargins(10, 0, 10, 0)
@@ -1752,13 +1749,15 @@ class SettingsWorkspace(Workspace):
             )
 
             cam_status_row = QWidget()
+            cam_status_row.setObjectName("ls-cam-status-row")
             cam_status_row.setFixedHeight(theme.BTN_MIN_H)
             cam_status_row.setSizePolicy(
                 QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
             )
+            # Scope the border to the row itself (see reference status row above).
             cam_status_row.setStyleSheet(
-                f"background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
-                " border-radius: 5px;"
+                f"QWidget#ls-cam-status-row {{ background: {theme.BG_CARD};"
+                f" border: 1px solid {theme.BORDER}; border-radius: 5px; }}"
             )
             cam_status_layout = QHBoxLayout(cam_status_row)
             cam_status_layout.setContentsMargins(10, 0, 10, 0)

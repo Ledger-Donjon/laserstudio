@@ -7,11 +7,61 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from . import theme
 
-_BRACKET = QColor(255, 255, 255, 115)  # rgba(255,255,255,0.45)
+# Shared HUD decoration tokens — used by the viewer overlay and workspace backdrops.
+GRID_STEP = 34
+GRID_LINE = QColor(255, 255, 255, 7)
+BRACKET = QColor(255, 255, 255, 115)  # rgba(255,255,255,0.45)
+INSET = 14
+BRACKET_LEN = 16
+LABEL_INSET = INSET + 4
+LABEL_FONT_SIZE = 10
+HUD_LABEL_SS = f"color: {theme.TEXT_MUTED}; background: transparent;"
+
 _SCALE_COLOR = QColor(theme.TEXT_MUTED)
-_INSET = 14
-_BRACKET_LEN = 16
 _TARGET_BAR_PX = 46.0
+
+
+def paint_grid_background(
+    painter: QPainter, width: int, height: int, *, bg: str = theme.BG_MAIN
+) -> None:
+    """Fill the widget and draw the 34 px viewer grid."""
+    painter.fillRect(0, 0, width, height, QColor(bg))
+    painter.setPen(GRID_LINE)
+    x = 0
+    while x <= width:
+        painter.drawLine(x, 0, x, height)
+        x += GRID_STEP
+    y = 0
+    while y <= height:
+        painter.drawLine(0, y, width, y)
+        y += GRID_STEP
+
+
+def paint_corner_brackets(painter: QPainter, width: int, height: int) -> None:
+    """Draw the four L-shaped corner brackets."""
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pen = QPen(BRACKET)
+    pen.setWidth(1)
+    painter.setPen(pen)
+
+    inset = INSET
+    blen = BRACKET_LEN
+    painter.drawLine(inset, inset, inset + blen, inset)
+    painter.drawLine(inset, inset, inset, inset + blen)
+    painter.drawLine(width - inset, inset, width - inset - blen, inset)
+    painter.drawLine(width - inset, inset, width - inset, inset + blen)
+    painter.drawLine(inset, height - inset, inset + blen, height - inset)
+    painter.drawLine(inset, height - inset, inset, height - inset - blen)
+    painter.drawLine(width - inset, height - inset, width - inset - blen, height - inset)
+    painter.drawLine(width - inset, height - inset, width - inset, height - inset - blen)
+
+
+def make_hud_label(parent: QWidget, text: str = "") -> QLabel:
+    """Return a top-left HUD annotation label with consistent font and color."""
+    lbl = QLabel(text, parent)
+    lbl.setStyleSheet(HUD_LABEL_SS)
+    lbl.setFont(theme.mono_font(LABEL_FONT_SIZE))
+    return lbl
 
 
 def _nice_scale(um: float) -> float:
@@ -45,23 +95,11 @@ class ViewerHud(QWidget):
         self._scale_um = 100.0
         self._scale_px = _TARGET_BAR_PX
 
-        self._tl = QLabel(self)
-        self._tl.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-family: monospace; font-size: 10px;"
-            " background: transparent;"
-        )
+        self._tl = make_hud_label(self)
 
-        self._tr = QLabel(self)
-        self._tr.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; background: transparent;"
-        )
-        self._tr.setFont(theme.mono_font(10))
+        self._tr = make_hud_label(self)
 
-        self._scale_lbl = QLabel(self)
-        self._scale_lbl.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-family: monospace; font-size: 10px;"
-            " background: transparent;"
-        )
+        self._scale_lbl = make_hud_label(self)
         self._scale_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self._refresh_labels()
@@ -88,7 +126,7 @@ class ViewerHud(QWidget):
 
     def _scale_bar_rect(self) -> tuple[int, int, int, int]:
         """Return (x, y, width, height) of the painted scale bar."""
-        m = _INSET + 4
+        m = LABEL_INSET
         self._scale_lbl.adjustSize()
         label_h = self._scale_lbl.height()
         bar_w = int(self._scale_px)
@@ -105,7 +143,7 @@ class ViewerHud(QWidget):
         self._reposition()
 
     def _reposition(self) -> None:
-        m = _INSET + 4
+        m = LABEL_INSET
         self._tl.move(m, m)
         self._tl.adjustSize()
         self._tr.adjustSize()
@@ -122,24 +160,8 @@ class ViewerHud(QWidget):
 
     def paintEvent(self, a0) -> None:  # noqa: N802
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(_BRACKET)
-        pen.setWidth(1)
-        painter.setPen(pen)
-
         w, h = self.width(), self.height()
-        inset = _INSET
-        blen = _BRACKET_LEN
-
-        # Corner brackets
-        painter.drawLine(inset, inset, inset + blen, inset)
-        painter.drawLine(inset, inset, inset, inset + blen)
-        painter.drawLine(w - inset, inset, w - inset - blen, inset)
-        painter.drawLine(w - inset, inset, w - inset, inset + blen)
-        painter.drawLine(inset, h - inset, inset + blen, h - inset)
-        painter.drawLine(inset, h - inset, inset, h - inset - blen)
-        painter.drawLine(w - inset, h - inset, w - inset - blen, h - inset)
-        painter.drawLine(w - inset, h - inset, w - inset, h - inset - blen)
+        paint_corner_brackets(painter, w, h)
 
         # Scale bar (drawn, not a child widget — avoids layout/visibility issues)
         bx, by, bw, bh = self._scale_bar_rect()
