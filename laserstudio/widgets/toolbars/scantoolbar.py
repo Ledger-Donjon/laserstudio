@@ -19,6 +19,9 @@ class ScanToolBar(QToolBar):
         group = laser_studio.viewer_buttons_group
         self.setAllowedAreas(Qt.ToolBarArea.TopToolBarArea)
         self.setFloatable(True)
+        # Guards __on_zone_selected against currentIndexChanged firing while
+        # __sync_zones is itself rebuilding the combo box (see __sync_zones).
+        self.__syncing = False
 
         # Activate scan-zone definition modes
         w = ColoredPushButton(":/icons/region_rect.svg", parent=self)
@@ -44,6 +47,24 @@ class ScanToolBar(QToolBar):
         group.addButton(w)
         group.setId(w, laser_studio.viewer.Mode.ZONE_POLY)
         self.addWidget(w)
+
+        # Active zone selector: drawing gestures target the selected zone.
+        self.zones = laser_studio.viewer.scan_zones
+        w = self.zone_combobox = QComboBox()
+        w.setToolTip("Zone that the drawing tools add to or subtract from")
+        w.setIconSize(QSize(16, 16))
+        w.setMinimumContentsLength(10)
+        w.currentIndexChanged.connect(self.__on_zone_selected)
+        self.addWidget(w)
+
+        w = QPushButton(self)
+        w.setToolTip("Add a new scanning zone")
+        w.setText("+")
+        w.clicked.connect(self.__on_add_zone)
+        self.addWidget(w)
+
+        self.zones.changed.connect(self.__sync_zones)
+        self.__sync_zones()
 
         # Go-to-next position button
         w = QPushButton(self)
@@ -122,3 +143,26 @@ class ScanToolBar(QToolBar):
             )
         )
         self.addWidget(w)
+
+    def __on_add_zone(self):
+        """Append a zone and make it the active one."""
+        self.zones.active_index = self.zones.add_zone()
+
+    def __on_zone_selected(self, index: int):
+        if self.__syncing or index < 0:
+            return
+        self.zones.active_index = index
+
+    def __sync_zones(self):
+        """Rebuild the zone list from the model."""
+        self.__syncing = True
+        try:
+            self.zone_combobox.clear()
+            for zone in self.zones.zones:
+                self.zone_combobox.addItem(
+                    create_color_qicon(zone.color), zone.name
+                )
+            if self.zones.zones:
+                self.zone_combobox.setCurrentIndex(self.zones.active_index)
+        finally:
+            self.__syncing = False

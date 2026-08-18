@@ -158,6 +158,35 @@ class RestProxy(QObject):
     def handle_clear_scangeometry(self) -> Config:
         return self.laser_studio.handle_clear_scangeometry()
 
+    def handle_scan_zones(self) -> Config:
+        return self.laser_studio.handle_scan_zones()
+
+    def handle_add_scan_zone(
+        self,
+        name: str | None,
+        color: str | None,
+        enabled: bool | None,
+        geometry: dict[str, Any] | None,
+    ) -> Config:
+        return self.laser_studio.handle_add_scan_zone(
+            name, color, enabled, geometry
+        )
+
+    def handle_update_scan_zone(
+        self,
+        index: int,
+        name: str | None,
+        color: str | None,
+        enabled: bool | None,
+        geometry: dict[str, Any] | None,
+    ) -> Config:
+        return self.laser_studio.handle_update_scan_zone(
+            index, name, color, enabled, geometry
+        )
+
+    def handle_delete_scan_zone(self, index: int) -> Config:
+        return self.laser_studio.handle_delete_scan_zone(index)
+
 
 class RestThread(QThread):
     """
@@ -320,7 +349,10 @@ class InstrumentSettingsBody(BaseModel):
 
 class ScanGeometryBody(BaseModel):
     settings: dict[str, Any] = Field(
-        description="Scan geometry settings (``geometry`` and optional ``density``).",
+        description="Scan zone settings: ``zones`` (list of "
+        "``{name, color, enabled, geometry}``), optional ``density`` and "
+        "optional ``active`` index. The historical single-``geometry`` form is "
+        "still accepted and loads as one zone.",
         examples=[
             {
                 "density": 100,
@@ -336,6 +368,55 @@ class ScanGeometryBody(BaseModel):
                         "interiors": [],
                     }
                 },
+            }
+        ],
+    )
+
+
+class ScanZoneBody(BaseModel):
+    """Fields of a scan zone. Every field is optional on both POST and PATCH.
+
+    On a PATCH, an omitted or ``null`` field is left unchanged, so a PATCH
+    with an empty body is a no-op; only the fields actually supplied are
+    applied.
+    """
+
+    name: str | None = Field(
+        default=None,
+        description="Zone name. Defaults to ``Zone <n>`` on creation.",
+        examples=["Corner pads"],
+    )
+    color: str | None = Field(
+        default=None,
+        description="Zone colour as ``#rrggbb`` (``#rrggbbaa`` accepted). "
+        "Defaults to the next colour of the zone palette on creation.",
+        examples=["#ff5300"],
+    )
+    enabled: bool | None = Field(
+        default=None,
+        description="Whether the zone contributes to point generation. "
+        "Defaults to true on creation.",
+        examples=[True],
+    )
+    geometry: dict[str, Any] | None = Field(
+        default=None,
+        description="Serialized shape (``polygon`` or ``multipolygon``). "
+        "Replaces the zone's shape, discarding its add/subtract history. "
+        "Omitting this field on a PATCH leaves the shape untouched; to "
+        "explicitly clear it instead, send "
+        "``{\"geometrycollection\": null}``.",
+        examples=[
+            {
+                "polygon": {
+                    "exterior": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 100.0, "y": 0.0},
+                        {"x": 100.0, "y": 100.0},
+                        {"x": 0.0, "y": 100.0},
+                        {"x": 0.0, "y": 0.0},
+                    ],
+                    "interiors": [],
+                }
             }
         ],
     )
@@ -589,8 +670,50 @@ def put_scangeometry(body: ScanGeometryBody):
 @scangeometry_router.delete("")
 @scangeometry_router.delete("/", include_in_schema=False)
 def delete_scangeometry():
-    """Clear the scan geometry (empty polygon) and return the new settings."""
+    """Delete every scan zone and return the new settings.
+
+    Removes the zones entirely, names and colours included. To empty a single
+    zone's shape while keeping the zone, PATCH it with
+    ``{"geometry": {"geometrycollection": null}}``.
+    """
     return RestServer.run("handle_clear_scangeometry")
+
+
+@scangeometry_router.get("/zones")
+def get_scan_zones():
+    """Return the list of scan zones and the active zone index."""
+    return RestServer.run("handle_scan_zones")
+
+
+@scangeometry_router.post("/zones", responses={400: _ERR})
+def post_scan_zone(body: ScanZoneBody):
+    """Create a scan zone and return its index and settings."""
+    return RestServer.run(
+        "handle_add_scan_zone", body.name, body.color, body.enabled, body.geometry
+    )
+
+
+@scangeometry_router.patch("/zones/{index}", responses={404: _ERR, 400: _ERR})
+def patch_scan_zone(index: int, body: ScanZoneBody):
+    """Update a scan zone and return its index and settings.
+
+    Omitted or ``null`` fields are left unchanged; a PATCH with an empty
+    body is a no-op.
+    """
+    return RestServer.run(
+        "handle_update_scan_zone",
+        index,
+        body.name,
+        body.color,
+        body.enabled,
+        body.geometry,
+    )
+
+
+@scangeometry_router.delete("/zones/{index}", responses={404: _ERR})
+def delete_scan_zone(index: int):
+    """Delete a scan zone and return the remaining zones."""
+    return RestServer.run("handle_delete_scan_zone", index)
 
 
 for _router in (

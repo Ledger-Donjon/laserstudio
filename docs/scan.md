@@ -10,13 +10,90 @@ within the defined zones that are .
 
 ## Defining zones
 
-In order to define the zone to scan, you have to use the Zone definition tool.
+In order to define a zone to scan, you have to use the Zone definition tool.
 
-Click and drag to define rectangle that will be the region added to the scanning zone.
-Press the SHIFT key while dragging to specify a rectangle that will be removed from the scanning zone.
+Click and drag to define a rectangle that will be the region added to the
+active zone. Press the SHIFT key while dragging to specify a rectangle that
+will be removed from the active zone.
 
-Each time the scanning zone is modified, the scan path is re-generated and
+Each time the active zone is modified, the scan path is re-generated and
 updated in the Viewer to show the 10 first points.
+
+## Multiple scan zones
+
+Scanning zones are organised as a list. Each zone has a name, a colour and an
+enabled flag, and can be created, renamed, recoloured, enabled, disabled or
+deleted independently.
+
+One zone is *active* at a time. The drawing tools always target the active
+zone: dragging adds to it, and Shift-dragging subtracts from it. Other zones
+are never modified by a drawing gesture. Drawing with no zone in the list
+creates `Zone 1` first; adding a zone thereafter (via the "+" button or the
+Scan tab's "Add zone" button) names it `Zone <n>`, where `<n>` is derived from
+the highest existing `Zone <n>` name plus one — not a simple count — so
+deleting a zone and adding another never reuses a name still in the list.
+
+Point generation runs on the **union of the enabled zones**. Disabling a zone
+excludes it from `go_next` without losing its shape, which makes it easy to try
+a subset of the zones and put them back afterwards.
+
+Enabled zones are drawn with a solid outline and a translucent fill in their own
+colour. A disabled zone is not drawn at all, unless it is the active zone — in
+which case it appears as a dashed outline so that drawing into it stays visible.
+
+Select the active zone from the combo box in the Scanning Zones toolbar of the
+classic window, or from the zone list of the Scan tab in the new interface. The
+zone list also holds the name field, the colour swatch, the enable toggle and
+the delete button for each zone.
+
+Both windows share the same zone list, as does the {doc}`rest`.
+
+## Scan zones over the API
+
+The zone list is available through the {doc}`rest`:
+
+* `GET /scangeometry/zones` — the zones and the active index
+* `POST /scangeometry/zones` — create a zone (`name`, `color`, `enabled`,
+  `geometry` are all optional)
+* `PATCH /scangeometry/zones/{index}` — update any subset of those fields
+* `DELETE /scangeometry/zones/{index}` — delete a zone
+
+Zones are addressed by 0-based index. Colours are returned as `#rrggbb`
+strings; `#rrggbbaa` is also accepted on input, but the alpha byte is not
+persisted, so it will not survive a later `GET`. `POST` and `PATCH` reject a
+malformed `color` or `geometry` with a `400 INVALID_PARAMETER` error. `PUT
+/scangeometry`, by contrast, is the same code path used to load
+`settings.yaml`: a malformed zone entry there is skipped and logged rather
+than rejected, so a bad entry elsewhere in the payload does not prevent the
+rest of the file from loading.
+
+`GET /scangeometry` returns `density`, `active`, the `zones` list and a
+`geometry` key holding the flattened union of the enabled zones. `PUT
+/scangeometry` accepts either the `zones` form or the historical single
+`geometry` form, which loads as one zone.
+
+`DELETE /scangeometry` deletes **every** zone, names and colours included — not
+just their shapes. To empty a single zone's shape while keeping the zone, patch
+it with `{"geometry": {"geometrycollection": null}}`.
+
+With the {doc}`lsapi` client:
+
+```python
+from laserstudio.lsapi import LSAPI
+
+lsapi = LSAPI()
+
+# Create a disabled zone and switch it on later.
+index = lsapi.add_scan_zone(name="Corner pads", color="#ff5300", enabled=False)["index"]
+lsapi.update_scan_zone(index, enabled=True)
+
+# Scan only that zone by disabling the others.
+for other in range(len(lsapi.scan_zones()["zones"])):
+    if other != index:
+        lsapi.update_scan_zone(other, enabled=False)
+
+lsapi.go_next()
+```
 
 ## Go Next command
 

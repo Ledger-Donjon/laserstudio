@@ -26,9 +26,13 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, read or update scan geometry, read or move the stage, run
-scans (go_next), focus, manage markers, and capture camera images or
+instrument settings, manage scan zones (create, rename, recolour, enable or
+disable, delete), read or update the overall scan geometry, read or move the
+stage, run scans (go_next), focus, manage markers, and capture camera images or
 screenshots.
+
+Scanning runs on the union of the *enabled* zones: disable a zone to exclude it
+from go_next without losing its shape.
 
 Tools fail with an explicit error message prefixed by a machine-readable code
 (e.g. INSTRUMENT_NOT_FOUND, DEVICE_UNAVAILABLE, INVALID_PARAMETER) when an
@@ -86,8 +90,73 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
 
     @mcp.tool()
     def delete_scangeometry() -> dict[str, Any]:
-        """Clear the scan geometry by setting an empty polygon."""
+        """Delete EVERY scan zone, including their names, colours and enabled
+        flags — not just their shapes.
+
+        To empty one zone's shape while keeping the zone itself, call
+        `update_scan_zone` with `geometry={"geometrycollection": null}`.
+        """
         return call(api.delete_scangeometry)
+
+    @mcp.tool()
+    def get_scan_zones() -> dict[str, Any]:
+        """List the scan zones (name, colour, enabled, shape) and which is active."""
+        return call(api.scan_zones)
+
+    @mcp.tool()
+    def add_scan_zone(
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a scan zone.
+
+        Defaults: name "Zone <n>", the next colour of the zone palette,
+        enabled, and an empty shape. `color` is "#rrggbb".
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see an
+        existing zone's geometry as a template.
+        """
+        return call(api.add_scan_zone, name, color, enabled, geometry)
+
+    @mcp.tool()
+    def update_scan_zone(
+        index: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Rename, recolour, enable/disable or reshape the scan zone at `index`.
+
+        `index` is the 0-based position reported by get_scan_zones. Only the
+        given fields change. Disabling a zone excludes it from point
+        generation without deleting it.
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see the
+        zone's current geometry as a template.
+        """
+        return call(api.update_scan_zone, index, name, color, enabled, geometry)
+
+    @mcp.tool()
+    def delete_scan_zone(index: int) -> dict[str, Any]:
+        """Delete the scan zone at `index` (0-based, from get_scan_zones) and
+        return the remaining zones.
+
+        Deleting shifts the indices of every zone after it, so when deleting
+        several zones, re-list with get_scan_zones between calls rather than
+        reusing indices computed before earlier deletes.
+        """
+        return call(api.delete_scan_zone, index)
 
     # -- Motion ------------------------------------------------------------- #
 

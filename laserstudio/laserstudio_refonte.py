@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .instruments.instruments import Instruments
+from .utils.scanzones import ScanZones
 from .utils.util import resource_path
 from .utils.yaml_types import Config
 from .widgets.newui import lucide, theme
@@ -50,12 +51,15 @@ class LaserStudioRefonte(QMainWindow):
         config_path: Path | None = None,
         config_loaded: bool = False,
         yaml_config: Config | None = None,
+        scan_zones: ScanZones | None = None,
     ) -> None:
+        """:param scan_zones: Scan zone model shared with the classic window."""
         super().__init__()
         self.instruments = instruments
         config_path = config_path or Path("config.yaml")
         self.yaml_config = yaml_config
         self.laser_armed = False
+        self._scan_zones = scan_zones
 
         self.setWindowTitle("Laser Studio · New UI")
         self.setMinimumSize(1200, 720)
@@ -65,7 +69,7 @@ class LaserStudioRefonte(QMainWindow):
             ConfigWorkspace(yaml_config, config_path, config_loaded, self),
             SettingsWorkspace(self),
             PhotoemissionWorkspace(),
-            ScanWorkspace(),
+            ScanWorkspace(self),
             AnalyzeWorkspace(),
         ]
 
@@ -228,7 +232,7 @@ class LaserStudioRefonte(QMainWindow):
     # ── Viewer area ───────────────────────────────────────────────────────────
 
     def _build_viewer_area(self) -> ViewerArea:
-        area = ViewerArea()
+        area = ViewerArea(scan_zones=self._scan_zones)
         instr = self.instruments
         if instr.stage is not None or instr.camera is not None:
             area.viewer.add_stage_sight(

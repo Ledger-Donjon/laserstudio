@@ -45,6 +45,7 @@ from ..instruments.stage import MoveFor, Vector
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
 from ..utils.background_align import BackgroundPin, compute_affine_transform
+from ..utils.scanzones import ScanZones, default_zone_color
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -74,7 +75,17 @@ class Viewer(QGraphicsView):
     # Background reference image state
     background_changed = pyqtSignal()
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        scan_zones: ScanZones | None = None,
+    ):
+        """
+        :param parent: Parent widget.
+        :param scan_zones: Scan zone model to display. When ``None`` a private
+            model is created; pass an existing one to share the zones with
+            another viewer (both windows do this, see ``__main__``).
+        """
         super().__init__(parent)
 
         # # Align objects to the center
@@ -109,9 +120,10 @@ class Viewer(QGraphicsView):
         self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
-        # Scanning geometry object and its representative item in the view.
-        # Also includes the scan path
-        self.scan_geometry = ScanGeometry()
+        # `scan_zones` is the shared model (zones + scan path); `scan_geometry`
+        # is this window's own graphics view of it, added to `self.__scene`.
+        self.scan_zones = scan_zones if scan_zones is not None else ScanZones()
+        self.scan_geometry = ScanGeometry(self.scan_zones)
         self.__scene.addItem(self.scan_geometry)
         self.scan_geometry.setZValue(3)
 
@@ -657,9 +669,9 @@ class Viewer(QGraphicsView):
         """
         result: Config = {}
 
-        if self.scan_geometry and self.stage_sight is not None:
-            """Get position of the next point from the scan geometry"""
-            next_point_tuple = self.scan_geometry.next_point()
+        if self.stage_sight is not None:
+            """Get position of the next point from the shared scan zones"""
+            next_point_tuple = self.scan_zones.next_point()
 
             if next_point_tuple is not None:
                 next_point = list(next_point_tuple)
@@ -684,19 +696,29 @@ class Viewer(QGraphicsView):
                 Qt.KeyboardModifier.ShiftModifier
                 in QGuiApplication.queryKeyboardModifiers()
             )
-        color = ("red" if has_shift else "green") if is_valid else "orange"
-        self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
-        c = (
-            (QColorConstants.Red if has_shift else QColorConstants.Green)
-            if is_valid
-            else QColorConstants.DarkYellow
+        if not is_valid:
+            # Self-intersecting outline: neither adding nor removing would work.
+            base = QColor(QColorConstants.DarkYellow)
+        elif has_shift:
+            # Subtracting is an erase gesture, so it keeps its own red signal
+            # rather than borrowing the zone's colour.
+            base = QColor(QColorConstants.Red)
+        else:
+            # Adding: draw in the colour of the zone the shape will land in, so
+            # it is obvious which zone the gesture targets. With no zone yet,
+            # preview the colour the about-to-be-created Zone 1 will get.
+            zone = self.scan_zones.active_zone
+            base = QColor(zone.color) if zone is not None else default_zone_color(0)
+
+        self.setStyleSheet(
+            f"QGraphicsView {{ selection-background-color: {base.name()}; }}"
         )
-        pen = QPen(c)
-        if isinstance(c, QColor):
-            c.setAlpha(64)
+        pen = QPen(base)
         pen.setCosmetic(True)
+        fill = QColor(base)
+        fill.setAlpha(64)
         self.zone_poly_item.setPen(pen)
-        self.zone_poly_item.setBrush(QBrush(c))
+        self.zone_poly_item.setBrush(QBrush(fill))
 
     def __update_drag_mode(self):
         if self.mode == Viewer.Mode.ZONE:

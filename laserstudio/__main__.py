@@ -17,6 +17,7 @@ from .laserstudio_refonte import LaserStudioRefonte
 from .utils.util import resource_path
 from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
 from .instruments.list_serials import list_devices
+from .utils.scanzones import ScanZones
 from .utils.yaml_types import Config
 
 
@@ -106,7 +107,11 @@ def main() -> int:
         yaml_config = wizard.config_result_page.config
         logger.info("Configuration generated successfully")
 
-    win = LaserStudio(yaml_config)
+    # Created once, in a neutral place, so neither window has to be built
+    # first to become the source the other one reaches into.
+    scan_zones = ScanZones()
+
+    win = LaserStudio(yaml_config, scan_zones=scan_zones)
     win.setWindowTitle(app.applicationDisplayName() + " (Classic)")
     win.show()
 
@@ -115,6 +120,7 @@ def main() -> int:
         config_path=pathlib.Path(args.config),
         config_loaded=yaml_config is not None,
         yaml_config=yaml_config,
+        scan_zones=scan_zones,
     )
     win_new.show()
 

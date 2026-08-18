@@ -200,6 +200,7 @@ _PATHS: dict[str, str] = {
         '<path d="M7 16h10"/><path d="M8 12h.01"/>'
         '<rect width="20" height="16" x="2" y="4" rx="2"/>'
     ),
+    "plus": ('<path d="M5 12h14"/><path d="M12 5v14"/>'),
 }
 
 

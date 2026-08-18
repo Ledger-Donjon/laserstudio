@@ -53,7 +53,9 @@ from .restserver.errors import (
     InstrumentNotFoundError,
     InvalidParameterError,
     MemoryPointNotFoundError,
+    ScanZoneNotFoundError,
 )
+from .utils.scanzones import ScanZones
 from .utils.yaml_types import Config
 
 
@@ -62,12 +64,19 @@ class LaserStudio(QMainWindow):
     Laser Studio main class and main window.
     """
 
-    def __init__(self, config_file: Config | None):
+    def __init__(
+        self,
+        config_file: Config | None,
+        scan_zones: ScanZones | None = None,
+    ):
         """
         Initialize the Laser Studio main window.
 
         :param config: Optional configuration dictionary.
             If None, an empty configuration is used.
+        :param scan_zones: Scan zone model to display. When ``None`` a private
+            model is created; pass an existing one to share the zones with
+            another window (see ``__main__``).
         """
         super().__init__()
 
@@ -86,7 +95,7 @@ class LaserStudio(QMainWindow):
         self.instruments = Instruments(config)
 
         # Creation of Viewer as the central widget
-        self.viewer = Viewer()
+        self.viewer = Viewer(scan_zones=scan_zones)
         self.setCentralWidget(self.viewer)
 
         # Add StageSight if there is a Stage instrument or a camera
@@ -578,25 +587,191 @@ class LaserStudio(QMainWindow):
             positions.append([scene_point.x(), scene_point.y()])
         return {"positions": positions}
 
+    #: A pre-zones payload describing an empty scan geometry. Nothing in this
+    #: code base uses it any more — :meth:`handle_clear_scangeometry` clears the
+    #: zone list directly — but it is kept because it is a public attribute that
+    #: external scripts may import, and it is still a valid
+    #: :meth:`handle_scangeometry` argument.
     EMPTY_SCAN_GEOMETRY: Config = {
         "geometry": {"polygon": {"exterior": [], "interiors": []}}
     }
 
     def handle_scangeometry(self, settings: Config | None = None) -> Config:
-        """Get or set the viewer scan geometry settings.
+        """Get or set the scan zone settings.
 
-        :param settings: If provided, apply these settings to the scan geometry.
-            If ``None``, return the current settings unchanged.
-        :return: The current scan geometry settings.
+        :param settings: If provided, apply these settings. Accepts both the
+            zones form (``{"zones": [...]}``) and the historical single
+            geometry form (``{"geometry": ...}``).
+        :return: The current scan zone settings.
         """
         if settings is not None:
-            self.viewer.scan_geometry.settings = settings
-        return self.viewer.scan_geometry.settings
+            self.viewer.scan_zones.settings = settings
+        return self.viewer.scan_zones.settings
 
     def handle_clear_scangeometry(self) -> Config:
-        """Clear the scan geometry by setting an empty polygon."""
-        self.viewer.scan_geometry.settings = self.EMPTY_SCAN_GEOMETRY
-        return self.viewer.scan_geometry.settings
+        """Remove every scan zone."""
+        self.viewer.scan_zones.clear()
+        return self.viewer.scan_zones.settings
+
+    def __check_scan_zone_index(self, index: int) -> None:
+        """:raises ScanZoneNotFoundError: if ``index`` is out of range."""
+        count = len(self.viewer.scan_zones.zones)
+        if not (0 <= index < count):
+            raise ScanZoneNotFoundError(index, details={"available": count})
+
+    def __check_scan_zone_color(self, color: str) -> None:
+        """:raises InvalidParameterError: if ``color`` is not a valid colour."""
+        if not self.__is_valid_scan_zone_color(color):
+            raise InvalidParameterError(
+                f"Invalid scan zone colour: {color!r}. Expected '#rrggbb' or "
+                "'#rrggbbaa', or a name Qt understands.",
+                details={"color": color},
+            )
+
+    @staticmethod
+    def __is_valid_scan_zone_color(color: Any) -> bool:
+        """Mirrors the colour forms :func:`~laserstudio.utils.scanzones.parse_color`
+        accepts, without inheriting its lenient fallback-to-default behaviour."""
+        if not isinstance(color, str):
+            return False
+        text = color.strip()
+        if len(text) == 9 and text.startswith("#"):
+            if not QColor(text[:7]).isValid():
+                return False
+            try:
+                alpha = int(text[7:], 16)
+            except ValueError:
+                return False
+            return 0 <= alpha <= 255
+        return QColor(text).isValid()
+
+    def __check_scan_zone_geometry(self, geometry: Any) -> None:
+        """:raises InvalidParameterError: if ``geometry`` is not a usable
+        serialized shape (as produced by
+        :func:`~laserstudio.utils.scanzones.shapely_to_yaml`)."""
+        if not self.__is_valid_scan_zone_geometry(geometry):
+            raise InvalidParameterError(
+                "Invalid scan zone geometry: expected a serialized 'polygon' "
+                "(with an 'exterior' list of {'x', 'y'} points and an "
+                "optional 'interiors' list of such lists), 'multipolygon' "
+                "(a list of such geometries) or 'geometrycollection'.",
+                details={"geometry": geometry},
+            )
+
+    def __is_valid_scan_zone_geometry(self, geometry: Any) -> bool:
+        if not isinstance(geometry, dict) or len(geometry) != 1:
+            return False
+        type_, value = next(iter(geometry.items()))
+        if type_ == "geometrycollection":
+            return True
+        if type_ == "polygon":
+            return self.__is_valid_scan_zone_ring_set(value)
+        if type_ == "multipolygon":
+            return isinstance(value, list) and all(
+                self.__is_valid_scan_zone_geometry(item) for item in value
+            )
+        return False
+
+    def __is_valid_scan_zone_ring_set(self, value: Any) -> bool:
+        if not isinstance(value, dict) or "exterior" not in value:
+            return False
+        if not self.__is_valid_scan_zone_point_list(value["exterior"]):
+            return False
+        interiors = value.get("interiors") or []
+        if not isinstance(interiors, list):
+            return False
+        return all(
+            self.__is_valid_scan_zone_point_list(ring) for ring in interiors
+        )
+
+    @staticmethod
+    def __is_valid_scan_zone_point_list(points: Any) -> bool:
+        if not isinstance(points, list):
+            return False
+        for point in points:
+            if not isinstance(point, dict):
+                return False
+            x, y = point.get("x"), point.get("y")
+            if isinstance(x, bool) or isinstance(y, bool):
+                return False
+            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+                return False
+        return True
+
+    def handle_scan_zones(self) -> Config:
+        """:return: The list of scan zones and the active zone index."""
+        zones = self.viewer.scan_zones
+        return {
+            "zones": [zone.settings for zone in zones.zones],
+            "active": zones.active_index,
+        }
+
+    def handle_add_scan_zone(
+        self,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> Config:
+        """Create a scan zone.
+
+        :param name: Zone name. Defaults to ``Zone <n>``.
+        :param color: ``#rrggbb`` colour. Defaults to the next zone colour.
+        :param enabled: Whether the zone is scanned. Defaults to True.
+        :param geometry: Serialized shape. Defaults to an empty zone.
+        :return: The new zone's index and settings.
+        :raises InvalidParameterError: if ``color`` or ``geometry`` is given
+            but unusable.
+        """
+        if color is not None:
+            self.__check_scan_zone_color(color)
+        if geometry is not None:
+            self.__check_scan_zone_geometry(geometry)
+        zones = self.viewer.scan_zones
+        index = zones.add_zone(
+            name=name,
+            color=color,
+            enabled=True if enabled is None else enabled,
+            geometry=geometry,
+        )
+        return {"index": index, "zone": zones.zone(index).settings}
+
+    def handle_update_scan_zone(
+        self,
+        index: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> Config:
+        """Update any subset of a scan zone's attributes.
+
+        :param index: 0-based index of the zone to update.
+        :return: The zone's index and updated settings.
+        :raises ScanZoneNotFoundError: if the index is out of range.
+        :raises InvalidParameterError: if ``color`` or ``geometry`` is given
+            but unusable.
+        """
+        self.__check_scan_zone_index(index)
+        if color is not None:
+            self.__check_scan_zone_color(color)
+        if geometry is not None:
+            self.__check_scan_zone_geometry(geometry)
+        zone = self.viewer.scan_zones.update_zone(
+            index, name=name, color=color, enabled=enabled, geometry=geometry
+        )
+        return {"index": index, "zone": zone.settings}
+
+    def handle_delete_scan_zone(self, index: int) -> Config:
+        """Delete a scan zone.
+
+        :param index: 0-based index of the zone to delete.
+        :return: The remaining zones and the active zone index.
+        :raises ScanZoneNotFoundError: if the index is out of range.
+        """
+        self.__check_scan_zone_index(index)
+        self.viewer.scan_zones.remove_zone(index)
+        return self.handle_scan_zones()
 
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
@@ -664,7 +839,7 @@ class LaserStudio(QMainWindow):
             data["camera"] = self.instruments.camera.settings
 
         # Scanning geometry
-        data["scangeometry"] = self.viewer.scan_geometry.settings
+        data["scangeometry"] = self.viewer.scan_zones.settings
 
         # Lighting
         if self.instruments.light is not None:
@@ -729,7 +904,7 @@ class LaserStudio(QMainWindow):
         geometry = data.get("scangeometry")
         logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {geometry}...")
         if geometry is not None:
-            self.viewer.scan_geometry.settings = geometry
+            self.viewer.scan_zones.settings = geometry
 
         # Probes
         probes = data.get("probes", [])

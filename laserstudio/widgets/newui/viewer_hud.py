@@ -1,11 +1,16 @@
 """HUD overlay drawn on top of the spatial viewer."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from . import theme
+
+if TYPE_CHECKING:
+    from ...utils.scanzones import ScanZones
 
 _BRACKET = QColor(255, 255, 255, 115)  # rgba(255,255,255,0.45)
 _SCALE_COLOR = QColor(theme.TEXT_MUTED)
@@ -151,14 +156,19 @@ class ViewerHud(QWidget):
 class ViewerArea(QWidget):
     """Viewer widget with a HUD overlay on top."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        scan_zones: "ScanZones | None" = None,
+    ) -> None:
+        """:param scan_zones: Shared scan zone model, forwarded to the Viewer."""
         super().__init__(parent)
         self.setObjectName("ls-viewer-area")
         self.setStyleSheet(f"QWidget#ls-viewer-area {{ background: {theme.BG_MAIN}; }}")
 
         from ..viewer import Viewer
 
-        self.viewer = Viewer(self)
+        self.viewer = Viewer(self, scan_zones=scan_zones)
         self.hud = ViewerHud(self)
         self._distortion_overlay = None
 

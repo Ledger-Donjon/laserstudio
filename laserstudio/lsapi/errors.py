@@ -67,6 +67,12 @@ class MemoryPointNotFound(LSAPIError):
     code = "MEMORY_POINT_NOT_FOUND"
 
 
+class ScanZoneNotFound(LSAPIError):
+    """No scan zone matches the requested index."""
+
+    code = "SCAN_ZONE_NOT_FOUND"
+
+
 class DeviceUnavailable(LSAPIError):
     """A required device is not available (HTTP 503)."""
 
@@ -92,6 +98,7 @@ _CODE_TO_EXCEPTION: dict[str, type[LSAPIError]] = {
         InvalidParameter,
         InstrumentNotFound,
         MemoryPointNotFound,
+        ScanZoneNotFound,
         DeviceUnavailable,
         Conflict,
         ActionNotImplemented,
@@ -155,6 +162,7 @@ __all__ = [
     "InvalidParameter",
     "InstrumentNotFound",
     "MemoryPointNotFound",
+    "ScanZoneNotFound",
     "DeviceUnavailable",
     "Conflict",
     "ActionNotImplemented",

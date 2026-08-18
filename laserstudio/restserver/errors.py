@@ -89,6 +89,21 @@ class MemoryPointNotFoundError(LaserStudioError):
         )
 
 
+class ScanZoneNotFoundError(LaserStudioError):
+    """No scan zone matches the requested index."""
+
+    code = "SCAN_ZONE_NOT_FOUND"
+    http_status = HTTPStatus.NOT_FOUND
+
+    def __init__(self, index: int, *, details: dict[str, Any] | None = None):
+        merged: dict[str, Any] = {"index": index}
+        if details:
+            merged.update(details)
+        super().__init__(
+            f"No scan zone exists at index {index}.", details=merged
+        )
+
+
 class DeviceUnavailableError(LaserStudioError):
     """A device required to perform the action is not available."""
 
@@ -115,6 +130,7 @@ __all__ = [
     "InvalidParameterError",
     "InstrumentNotFoundError",
     "MemoryPointNotFoundError",
+    "ScanZoneNotFoundError",
     "DeviceUnavailableError",
     "ConflictError",
     "ActionNotImplementedError",
