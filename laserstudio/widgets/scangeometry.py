@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 
@@ -12,7 +14,8 @@ from PyQt6.QtWidgets import (
 )
 from shapely.geometry import Polygon
 
-from ..utils.scanzones import ScanZone, ScanZones
+from ..utils.scanzones import ScanZone
+from ..instruments.scans import ScansInstrument
 from .scanpath import ScanPath
 
 # Generic marker attribute (see softlimits.EDIT_HANDLE_ATTR) so the Viewer
@@ -32,8 +35,8 @@ class _ZoneVertexHandle(QGraphicsRectItem):
 
     def __init__(
         self,
-        owner: "ScanGeometry",
-        zone_index: int,
+        owner: ScanGeometry,
+        zone_id: int,
         geom_index: int,
         ring_index: int,
         vertex_index: int,
@@ -50,7 +53,7 @@ class _ZoneVertexHandle(QGraphicsRectItem):
         )
         setattr(self, EDIT_HANDLE_ATTR, True)
         self._owner = owner
-        self.zone_index = zone_index
+        self.zone_id = zone_id
         self.geom_index = geom_index
         self.ring_index = ring_index
         self.vertex_index = vertex_index
@@ -63,7 +66,7 @@ class _ZoneVertexHandle(QGraphicsRectItem):
         self.setCursor(Qt.CursorShape.SizeAllCursor)
 
     def set_color(self, color: QColor):
-        """Tint the handle with its zone's colour."""
+        """Tint the handle with its zone's color."""
         self._color = QColor(color)
         self._apply_style(hovered=False)
 
@@ -112,7 +115,7 @@ def _poly_to_path_item(
         much better display for polygons with holes.
 
     :param poly: The Shapely Polygon to convert to Graphics Path Item
-    :param color: The owning zone's colour
+    :param color: The owning zone's color
     :param filled: False draws a dashed outline with no fill (disabled zone)
     :param active: True thickens the outline (the zone being drawn into)
     :return: A Graphics path item
@@ -149,7 +152,7 @@ def _poly_to_path_item(
 class ScanGeometry(QGraphicsItemGroup):
     """Scene representation of a :class:`ScanZones` model.
 
-    Draws one path item per rendered zone in that zone's colour, plus the scan
+    Draws one path item per rendered zone in that zone's color, plus the scan
     path, and owns the interactive vertex handles. Holds no geometry of its
     own: several instances (one per viewer) can render the same model.
 
@@ -159,7 +162,7 @@ class ScanGeometry(QGraphicsItemGroup):
     still visible. The active zone's outline is thicker.
     """
 
-    def __init__(self, zones: ScanZones, parent: QGraphicsItem | None = None):
+    def __init__(self, zones: ScansInstrument, parent: QGraphicsItem | None = None):
         super().__init__(parent)
         self.zones = zones
 
@@ -172,16 +175,12 @@ class ScanGeometry(QGraphicsItemGroup):
 
         # Interactive vertex-edition state.
         self.__vertex_handles: list[_ZoneVertexHandle] = []
-        self.__editing = False
         self.__handles_dragging = False
-        self.__edit_zone_index = -1
-        self.__edit_zone: ScanZone | None = None
-        self.__edit_polys: list[Polygon] = []
-        self.__edit_pre_polys: list[Polygon] = []
+        self.__editing_zone: ScanZone | None = None
 
-        zones.changed.connect(self.__on_zones_changed)
+        zones.zone_changed.connect(self.__on_zones_changed)
         zones.path_changed.connect(self.__update_scan_path)
-        self.__on_zones_changed()
+        self.__on_zones_changed(-1)
 
     # -- Drawing gestures (called by the Viewer) ---------------------------- #
 
@@ -206,15 +205,13 @@ class ScanGeometry(QGraphicsItemGroup):
 
     # -- Model-driven rendering --------------------------------------------- #
 
-    def __rendered_zones(self) -> list[tuple[int, bool]]:
-        """:return: (zone index, is active) for every zone that gets drawn."""
-        active = self.zones.active_index
-        result: list[tuple[int, bool]] = []
-        for index, zone in enumerate(self.zones.zones):
-            is_active = index == active
-            if zone.enabled or is_active:
-                result.append((index, is_active))
-        return result
+    def __rendered_zones(self) -> list[ScanZone]:
+        """Return every zone that gets drawn (eg. enabled or active)."""
+        return [
+            zone
+            for zone in self.zones.zones.values()
+            if (zone.enabled or zone == self.zones.active_zone)
+        ]
 
     def __clear_scan_geometry_items(self):
         """Clear the scan geometry items."""
@@ -222,11 +219,11 @@ class ScanGeometry(QGraphicsItemGroup):
             child.setParentItem(None)
             del child
 
-    def __on_zones_changed(self):
-        """Rebuild every scene item from the model."""
+    def __on_zones_changed(self, zone_id: int):
+        """Rebuild all scene items from the model."""
         self.__clear_scan_geometry_items()
-        for index, is_active in self.__rendered_zones():
-            zone = self.zones.zones[index]
+        for zone in self.__rendered_zones():
+            is_active = self.zones.active_zone == zone
             for poly in zone.polygons:
                 if not poly.is_valid:
                     logging.getLogger("laserstudio").warning(
@@ -242,7 +239,7 @@ class ScanGeometry(QGraphicsItemGroup):
         self.__scan_path.diameter = self.zones.point_diameter
         self.__update_scan_path()
 
-        if not self.__editing:
+        if self.__editing_zone is None:
             self.__rebuild_handles()
 
     def __update_scan_path(self):
@@ -324,8 +321,7 @@ class ScanGeometry(QGraphicsItemGroup):
         if scene is None:
             return
 
-        for zone_index, _ in self.__rendered_zones():
-            zone = self.zones.zones[zone_index]
+        for zone in self.__rendered_zones():
             for geom_index, poly in enumerate(zone.polygons):
                 if not poly.is_valid:
                     continue
@@ -335,7 +331,7 @@ class ScanGeometry(QGraphicsItemGroup):
                         self.__ring_coords(poly, ring_index)
                     ):
                         handle = _ZoneVertexHandle(
-                            self, zone_index, geom_index, ring_index, vertex_index
+                            self, zone.id, geom_index, ring_index, vertex_index
                         )
                         handle.set_color(zone.color)
                         handle.setPos(QPointF(x, y))
@@ -344,13 +340,21 @@ class ScanGeometry(QGraphicsItemGroup):
                         self.__vertex_handles.append(handle)
 
     def __reposition_handles(self):
-        """Update handle positions from the edited polygons (no recreation)."""
+        """Update handle positions from the edited zone (no recreation)."""
+        if self.__editing_zone is None:
+            return
         for handle in self.__vertex_handles:
-            if handle.zone_index != self.__edit_zone_index:
+            if handle.zone_id != self.__editing_zone.id:
+                logging.getLogger("laserstudio").debug(
+                    f"handle {handle.zone_id} is not the editing zone"
+                )
                 continue
-            if handle.geom_index >= len(self.__edit_polys):
+            if handle.geom_index >= len(self.__editing_zone.polygons):
+                logging.getLogger("laserstudio").debug(
+                    f"handle {handle.zone_id} {handle.geom_index} is out of range"
+                )
                 continue
-            poly = self.__edit_polys[handle.geom_index]
+            poly = self.__editing_zone.polygons[handle.geom_index]
             coords = self.__ring_coords(poly, handle.ring_index)
             if handle.vertex_index < len(coords):
                 x, y = coords[handle.vertex_index]
@@ -372,34 +376,32 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def _begin_vertex_edit(self, handle: _ZoneVertexHandle):
         self.__handles_dragging = True
-        if not self.__editing:
-            self.__editing = True
-            # ``__edit_zone_index`` is kept only to correlate handles among
-            # themselves during the drag (they are not rebuilt mid-drag, so
-            # their captured indices stay coherent with each other). The
-            # zone being edited is tracked by identity in ``__edit_zone``,
-            # since the index can go stale if the zone list is mutated (e.g.
-            # by a concurrent REST client) while the drag is in progress.
-            self.__edit_zone_index = handle.zone_index
-            try:
-                zone = self.zones.zone(handle.zone_index)
-            except IndexError:
-                self.__editing = False
-                self.__edit_zone_index = -1
-                return
-            self.__edit_zone = zone
-            # Flatten that zone's shape into individually editable polygons.
-            self.__edit_polys = list(zone.polygons)
-            # Keep the pre-drag shapes so a drag that ends up invalid can
-            # fall back to them instead of deleting the polygon outright.
-            self.__edit_pre_polys = list(zone.polygons)
+        try:
+            logging.getLogger("laserstudio").debug(
+                f"begin vertex edit for zone {handle.zone_id}"
+            )
+            self.__editing_zone = self.zones.zone(handle.zone_id)
+        except KeyError:
+            logging.getLogger("laserstudio").debug(f"zone {handle.zone_id} not found")
+            self.__editing_zone = None
+            return
+
+        # Keep the pre-drag polygons so a drag that ends up invalid can
+        self.__pre_polygons = self.__editing_zone.polygons
 
     def _move_vertex(self, handle: _ZoneVertexHandle, scene_point: QPointF):
-        if not self.__editing or handle.zone_index != self.__edit_zone_index:
+        if self.__editing_zone is None or handle.zone_id != self.__editing_zone.id:
+            logging.getLogger("laserstudio").debug(
+                f"move vertex for zone {handle.zone_id} is not the editing zone"
+            )
             return
-        if handle.geom_index >= len(self.__edit_polys):
+        if handle.geom_index >= len(self.__editing_zone.polygons):
+            logging.getLogger("laserstudio").debug(
+                f"move vertex for zone {handle.zone_id} {handle.geom_index} is out of range"
+            )
             return
-        poly = self.__edit_polys[handle.geom_index]
+
+        poly = self.__editing_zone.polygons[handle.geom_index]
         exterior = self.__ring_coords(poly, -1)
         interiors = [
             self.__ring_coords(poly, i) for i in range(len(list(poly.interiors)))
@@ -412,9 +414,15 @@ class ScanGeometry(QGraphicsItemGroup):
             ring = interiors[handle.ring_index]
             if handle.vertex_index < len(ring):
                 ring[handle.vertex_index] = point
+
         try:
-            self.__edit_polys[handle.geom_index] = Polygon(exterior, interiors)
+            self.zones.zones[self.__editing_zone.id].polygons[handle.geom_index] = (
+                Polygon(exterior, interiors)
+            )
         except Exception:
+            logging.getLogger("laserstudio").debug(
+                f"move vertex for zone {handle.zone_id} {handle.geom_index} is invalid"
+            )
             return
         self.__render_edit_polys()
         self.__reposition_handles()
@@ -422,26 +430,29 @@ class ScanGeometry(QGraphicsItemGroup):
     def __render_edit_polys(self):
         """Render the raw (non-merged) edited polygons during a drag."""
         self.__clear_scan_geometry_items()
-        edited = self.__edit_zone
+        edited = self.__editing_zone
         if edited is None:
             return
+
         active = self.zones.active_zone is edited
         # Other zones keep being drawn normally while one is edited. The
-        # edited zone is skipped by identity, not by index: if a zone before
+        # edited zone is skipped by identity: if a zone before
         # it in the list was removed mid-drag, ``__edit_zone_index`` no
         # longer names it, and skipping by index would either miss it (drawn
         # twice, once here and once below) or skip the wrong zone.
-        for zone_index, is_active in self.__rendered_zones():
-            zone = self.zones.zones[zone_index]
+        for zone in self.__rendered_zones():
             if zone is edited:
                 continue
             for poly in zone.polygons:
                 self.__scan_geometry_items.addToGroup(
                     _poly_to_path_item(
-                        poly, zone.color, filled=zone.enabled, active=is_active
+                        poly,
+                        zone.color,
+                        filled=zone.enabled,
+                        active=active,
                     )
                 )
-        for poly in self.__edit_polys:
+        for poly in edited.polygons:
             if not isinstance(poly, Polygon) or poly.is_empty:
                 continue
             try:
@@ -454,16 +465,11 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def _end_vertex_edit(self):
         self.__handles_dragging = False
-        if not self.__editing:
+        if self.__editing_zone is None:
             return
-        self.__editing = False
-        edit_polys = self.__edit_polys
-        pre_polys = self.__edit_pre_polys
-        zone = self.__edit_zone
-        self.__edit_polys = []
-        self.__edit_pre_polys = []
-        self.__edit_zone = None
-        self.__edit_zone_index = -1
+        zone = self.__editing_zone
+        self.__editing_zone = None
+
         # Confirm the zone is still present by identity (not ``in``, which
         # would fall back to ``__eq__``): it may have been removed by a
         # concurrent mutation (e.g. a REST client) while the drag was live.
@@ -472,10 +478,11 @@ class ScanGeometry(QGraphicsItemGroup):
             # the surviving zones come back instead of leaving a blank
             # canvas (the raw edit-polygon rendering used during the drag
             # only draws the other zones, not a merged commit).
-            self.__on_zones_changed()
+            self.__on_zones_changed(zone.id)
             return
+
         polys: list[Polygon] = []
-        for index, poly in enumerate(edit_polys):
+        for index, poly in enumerate(zone.polygons):
             if isinstance(poly, Polygon) and poly.is_valid and not poly.is_empty:
                 polys.append(poly)
                 continue
@@ -486,7 +493,7 @@ class ScanGeometry(QGraphicsItemGroup):
                 "Discarding invalid edited polygon, keeping the pre-drag "
                 f"shape instead: {poly=}"
             )
-            if index < len(pre_polys):
-                polys.append(pre_polys[index])
+            if index < len(self.__pre_polygons):
+                polys.append(self.__pre_polygons[index])
         zone.set_polygons(polys)
         self.zones.refresh_geometry()

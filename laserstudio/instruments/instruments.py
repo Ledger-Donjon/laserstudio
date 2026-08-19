@@ -9,6 +9,7 @@ from .camera_raptor import CameraRaptorInstrument
 from .light import LightInstrument
 from .hayashilight import HayashiLRInstrument
 from .focus import FocusInstrument
+from .scans import ScansInstrument
 from .instrument import Instrument
 from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
@@ -149,6 +150,13 @@ class Instruments:
                     logging.getLogger("laserstudio").warning(
                         f"Lighting system is enabled but device of type {device_type} could not be created: {str(e)}... Skipping."
                     )
+
+        # Scan zones
+        scans_config = config.get("scans")
+        if type(scans_config) is dict:
+            self.scans = ScansInstrument(scans_config)
+        else:
+            self.scans = ScansInstrument({})
 
     def go_next(self) -> Config:
         results: list[dict[str, Any]] = []

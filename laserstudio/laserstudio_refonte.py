@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
 )
 
 from .instruments.instruments import Instruments
-from .utils.scanzones import ScanZones
 from .utils.util import resource_path
 from .utils.yaml_types import Config
 from .widgets.newui import lucide, theme
@@ -51,25 +50,25 @@ class LaserStudioRefonte(QMainWindow):
         config_path: Path | None = None,
         config_loaded: bool = False,
         yaml_config: Config | None = None,
-        scan_zones: ScanZones | None = None,
     ) -> None:
-        """:param scan_zones: Scan zone model shared with the classic window."""
         super().__init__()
         self.instruments = instruments
         config_path = config_path or Path("config.yaml")
         self.yaml_config = yaml_config
         self.laser_armed = False
-        self._scan_zones = scan_zones
 
         self.setWindowTitle("Laser Studio · New UI")
         self.setMinimumSize(1200, 720)
+
+        # Viewer must exist before workspace panels are built (Settings wires it).
+        self._viewer_area = self._build_viewer_area()
 
         # The ordered set of workspaces shown as tabs.
         self._workspaces: list[Workspace] = [
             ConfigWorkspace(yaml_config, config_path, config_loaded, self),
             SettingsWorkspace(self),
             PhotoemissionWorkspace(),
-            ScanWorkspace(self),
+            ScanWorkspace(self._viewer_area.viewer, self.instruments.scans),
             AnalyzeWorkspace(),
         ]
 
@@ -91,9 +90,6 @@ class LaserStudioRefonte(QMainWindow):
         hbox = QHBoxLayout(content)
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(0)
-
-        # Viewer must exist before workspace panels are built (Settings wires it).
-        self._viewer_area = self._build_viewer_area()
 
         # Left column: one panel per workspace.
         self._sidebar = QStackedWidget()
@@ -164,9 +160,7 @@ class LaserStudioRefonte(QMainWindow):
 
         ledger_logo = QLabel()
         ledger_logo.setPixmap(
-            lucide.svg_file_pixmap(
-                resource_path(":/icons/ledger-single-white.svg"), 18
-            )
+            lucide.svg_file_pixmap(resource_path(":/icons/ledger-single-white.svg"), 18)
         )
         ledger_logo.setFixedSize(18, 18)
         ledger_logo.setStyleSheet("background: transparent;")
@@ -232,7 +226,7 @@ class LaserStudioRefonte(QMainWindow):
     # ── Viewer area ───────────────────────────────────────────────────────────
 
     def _build_viewer_area(self) -> ViewerArea:
-        area = ViewerArea(scan_zones=self._scan_zones)
+        area = ViewerArea(scans=self.instruments.scans)
         instr = self.instruments
         if instr.stage is not None or instr.camera is not None:
             area.viewer.add_stage_sight(

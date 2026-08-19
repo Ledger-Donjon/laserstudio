@@ -2,10 +2,11 @@
 Lucide icon helpers for PyQt6.
 
 Renders Lucide-compatible SVG paths into QIcon/QPixmap objects
-with configurable size and stroke colour. All icons use:
+with configurable size and stroke color. All icons use:
   viewBox="0 0 24 24", fill="none", stroke-linecap="round",
   stroke-linejoin="round", stroke-width="1.6"  (Lucide defaults).
 """
+
 from __future__ import annotations
 
 from PyQt6.QtCore import QRectF, Qt
@@ -20,7 +21,7 @@ _PATHS: dict[str, str] = {
     # ── File / folder ────────────────────────────────────────────────────────
     "folder": (
         '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9'
-        "L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>"
+        'L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'
     ),
     "folder-open": (
         '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5'
@@ -106,7 +107,7 @@ _PATHS: dict[str, str] = {
     ),
     "activity": (
         '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0'
-        "L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\"/>"
+        'L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>'
     ),
     "sliders-horizontal": (
         '<line x1="21" x2="14" y1="4" y2="4"/>'
@@ -130,22 +131,10 @@ _PATHS: dict[str, str] = {
         '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
         '<polyline points="9 22 9 12 15 12 15 22"/>'
     ),
-    "arrow-up": (
-        '<path d="m5 12 7-7 7 7"/>'
-        '<path d="M12 19V5"/>'
-    ),
-    "arrow-down": (
-        '<path d="m5 12 7 7 7-7"/>'
-        '<path d="M12 5v14"/>'
-    ),
-    "arrow-left": (
-        '<path d="m12 19-7-7 7-7"/>'
-        '<path d="M19 12H5"/>'
-    ),
-    "arrow-right": (
-        '<path d="m12 5 7 7-7 7"/>'
-        '<path d="M5 12h14"/>'
-    ),
+    "arrow-up": ('<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>'),
+    "arrow-down": ('<path d="m5 12 7 7 7-7"/><path d="M12 5v14"/>'),
+    "arrow-left": ('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>'),
+    "arrow-right": ('<path d="m12 5 7 7-7 7"/><path d="M5 12h14"/>'),
     "image": (
         '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>'
         '<circle cx="9" cy="9" r="2"/>'
@@ -158,13 +147,8 @@ _PATHS: dict[str, str] = {
         '<line x1="14" x2="14" y1="11" y2="17"/>'
     ),
     "chevron-down": ('<path d="m6 9 6 6 6-6"/>'),
-    "x": (
-        '<path d="M18 6 6 18"/>'
-        '<path d="m6 6 12 12"/>'
-    ),
-    "check": (
-        '<path d="M20 6 9 17l-5-5"/>'
-    ),
+    "x": ('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+    "check": ('<path d="M20 6 9 17l-5-5"/>'),
     "locate-fixed": (
         '<line x1="2" x2="5" y1="12" y2="12"/>'
         '<line x1="19" x2="22" y1="12" y2="12"/>'
@@ -174,8 +158,7 @@ _PATHS: dict[str, str] = {
         '<circle cx="12" cy="12" r="3"/>'
     ),
     "spline": (
-        '<path d="M3 17c3-6 6-6 9 0s6 6 9 0"/>'
-        '<path d="M3 7c3-6 6-6 9 0s6 6 9 0"/>'
+        '<path d="M3 17c3-6 6-6 9 0s6 6 9 0"/><path d="M3 7c3-6 6-6 9 0s6 6 9 0"/>'
     ),
     "grid-3x3": (
         '<rect width="18" height="18" x="3" y="3" rx="2"/>'
@@ -185,13 +168,10 @@ _PATHS: dict[str, str] = {
         '<path d="M15 3v18"/>'
     ),
     "circle": ('<circle cx="12" cy="12" r="10"/>'),
-    "circle-dot": (
-        '<circle cx="12" cy="12" r="10"/>'
-        '<circle cx="12" cy="12" r="1"/>'
-    ),
+    "circle-dot": ('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/>'),
     "shield": (
         '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6'
-        'a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5'
+        "a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5"
         ' 19 5a1 1 0 0 1 1 1z"/>'
     ),
     "keyboard": (
@@ -239,11 +219,13 @@ def _render(paths: str, size: int, color: str) -> QPixmap:
 
 
 def icon(name: str, size: int = 15, color: str = "#A3A3A3") -> QIcon:
-    """Return a QIcon for the named Lucide icon at the given size and stroke colour."""
+    """Return a QIcon for the named Lucide icon at the given size and stroke color."""
     paths = _PATHS.get(name)
     if paths is None:
         # Fallback: simple X mark so missing icons are visible in dev
-        paths = '<line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/>'
+        paths = (
+            '<line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/>'
+        )
     return QIcon(_render(paths, size, color))
 
 
@@ -251,7 +233,9 @@ def pixmap(name: str, size: int = 15, color: str = "#A3A3A3") -> QPixmap:
     """Return a QPixmap for the named Lucide icon."""
     paths = _PATHS.get(name)
     if paths is None:
-        paths = '<line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/>'
+        paths = (
+            '<line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/>'
+        )
     return _render(paths, size, color)
 
 
@@ -288,7 +272,7 @@ def _render_filled(svg: str, size: int) -> QPixmap:
 
 
 def ledger_pixmap(size: int = 16, color: str = "#D4A0FF") -> QPixmap:
-    """Return the Ledger single-L logo as a QPixmap in the given fill colour."""
+    """Return the Ledger single-L logo as a QPixmap in the given fill color."""
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 147 128">'
         f'<path d="{_LEDGER_LOGO_PATH}" fill="{color}"/></svg>'
@@ -331,36 +315,36 @@ def svg_file_icon(path: str, size: int) -> QIcon:
 
 
 # ── Microscope objective icon ─────────────────────────────────────────────────
-# A stroked microscope-objective silhouette (new-UI style) with a coloured
-# magnification band, following the standard manufacturer objective colour code
+# A stroked microscope-objective silhouette (new-UI style) with a colored
+# magnification band, following the standard manufacturer objective color code
 # (Nikon/Olympus/Leica/Zeiss, "Table 3"):
 #     1/2x none · 1-1.5x black · 2-2.5x brown · 4-5x red · 10x yellow
 #     16-20x green · 25-32x turquoise · 40-50x light blue · 60-63x cobalt blue
 #     100-250x white
 # The four objectives physically present on the bench (5x, 10x, 20x, 50x) keep
-# the *exact* ring colour sampled from the classic-UI icons (obj-{mag}x.png) so
+# the *exact* ring color sampled from the classic-UI icons (obj-{mag}x.png) so
 # the on-screen band matches the real objective the user handles.
 _OBJECTIVE_RING_COLORS: dict[float, str | None] = {
-    0.5: None,          # no colour assigned
-    1.0: "#000000",     # black
-    1.25: "#000000",    # black
-    1.5: "#000000",     # black
-    2.0: "#8B5A2B",     # brown
-    2.5: "#8B5A2B",     # brown
-    4.0: "#FF0000",     # red
-    5.0: "#FF0000",     # red         (bench objective — sampled from obj-5x.png)
-    10.0: "#FFED00",    # yellow      (bench objective — sampled from obj-10x.png)
-    16.0: "#14FF00",    # green
-    20.0: "#14FF00",    # green       (bench objective — sampled from obj-20x.png)
-    25.0: "#2FD4C4",    # turquoise
-    32.0: "#2FD4C4",    # turquoise
-    40.0: "#7CB9FF",    # light blue
-    50.0: "#0066FF",    # light blue  (bench objective — sampled from obj-50x.png)
-    60.0: "#0047AB",    # cobalt blue
-    63.0: "#0047AB",    # cobalt blue
-    100.0: "#F5F5F5",   # white
-    150.0: "#F5F5F5",   # white
-    250.0: "#F5F5F5",   # white
+    0.5: None,  # no color assigned
+    1.0: "#000000",  # black
+    1.25: "#000000",  # black
+    1.5: "#000000",  # black
+    2.0: "#8B5A2B",  # brown
+    2.5: "#8B5A2B",  # brown
+    4.0: "#FF0000",  # red
+    5.0: "#FF0000",  # red         (bench objective — sampled from obj-5x.png)
+    10.0: "#FFED00",  # yellow      (bench objective — sampled from obj-10x.png)
+    16.0: "#14FF00",  # green
+    20.0: "#14FF00",  # green       (bench objective — sampled from obj-20x.png)
+    25.0: "#2FD4C4",  # turquoise
+    32.0: "#2FD4C4",  # turquoise
+    40.0: "#7CB9FF",  # light blue
+    50.0: "#0066FF",  # light blue  (bench objective — sampled from obj-50x.png)
+    60.0: "#0047AB",  # cobalt blue
+    63.0: "#0047AB",  # cobalt blue
+    100.0: "#F5F5F5",  # white
+    150.0: "#F5F5F5",  # white
+    250.0: "#F5F5F5",  # white
 }
 
 # Objective silhouette (pointing down), viewBox 0 0 24 24: narrow mount on top,
@@ -370,8 +354,8 @@ _OBJECTIVE_BODY_FILL = "#2A2A2E"
 
 
 def objective_ring_color(mag: float) -> str | None:
-    """Standard magnification-ring colour for the objective, or None if the code
-    assigns no colour. Bench objectives keep their exact sampled colour."""
+    """Standard magnification-ring color for the objective, or None if the code
+    assigns no color. Bench objectives keep their exact sampled color."""
     if mag in _OBJECTIVE_RING_COLORS:
         return _OBJECTIVE_RING_COLORS[mag]
     # Nearest known magnification, so unusual values still get a sensible band.
@@ -379,15 +363,12 @@ def objective_ring_color(mag: float) -> str | None:
     return _OBJECTIVE_RING_COLORS[nearest]
 
 
-def objective_pixmap(
-    mag: float, size: int = 18, color: str = "#A3A3A3"
-) -> QPixmap:
-    """Render a microscope-objective icon with the magnification colour band."""
+def objective_pixmap(mag: float, size: int = 18, color: str = "#A3A3A3") -> QPixmap:
+    """Render a microscope-objective icon with the magnification color band."""
     ring = objective_ring_color(mag)
     parts = [
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">',
-        f'<path d="{_OBJECTIVE_BODY}" fill="{_OBJECTIVE_BODY_FILL}"'
-        ' stroke="none"/>',
+        f'<path d="{_OBJECTIVE_BODY}" fill="{_OBJECTIVE_BODY_FILL}" stroke="none"/>',
     ]
     if ring is not None:
         # A hairline rim around the band keeps dark codes (black, brown, cobalt)

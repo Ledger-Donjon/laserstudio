@@ -26,7 +26,7 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, manage scan zones (create, rename, recolour, enable or
+instrument settings, manage scan zones (create, rename, recolor, enable or
 disable, delete), read or update the overall scan geometry, read or move the
 stage, run scans (go_next), focus, manage markers, and capture camera images or
 screenshots.
@@ -70,9 +70,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         return call(api.get_instrument_settings, label)
 
     @mcp.tool()
-    def set_instrument_settings(
-        label: str, settings: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_instrument_settings(label: str, settings: dict[str, Any]) -> dict[str, Any]:
         """Update the settings of the instrument identified by its label."""
         return call(api.set_instrument_settings, label, settings)
 
@@ -90,7 +88,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
 
     @mcp.tool()
     def delete_scangeometry() -> dict[str, Any]:
-        """Delete EVERY scan zone, including their names, colours and enabled
+        """Delete EVERY scan zone, including their names, colors and enabled
         flags — not just their shapes.
 
         To empty one zone's shape while keeping the zone itself, call
@@ -100,7 +98,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
 
     @mcp.tool()
     def get_scan_zones() -> dict[str, Any]:
-        """List the scan zones (name, colour, enabled, shape) and which is active."""
+        """List the scan zones (name, color, enabled, shape) and which is active."""
         return call(api.scan_zones)
 
     @mcp.tool()
@@ -112,7 +110,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
     ) -> dict[str, Any]:
         """Create a scan zone.
 
-        Defaults: name "Zone <n>", the next colour of the zone palette,
+        Defaults: name "Zone <n>", the next color of the zone palette,
         enabled, and an empty shape. `color` is "#rrggbb".
 
         `geometry` shapes: polygon
@@ -132,7 +130,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         enabled: bool | None = None,
         geometry: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Rename, recolour, enable/disable or reshape the scan zone at `index`.
+        """Rename, recolor, enable/disable or reshape the scan zone at `index`.
 
         `index` is the 0-based position reported by get_scan_zones. Only the
         given fields change. Disabling a zone excludes it from point

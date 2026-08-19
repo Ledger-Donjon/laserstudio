@@ -168,9 +168,7 @@ class RestProxy(QObject):
         enabled: bool | None,
         geometry: dict[str, Any] | None,
     ) -> Config:
-        return self.laser_studio.handle_add_scan_zone(
-            name, color, enabled, geometry
-        )
+        return self.laser_studio.handle_add_scan_zone(name, color, enabled, geometry)
 
     def handle_update_scan_zone(
         self,
@@ -388,8 +386,8 @@ class ScanZoneBody(BaseModel):
     )
     color: str | None = Field(
         default=None,
-        description="Zone colour as ``#rrggbb`` (``#rrggbbaa`` accepted). "
-        "Defaults to the next colour of the zone palette on creation.",
+        description="Zone color as ``#rrggbb`` (``#rrggbbaa`` accepted). "
+        "Defaults to the next color of the zone palette on creation.",
         examples=["#ff5300"],
     )
     enabled: bool | None = Field(
@@ -404,7 +402,7 @@ class ScanZoneBody(BaseModel):
         "Replaces the zone's shape, discarding its add/subtract history. "
         "Omitting this field on a PATCH leaves the shape untouched; to "
         "explicitly clear it instead, send "
-        "``{\"geometrycollection\": null}``.",
+        '``{"geometrycollection": null}``.',
         examples=[
             {
                 "polygon": {
@@ -423,9 +421,7 @@ class ScanZoneBody(BaseModel):
 
 
 class InstrumentInfo(BaseModel):
-    type: str = Field(
-        description="Instrument class name.", examples=["PDMInstrument"]
-    )
+    type: str = Field(description="Instrument class name.", examples=["PDMInstrument"])
     label: str | None = Field(description="Instrument label, if any.")
 
 
@@ -630,7 +626,9 @@ instruments_router = APIRouter(prefix="/instruments", tags=["instruments"])
 
 
 @instruments_router.get("/", response_model=list[InstrumentInfo])
-@instruments_router.get("", response_model=list[InstrumentInfo], include_in_schema=False)
+@instruments_router.get(
+    "", response_model=list[InstrumentInfo], include_in_schema=False
+)
 def list_instruments():
     """List the available instruments (type and label)."""
     return RestServer.run("handle_list_instruments")
@@ -672,7 +670,7 @@ def put_scangeometry(body: ScanGeometryBody):
 def delete_scangeometry():
     """Delete every scan zone and return the new settings.
 
-    Removes the zones entirely, names and colours included. To empty a single
+    Removes the zones entirely, names and colors included. To empty a single
     zone's shape while keeping the zone, PATCH it with
     ``{"geometry": {"geometrycollection": null}}``.
     """

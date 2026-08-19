@@ -35,6 +35,9 @@ MARKERS_COLORS: Sequence[tuple[QColor | Qt.GlobalColor | int, str]] = [
     (QColorConstants.White, "White"),
 ]
 
+ZONE_COLORS: Sequence[tuple[QColor | Qt.GlobalColor | int, str]] = MARKERS_COLORS
+
+
 LedgerPalette = QPalette()
 
 LedgerPalette.setColor(QPalette.ColorRole.Window, QColor(25, 25, 25))

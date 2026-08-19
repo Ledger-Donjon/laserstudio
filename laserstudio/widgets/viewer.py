@@ -29,7 +29,6 @@ from typing import Any
 from shapely import Polygon
 import logging
 import json
-import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -42,10 +41,10 @@ from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from .maxdistance import MaxDistanceItem
 from ..instruments.stage import MoveFor, Vector
+from ..instruments.scans import ScansInstrument, default_zone_color
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
 from ..utils.background_align import BackgroundPin, compute_affine_transform
-from ..utils.scanzones import ScanZones, default_zone_color
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
 
 
@@ -78,13 +77,10 @@ class Viewer(QGraphicsView):
     def __init__(
         self,
         parent: QWidget | None = None,
-        scan_zones: ScanZones | None = None,
+        scans: ScansInstrument | None = None,
     ):
         """
         :param parent: Parent widget.
-        :param scan_zones: Scan zone model to display. When ``None`` a private
-            model is created; pass an existing one to share the zones with
-            another viewer (both windows do this, see ``__main__``).
         """
         super().__init__(parent)
 
@@ -120,10 +116,11 @@ class Viewer(QGraphicsView):
         self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
-        # `scan_zones` is the shared model (zones + scan path); `scan_geometry`
-        # is this window's own graphics view of it, added to `self.__scene`.
-        self.scan_zones = scan_zones if scan_zones is not None else ScanZones()
-        self.scan_geometry = ScanGeometry(self.scan_zones)
+        # Scan Instrument for the management of scan zones
+        self.scans: ScansInstrument = (
+            scans if scans is not None else ScansInstrument({})
+        )
+        self.scan_geometry = ScanGeometry(self.scans)
         self.__scene.addItem(self.scan_geometry)
         self.scan_geometry.setZValue(3)
 
@@ -598,9 +595,7 @@ class Viewer(QGraphicsView):
         stage = self.stage_sight.stage if self.stage_sight is not None else None
         if stage is None:
             return
-        stage.set_soft_limits_xy(
-            rect.left(), rect.top(), rect.right(), rect.bottom()
-        )
+        stage.set_soft_limits_xy(rect.left(), rect.top(), rect.right(), rect.bottom())
 
     def _on_stage_sight_moved(self, scene_pos: QPointF) -> None:
         """Recenter the max-distance circle on the stage sight scene position."""
@@ -671,7 +666,7 @@ class Viewer(QGraphicsView):
 
         if self.stage_sight is not None:
             """Get position of the next point from the shared scan zones"""
-            next_point_tuple = self.scan_zones.next_point()
+            next_point_tuple = self.scans.next_point()
 
             if next_point_tuple is not None:
                 next_point = list(next_point_tuple)
@@ -701,13 +696,13 @@ class Viewer(QGraphicsView):
             base = QColor(QColorConstants.DarkYellow)
         elif has_shift:
             # Subtracting is an erase gesture, so it keeps its own red signal
-            # rather than borrowing the zone's colour.
+            # rather than borrowing the zone's color.
             base = QColor(QColorConstants.Red)
         else:
-            # Adding: draw in the colour of the zone the shape will land in, so
+            # Adding: draw in the color of the zone the shape will land in, so
             # it is obvious which zone the gesture targets. With no zone yet,
-            # preview the colour the about-to-be-created Zone 1 will get.
-            zone = self.scan_zones.active_zone
+            # preview the color the about-to-be-created Zone 1 will get.
+            zone = self.scans.active_zone
             base = QColor(zone.color) if zone is not None else default_zone_color(0)
 
         self.setStyleSheet(
@@ -1090,9 +1085,7 @@ class Viewer(QGraphicsView):
 
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
-            bg_pins = [
-                BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins
-            ]
+            bg_pins = [BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins]
             self.commit_background_alignment(bg_pins)
             self.mode = self.Mode.NONE
         else:

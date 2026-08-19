@@ -411,7 +411,7 @@ class LSAPI:
     def delete_scangeometry(self) -> dict[str, Any]:
         """Delete **every** scan zone and return the new settings.
 
-        This removes the zones entirely — their names, colours and enabled
+        This removes the zones entirely — their names, colors and enabled
         flags go with them, not just their shapes. To empty one zone's shape
         while keeping the zone, use
         :meth:`update_scan_zone` with ``geometry={"geometrycollection": None}``.
@@ -420,7 +420,7 @@ class LSAPI:
         return result
 
     def scan_zones(self) -> dict[str, Any]:
-        """Return the list of scan zones and the active zone index."""
+        """Return the list of scan zones and the active zone identifier."""
         result: dict[str, Any] = self.send("scangeometry/zones").json()
         return result
 
@@ -434,10 +434,10 @@ class LSAPI:
         """Create a scan zone.
 
         :param name: Zone name. Defaults to ``Zone <n>``.
-        :param color: ``#rrggbb`` colour. Defaults to the next zone colour.
+        :param color: ``#rrggbb`` color. Defaults to the next zone color.
         :param enabled: Whether the zone is scanned. Defaults to True.
         :param geometry: Serialized shape. Defaults to an empty zone.
-        :return: The new zone's index and settings.
+        :return: The new zone's identifier and settings.
         """
         payload: dict[str, Any] = {
             "name": name,
@@ -450,7 +450,7 @@ class LSAPI:
 
     def update_scan_zone(
         self,
-        index: int,
+        zone_id: int,
         name: str | None = None,
         color: str | None = None,
         enabled: bool | None = None,
@@ -458,9 +458,9 @@ class LSAPI:
     ) -> dict[str, Any]:
         """Update any subset of a scan zone's attributes.
 
-        :param index: 0-based index of the zone.
-        :return: The zone's index and updated settings.
-        :raises ScanZoneNotFound: If no zone exists at this index.
+        :param zone_id: Identifier of the zone.
+        :return: The zone's identifier and updated settings.
+        :raises ScanZoneNotFound: If no zone exists with this identifier.
         """
         payload: dict[str, Any] = {
             "name": name,
@@ -469,18 +469,18 @@ class LSAPI:
             "geometry": geometry,
         }
         result: dict[str, Any] = self.send(
-            f"scangeometry/zones/{index}", payload, is_patch=True
+            f"scangeometry/zones/{zone_id}", payload, is_patch=True
         ).json()
         return result
 
-    def delete_scan_zone(self, index: int) -> dict[str, Any]:
+    def delete_scan_zone(self, zone_id: int) -> dict[str, Any]:
         """Delete a scan zone.
 
-        :param index: 0-based index of the zone.
-        :return: The remaining zones and the active zone index.
-        :raises ScanZoneNotFound: If no zone exists at this index.
+        :param zone_id: Identifier of the zone.
+        :return: The remaining zones and the active zone identifier.
+        :raises ScanZoneNotFound: If no zone exists with this identifier.
         """
         result: dict[str, Any] = self.send(
-            f"scangeometry/zones/{index}", is_delete=True
+            f"scangeometry/zones/{zone_id}", is_delete=True
         ).json()
         return result

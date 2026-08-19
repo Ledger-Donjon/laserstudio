@@ -1,11 +1,12 @@
 """Scan workspace — scan zone list and scan controls."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
 from PyQt6 import sip
-from PyQt6.QtCore import QObject, QSize, Qt
-from PyQt6.QtGui import QAction, QColor, QIcon, QMouseEvent
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QAction, QColor, QIcon, QMouseEvent, QCursor
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -20,8 +21,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...utils.colors import MARKERS_COLORS
-from ...utils.scanzones import ScanZone, ScanZones
+from ...utils.colors import MARKERS_COLORS, ZONE_COLORS
+from ...utils.scanzones import ScanZone
+from ...instruments.scans import ScansInstrument
 from ...utils.util import colored_image, create_color_qicon
 from ..newui import lucide, theme
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
@@ -38,7 +40,7 @@ def _row_style(zone_color: str, active: bool) -> str:
     """Stylesheet for one zone row.
 
     The active zone is the one every drawing gesture lands in, so it is marked
-    unmistakably rather than subtly: a thick left bar in the zone's own colour,
+    unmistakably rather than subtly: a thick left bar in the zone's own color,
     a lifted background and an accented border. Inactive rows keep a
     transparent bar of the same width so nothing shifts when the selection
     moves.
@@ -65,16 +67,6 @@ QFrame#ls-zone-row:hover {{
 """
 
 
-_ACTIVE_CHIP_SS = f"""
-QLabel {{
-    color: {theme.PURPLE};
-    font-family: monospace;
-    font-size: 9px;
-    letter-spacing: 1px;
-    background: transparent;
-}}
-"""
-
 _NAME_SS = f"""
 QLineEdit {{
     background: transparent;
@@ -99,54 +91,6 @@ QPushButton:hover {{
     border-color: {theme.BORDER_HOVER};
 }}
 """
-
-
-class _ScanModelBridge(QObject):
-    """Forwards the shared model's signals to a panel's sync methods.
-
-    ``ScanWorkspace`` is a plain Python object, not a ``QObject`` — a direct
-    ``zones.changed.connect(scan_workspace._sync_rows)`` connection has no
-    QObject receiver for Qt to track, so nothing makes it go away once the
-    panel is discarded (closures created for row/button callbacks can also
-    keep the ``ScanWorkspace`` instance itself alive well past its widgets'
-    destruction). Left connected, the next `changed`/`path_changed` emission
-    calls a sync method against a Qt object that's already been deleted —
-    which aborts the process (SIGABRT), not a catchable Python exception.
-
-    This bridge *is* a real ``QObject`` and is parented to the panel's root
-    widget, so Qt's ordinary, native "disconnect everything when a QObject
-    is destroyed" behaviour applies to it directly: when the panel goes
-    away, Qt tears this bridge down as part of the normal C++ parent/child
-    cascade and disconnects its connections to ``zones`` itself, in C++,
-    without running any Python callback in the process. That was
-    deliberately chosen over reacting to a widget's ``destroyed`` signal
-    from Python (which would mean calling back into the interpreter — to
-    disconnect from ``zones`` — from inside a QObject destructor that can
-    itself be firing mid garbage-collection): that alternative was tried
-    first and reliably crashed the test suite, since the receiver (``zones``)
-    can be simultaneously in the middle of its own teardown in the same GC
-    pass, which is a fragile time to re-enter Python bytecode.
-    """
-
-    def __init__(
-        self,
-        zones: ScanZones,
-        sync_rows: Callable[[], None],
-        sync_controls: Callable[[], None],
-        parent: QObject,
-    ) -> None:
-        super().__init__(parent)
-        self._sync_rows = sync_rows
-        self._sync_controls = sync_controls
-        zones.changed.connect(self._on_changed)
-        zones.path_changed.connect(self._on_path_changed)
-
-    def _on_changed(self) -> None:
-        self._sync_rows()
-        self._sync_controls()
-
-    def _on_path_changed(self) -> None:
-        self._sync_controls()
 
 
 class _ZoneRow(QFrame):
@@ -185,46 +129,26 @@ class ScanWorkspace(Workspace):
     label = "Scan"
     icon = "scan"
 
-    def __init__(self, window: "LaserStudioRefonte | None" = None) -> None:
-        self._window = window
+    def __init__(self, viewer: Viewer, scans: ScansInstrument) -> None:
+        super().__init__()
         self._rows_layout: QVBoxLayout | None = None
         self._syncing = False
-        # See _ScanModelBridge: owns this panel's connections to the shared
-        # model, so they get torn down (natively, by Qt) when the panel does.
-        self._bridge: _ScanModelBridge | None = None
 
         self._mode_buttons: QButtonGroup | None = None
         self._density: ReturnSpinBox | None = None
         self._point_size: ReturnDoubleSpinBox | None = None
         self._path_color: QComboBox | None = None
 
-    @property
-    def zones(self) -> ScanZones | None:
-        """The shared scan zone model, or None when there is no viewer."""
-        if self._window is None:
-            return None
-        return self._window.viewer.scan_zones
+        self.viewer = viewer
+        self.zones = scans
+
+        self.zones.zone_changed.connect(self._on_changed)
+        self.zones.path_changed.connect(self._on_path_changed)
+        self.zones.active_zone_changed.connect(self._on_active_zone_changed)
 
     # ── Panel ────────────────────────────────────────────────────────────────
 
     def build_panel(self) -> QWidget:
-        # Calling build_panel more than once on the same instance (a future
-        # rebuild path, or a test) must not double-connect to the shared
-        # model. Merely dropping our own reference to the previous bridge is
-        # not enough to disconnect it: PyQt keeps a parented QObject's
-        # Python wrapper alive as long as its *parent* (the old panel's root
-        # widget) is still referenced anywhere else — e.g. still installed
-        # in a stacked widget — which the old bridge being intact would
-        # count as. `sip.delete` forces its immediate C++ destruction
-        # regardless, which — same as any other bridge teardown — natively
-        # disconnects it from `zones`. This runs as ordinary, synchronous
-        # code here (not from a callback fired mid garbage-collection), so
-        # it carries none of the reentrancy risk described on the bridge
-        # class above.
-        if self._bridge is not None:
-            sip.delete(self._bridge)
-            self._bridge = None
-
         scroll = theme.setup_scroll_area(QScrollArea())
         inner = theme.panel_inner()
         layout = QVBoxLayout(inner)
@@ -262,24 +186,24 @@ class ScanWorkspace(Workspace):
         layout.addStretch(1)
         scroll.setWidget(inner)
 
-        zones = self.zones
-        if zones is not None:
-            self._bridge = _ScanModelBridge(
-                zones, self._sync_rows, self._sync_scan_controls, parent=scroll
-            )
-
         self._sync_rows()
         self._sync_scan_controls()
         return scroll
 
+    def _on_changed(self) -> None:
+        self._sync_rows()
+        self._sync_scan_controls()
+
+    def _on_path_changed(self) -> None:
+        self._sync_scan_controls()
+
+    def _on_active_zone_changed(self, zone_id: int) -> None:
+        self._sync_rows()
+
     # ── Zone list ────────────────────────────────────────────────────────────
 
     def _on_add_zone(self) -> None:
-        zones = self.zones
-        if zones is None:
-            return
-        index = zones.add_zone()
-        zones.active_index = index
+        self.zones.add_zone()
 
     def _pending_rename(self, layout: QVBoxLayout) -> tuple[ScanZone, str] | None:
         """Detect an in-progress, uncommitted rename in one of the rows.
@@ -341,21 +265,21 @@ class ScanWorkspace(Workspace):
         if pending is not None and zones is not None:
             zone, text = pending
             try:
-                index = zones.zones.index(zone)
-            except ValueError:
-                index = None  # the zone was removed by whatever change we
+                zone = zones.zone(zone.id)
+            except KeyError:
+                zone = None  # the zone was removed by whatever change we
                 # are reacting to; nothing sensible left to commit.
-            if index is not None:
+            if zone is not None:
                 try:
-                    zones.update_zone(index, name=text)
-                except IndexError:
-                    index = None
+                    zones.update_zone(zone)
+                except KeyError:
+                    zone = None
                 else:
                     # update_zone() above synchronously re-emitted `changed`,
                     # which re-entered this method (self._syncing was still
                     # False) and already rebuilt the rows with both the
                     # external change and this rename applied.
-                    self._restore_focus(index, zone)
+                    self._restore_focus(zone.id, zone)
                     return
 
         self._syncing = True
@@ -376,15 +300,13 @@ class ScanWorkspace(Workspace):
                 layout.addWidget(empty)
                 return
 
-            for index, zone in enumerate(zones.zones):
-                layout.addWidget(
-                    self._zone_row(index, zone, index == zones.active_index)
-                )
+            for zone in zones.zones.values():
+                layout.addWidget(self._zone_row(zone, zone == zones.active_zone))
         finally:
             self._syncing = False
 
-    def _zone_row(self, index: int, zone: ScanZone, active: bool) -> QWidget:
-        row = _ZoneRow(zone, lambda i=index: self._on_activate(i))
+    def _zone_row(self, zone: ScanZone, active: bool) -> QWidget:
+        row = _ZoneRow(zone, lambda: self._on_activate(zone))
         row.setObjectName("ls-zone-row")
         row.setProperty("active", "true" if active else "false")
         row.setStyleSheet(_row_style(zone.color.name(), active))
@@ -403,9 +325,9 @@ class ScanWorkspace(Workspace):
         swatch.setStyleSheet(_ICON_BTN_SS)
         swatch.setIcon(create_color_qicon(zone.color))
         swatch.setFixedSize(26, 24)
-        swatch.setToolTip("Zone colour")
+        swatch.setToolTip("Zone color")
         swatch.setCursor(Qt.CursorShape.PointingHandCursor)
-        swatch.clicked.connect(lambda _checked, i=index: self._pick_color(i))
+        swatch.clicked.connect(lambda _checked, z=zone: self._pick_color(z))
         hl.addWidget(swatch)
 
         name = QLineEdit(zone.name)
@@ -415,19 +337,13 @@ class ScanWorkspace(Workspace):
         )
         name.setToolTip("Zone name")
         name.editingFinished.connect(
-            lambda i=index, w=name: self._on_rename(i, w.text())
+            lambda z=zone, w=name: self._on_rename(z, w.text())
         )
         hl.addWidget(name, stretch=1)
 
-        if active:
-            chip = QLabel("ACTIVE")
-            chip.setStyleSheet(_ACTIVE_CHIP_SS)
-            chip.setToolTip("Drawing gestures add to this zone")
-            hl.addWidget(chip)
-
         toggle = ToggleSwitch(zone.enabled)
         toggle.setToolTip("Include this zone in the scan")
-        toggle.toggled.connect(lambda on, i=index: self._on_toggle(i, on))
+        toggle.toggled.connect(lambda on, z=zone: self._on_toggle(z, on))
         hl.addWidget(toggle)
 
         delete = QPushButton()
@@ -436,73 +352,51 @@ class ScanWorkspace(Workspace):
         delete.setFixedSize(26, 24)
         delete.setToolTip("Delete this zone")
         delete.setCursor(Qt.CursorShape.PointingHandCursor)
-        delete.clicked.connect(lambda _checked, i=index: self._on_delete(i))
+        delete.clicked.connect(lambda _checked, z=zone: self._on_delete(z))
         hl.addWidget(delete)
 
         return row
 
-    def _on_activate(self, index: int) -> None:
-        zones = self.zones
-        if zones is not None:
-            zones.active_index = index
+    def _on_activate(self, zone: ScanZone) -> None:
+        if self.zones is not None and zone in self.zones.zones.values():
+            self.zones.active_zone = zone
 
-    def _on_rename(self, index: int, text: str) -> None:
-        zones = self.zones
-        if zones is None or self._syncing:
-            return
-        try:
-            zone = zones.zone(index)
-        except IndexError:
+    def _on_rename(self, zone: ScanZone, text: str) -> None:
+        if self._syncing or self.zones is None or zone not in self.zones.zones.values():
             return
         if text and text != zone.name:
-            zones.update_zone(index, name=text)
+            zone.name = text
+            self.zones.update_zone(zone)
 
-    def _on_toggle(self, index: int, enabled: bool) -> None:
-        zones = self.zones
-        if zones is None or self._syncing:
+    def _on_toggle(self, zone: ScanZone, enabled: bool) -> None:
+        if self.zones is None or self._syncing or zone not in self.zones.zones.values():
             return
-        try:
-            zones.update_zone(index, enabled=enabled)
-        except IndexError:
-            pass
+        zone.enabled = enabled
+        self.zones.update_zone(zone)
 
-    def _on_delete(self, index: int) -> None:
-        zones = self.zones
-        if zones is None:
+    def _on_delete(self, zone: ScanZone) -> None:
+        if self.zones is None or self._syncing or zone not in self.zones.zones.values():
             return
-        try:
-            zones.remove_zone(index)
-        except IndexError:
-            pass
+        self.zones.remove_zone(zone)
 
-    def _pick_color(self, index: int) -> None:
-        zones = self.zones
-        if zones is None:
+    def _pick_color(self, zone: ScanZone) -> None:
+        if self.zones is None or zone not in self.zones.zones.values():
             return
         menu = QMenu()
-        for color, name in MARKERS_COLORS:
+        for color, name in ZONE_COLORS:
             action = QAction(create_color_qicon(color), name, menu)
             action.triggered.connect(
-                lambda _checked, c=color, i=index: self._set_color(i, c)
+                lambda _checked, c=color, z=zone: self._set_color(z, c)
             )
             menu.addAction(action)
-        menu.exec(self._cursor_pos())
+        menu.exec(QCursor.pos())
         return
 
-    @staticmethod
-    def _cursor_pos():
-        from PyQt6.QtGui import QCursor
-
-        return QCursor.pos()
-
-    def _set_color(self, index: int, color) -> None:
-        zones = self.zones
-        if zones is None:
+    def _set_color(self, zone: ScanZone, color) -> None:
+        if self.zones is None or zone not in self.zones.zones.values():
             return
-        try:
-            zones.update_zone(index, color=QColor(color))
-        except IndexError:
-            pass
+        zone.color = color
+        self.zones.update_zone(zone)
 
     # ── Draw / Scan / Path sections ──────────────────────────────────────────
 
@@ -538,9 +432,8 @@ class ScanWorkspace(Workspace):
             hl.addWidget(btn)
         return box
 
-    def _select_mode(self, mode) -> None:
-        if self._window is not None:
-            self._window.viewer.select_mode(mode, toggle=True)
+    def _select_mode(self, mode: Viewer.Mode) -> None:
+        self.viewer.select_mode(mode, toggle=True)
 
     def _scan_section(self) -> QWidget:
         box = QWidget()
@@ -575,9 +468,7 @@ class ScanWorkspace(Workspace):
         self._point_size.setMaximum(2000.0)
         self._point_size.setDecimals(1)
         self._point_size.setSingleStep(1.0)
-        self._point_size.setValue(
-            zones.point_diameter if zones is not None else 10.0
-        )
+        self._point_size.setValue(zones.point_diameter if zones is not None else 10.0)
         self._point_size.setToolTip("Size of the points in the scan path")
         self._point_size.returnPressed2.connect(self._on_point_size)
         self._point_size.reset()
@@ -590,8 +481,7 @@ class ScanWorkspace(Workspace):
         return box
 
     def _on_go_next(self) -> None:
-        if self._window is not None:
-            self._window.viewer.go_next()
+        self.viewer.go_next()
 
     def _on_density(self) -> None:
         zones = self.zones
@@ -614,7 +504,7 @@ class ScanWorkspace(Workspace):
         hl.setContentsMargins(0, 0, 0, 0)
         hl.setSpacing(9)
 
-        label = QLabel("Path colour")
+        label = QLabel("Path color")
         label.setStyleSheet(
             f"color: {theme.TEXT_MUTED}; font-size: 11px; background: transparent;"
         )
@@ -622,7 +512,7 @@ class ScanWorkspace(Workspace):
         hl.addStretch(1)
 
         self._path_color = QComboBox()
-        self._path_color.setToolTip("Colour of the scan path points")
+        self._path_color.setToolTip("Color of the scan path points")
         for color, name in MARKERS_COLORS:
             self._path_color.addItem(create_color_qicon(color), name, color)
         self._path_color.currentIndexChanged.connect(self._on_path_color)
@@ -636,10 +526,10 @@ class ScanWorkspace(Workspace):
             zones.path_color = QColor(combo.currentData())
 
     def _sync_scan_controls(self) -> None:
-        """Push density / point size / path colour from the model into the
+        """Push density / point size / path color from the model into the
         matching widgets.
 
-        Connected to both ``changed`` (path colour, point diameter) and
+        Connected to both ``changed`` (path color, point diameter) and
         ``path_changed`` (density) so any writer of the shared model — this
         panel, the classic toolbar, or the REST API — keeps these readouts
         current instead of silently going stale. Every write is wrapped in
@@ -682,5 +572,5 @@ class ScanWorkspace(Workspace):
                     combo.setCurrentIndex(match)
                 finally:
                     combo.blockSignals(False)
-            # else: the model's colour isn't one of the offered swatches —
+            # else: the model's color isn't one of the offered swatches —
             # leave the combo as it is rather than forcing index 0.
