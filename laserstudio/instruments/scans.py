@@ -77,7 +77,7 @@ class ScansInstrument(Instrument):
         enabled: bool = True,
         geometry: BaseGeometry | dict[str, Any] | None = None,
     ) -> ScanZone:
-        """Append a zone. :return: The id of the new zone."""
+        """Append a zone. :return: The new zone."""
         if id is None:
             id = self.__next_zone_id()
 
@@ -94,14 +94,13 @@ class ScansInstrument(Instrument):
             zone.set_geometry(self.__as_geometry(geometry))
         self.zones[zone.id] = zone
         self.refresh_geometry()
-        self.zone_changed.emit(zone)
+        self.zone_changed.emit(zone.id)
         return zone
 
     def update_zone(self, zone: ScanZone) -> None:
-        """Update a zone."""
-        self.zones[zone.id] = zone
+        """Update a zone resulting actions."""
         self.refresh_geometry()
-        self.zone_changed.emit(zone)
+        self.zone_changed.emit(zone.id)
 
     def remove_zone(self, zone: ScanZone | int) -> None:
         """Delete a zone, keeping the active selection sensible.

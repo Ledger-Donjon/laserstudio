@@ -3,7 +3,7 @@
 These build the toolbar headlessly (QT_QPA_PLATFORM=offscreen, no real
 display) and drive it exactly like a user or the shared model would: adding
 zones through ``ScanZones``, selecting entries in the combo box, clicking the
-"+" button, and renaming/recolouring zones through the model.
+"+" button, and renaming/recoloring zones through the model.
 
 Building a ``ScanToolBar`` needs a ``LaserStudio``-like object. A real
 ``LaserStudio`` requires a fully loaded configuration (instruments, main
@@ -156,9 +156,7 @@ def test_add_button_creates_and_activates_zone(toolbar, zones):
 def _find_add_button(toolbar: ScanToolBar):
     from PyQt6.QtWidgets import QPushButton
 
-    matches = [
-        btn for btn in toolbar.findChildren(QPushButton) if btn.text() == "+"
-    ]
+    matches = [btn for btn in toolbar.findChildren(QPushButton) if btn.text() == "+"]
     assert len(matches) == 1
     return matches[0]
 
@@ -196,7 +194,7 @@ def test_model_active_index_change_updates_combo_without_feedback(toolbar, zones
     assert zones.active_index == 2
 
 
-# ── 6. Renaming / recolouring a zone through the model updates combo text ──
+# ── 6. Renaming / recoloring a zone through the model updates combo text ──
 
 
 def test_rename_via_model_updates_combo_text(toolbar, zones):

@@ -165,7 +165,7 @@ class ScanWorkspace(Workspace):
         self._rows_layout.setSpacing(8)
         layout.addWidget(rows)
 
-        add = QPushButton("  Add zone")
+        add = QPushButton("Add zone")
         add.setIcon(lucide.icon("plus", 14, theme.TEXT))
         add.setCursor(Qt.CursorShape.PointingHandCursor)
         add.clicked.connect(self._on_add_zone)
@@ -203,7 +203,8 @@ class ScanWorkspace(Workspace):
     # ── Zone list ────────────────────────────────────────────────────────────
 
     def _on_add_zone(self) -> None:
-        self.zones.add_zone()
+        zone = self.zones.add_zone()
+        self._on_activate(zone)
 
     def _pending_rename(self, layout: QVBoxLayout) -> tuple[ScanZone, str] | None:
         """Detect an in-progress, uncommitted rename in one of the rows.
@@ -442,7 +443,7 @@ class ScanWorkspace(Workspace):
         vl.setContentsMargins(0, 0, 0, 0)
         vl.setSpacing(8)
 
-        go = QPushButton("  Go to next point")
+        go = QPushButton("Go to next point")
         go.setIcon(lucide.icon("locate-fixed", 14, theme.TEXT))
         go.setCursor(Qt.CursorShape.PointingHandCursor)
         go.setToolTip("Move the stage to the next generated scan point")

@@ -86,7 +86,7 @@ class TestRoundTrip:
         assert [z["name"] for z in listed["zones"]] == ["A"]
         assert listed["active"] == 0
 
-        # A partial update (name only) must leave colour and geometry alone.
+        # A partial update (name only) must leave color and geometry alone.
         updated = ls.handle_update_scan_zone(0, name="B")
         assert updated["index"] == 0
         assert updated["zone"]["name"] == "B"
@@ -152,7 +152,7 @@ class TestGeometryValidationRegression:
 
 
 class TestColorValidationRegression:
-    """Fix 2: an invalid colour must be rejected, not silently replaced by
+    """Fix 2: an invalid color must be rejected, not silently replaced by
     the palette default."""
 
     def test_invalid_color_is_rejected(self, ls):

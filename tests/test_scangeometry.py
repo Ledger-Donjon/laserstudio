@@ -26,9 +26,7 @@ from laserstudio.widgets.viewer import Viewer
 
 
 def _square(x: float = 0.0, y: float = 0.0, size: float = 10.0) -> Polygon:
-    return Polygon(
-        [(x, y), (x + size, y), (x + size, y + size), (x, y + size)]
-    )
+    return Polygon([(x, y), (x + size, y), (x + size, y + size), (x, y + size)])
 
 
 @pytest.fixture(scope="module")
@@ -77,9 +75,7 @@ class TestRenderingRules:
         assert len(items) == 1
         # Only zone 0's 4 vertices get handles; zone 1 contributes none.
         assert len(view._ScanGeometry__vertex_handles) == 4
-        assert all(
-            h.zone_index == 0 for h in view._ScanGeometry__vertex_handles
-        )
+        assert all(h.zone_index == 0 for h in view._ScanGeometry__vertex_handles)
 
     def test_disabled_active_zone_is_dashed_with_no_brush(self, scene_and_view):
         zones, _scene, view = scene_and_view
@@ -115,9 +111,9 @@ class TestDragCycle:
             for h in view._ScanGeometry__vertex_handles
             if h.pos() == QPointF(0.0, 0.0)
         )
-        view._begin_vertex_edit(handle)
-        view._move_vertex(handle, QPointF(-5.0, -5.0))
-        view._end_vertex_edit()
+        view._begin_handle_move(handle)
+        view._handle_move(handle, QPointF(-5.0, -5.0))
+        view._end_handle_move()
         moved_poly = zones.zones[0].polygons[0]
         coords = list(moved_poly.exterior.coords)[:-1]
         assert any(c == pytest.approx((-5.0, -5.0)) for c in coords)
@@ -150,10 +146,10 @@ class TestFix1ZoneIdentityDuringDrag:
         handle = next(
             h for h in view._ScanGeometry__vertex_handles if h.zone_index == 1
         )  # a vertex of B
-        view._begin_vertex_edit(handle)
+        view._begin_handle_move(handle)
         zones.remove_zone(0)  # remove A; B is now index 0, C is now index 1
-        view._move_vertex(handle, QPointF(-100.0, -100.0))
-        view._end_vertex_edit()
+        view._handle_move(handle, QPointF(-100.0, -100.0))
+        view._end_handle_move()
 
         assert zones.zones[0].name == "B"
         assert zones.zones[0].geometry.area != pytest.approx(100.0)
@@ -170,10 +166,10 @@ class TestFix1ZoneIdentityDuringDrag:
         handle = next(
             h for h in view._ScanGeometry__vertex_handles if h.zone_index == 1
         )  # a vertex of B
-        view._begin_vertex_edit(handle)
+        view._begin_handle_move(handle)
         zones.remove_zone(1)  # remove B itself, the zone being edited
-        view._move_vertex(handle, QPointF(-100.0, -100.0))
-        view._end_vertex_edit()
+        view._handle_move(handle, QPointF(-100.0, -100.0))
+        view._end_handle_move()
 
         assert [z.name for z in zones.zones] == ["A", "C"]
         items = view._ScanGeometry__scan_geometry_items.childItems()
@@ -186,12 +182,12 @@ class TestFix2InvalidDragPreservesShape:
         zones.add_zone(geometry=_square())
         before_area = zones.zones[0].geometry.area
         handle = next(
-            h for h in view._ScanGeometry__vertex_handles if h.vertex_index == 0
+            h for h in view._ScanGeometry__vertex_handles if h.handle_index == 0
         )
-        view._begin_vertex_edit(handle)
+        view._begin_handle_move(handle)
         # Drag the (0, 0) corner far past the opposite edge: self-intersecting.
-        view._move_vertex(handle, QPointF(100.0, 100.0))
-        view._end_vertex_edit()
+        view._handle_move(handle, QPointF(100.0, 100.0))
+        view._end_handle_move()
 
         assert zones.zones[0].geometry.area == pytest.approx(before_area)
         assert len(zones.zones[0].polygons) > 0
@@ -212,10 +208,10 @@ class TestCursorProximity:
         zones.add_zone(geometry=_square())
         handle = view._ScanGeometry__vertex_handles[0]
         handle.setVisible(True)
-        view._begin_vertex_edit(handle)  # sets __handles_dragging True
+        view._begin_handle_move(handle)  # sets __handles_dragging True
         view.update_cursor_proximity(None, 0.0)
         assert handle.isVisible() is True
-        view._end_vertex_edit()
+        view._end_handle_move()
 
 
 class TestSharedModelMultipleViews:
@@ -250,9 +246,7 @@ class TestSharedModelMultipleViews:
         assert len(items_a) == 1
         assert len(items_b) == 1
 
-    def test_disabling_a_non_active_zone_removes_it_from_both_views(
-        self, two_views
-    ):
+    def test_disabling_a_non_active_zone_removes_it_from_both_views(self, two_views):
         zones, view_a, view_b, _scene_a, _scene_b = two_views
         zones.add_zone(geometry=_square())  # zone 0, active by default
         zones.add_zone(geometry=_square(x=20.0))  # zone 1, not active
@@ -285,17 +279,17 @@ class TestViewerScanZonesConstructorContract:
         assert viewer_b.scan_zones is shared
 
 
-class TestDrawingPreviewColour:
-    """The in-progress drawing outline takes the active zone's colour, so it
+class TestDrawingPreviewColor:
+    """The in-progress drawing outline takes the active zone's color, so it
     is obvious which zone a gesture will land in before releasing the mouse.
     Shift (subtract) keeps its own red signal, and an invalid outline its
-    warning colour, since neither is "drawing this zone"."""
+    warning color, since neither is "drawing this zone"."""
 
     @staticmethod
     def _preview(viewer: Viewer) -> QColor:
         return viewer.zone_poly_item.pen().color()
 
-    def test_add_uses_the_active_zones_colour(self, qapp):
+    def test_add_uses_the_active_zones_color(self, qapp):
         zones = ScanZones()
         zones.add_zone(name="A", color="#ff5300")
         zones.add_zone(name="B", color="#00c8ff")
@@ -328,9 +322,9 @@ class TestDrawingPreviewColour:
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=False)
         assert self._preview(viewer) != QColor("#ff5300")
 
-    def test_with_no_zones_previews_the_colour_zone_1_will_get(self, qapp):
+    def test_with_no_zones_previews_the_color_zone_1_will_get(self, qapp):
         zones = ScanZones()
         viewer = Viewer(scan_zones=zones)
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=True)
-        # Drawing here creates Zone 1, so the preview shows its future colour.
+        # Drawing here creates Zone 1, so the preview shows its future color.
         assert self._preview(viewer) == default_zone_color(0)

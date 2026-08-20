@@ -17,9 +17,7 @@ from laserstudio.utils.scanzones import (
 
 
 def _square(x: float = 0.0, y: float = 0.0, size: float = 1.0) -> Polygon:
-    return Polygon(
-        [(x, y), (x + size, y), (x + size, y + size), (x, y + size)]
-    )
+    return Polygon([(x, y), (x + size, y), (x + size, y + size), (x, y + size)])
 
 
 class TestScanZone:
@@ -102,7 +100,7 @@ class TestParseColor:
 
     def test_invalid_falls_back_to_default(self):
         default = QColor("#00ff00")
-        assert parse_color("not-a-colour", default) == default
+        assert parse_color("not-a-color", default) == default
         assert parse_color(None, default) == default
         assert parse_color(42, default) == default
 
@@ -162,9 +160,7 @@ class TestSerialisation:
     def test_multipolygon_skips_empty_polygons(self):
         empty_polygon = shapely_to_yaml(Polygon())
         real_polygon = shapely_to_yaml(_square())
-        restored = yaml_to_shapely(
-            {"multipolygon": [empty_polygon, real_polygon]}
-        )
+        restored = yaml_to_shapely({"multipolygon": [empty_polygon, real_polygon]})
         assert restored.equals(_square())
 
     def test_polygon_without_exterior_key_is_read_as_empty_geometry(self):
@@ -232,7 +228,7 @@ class TestScanZonesFlattening:
 
 
 class TestScanZonesDefaults:
-    def test_created_zones_get_incrementing_names_and_colours(self):
+    def test_created_zones_get_incrementing_names_and_colors(self):
         zones = ScanZones()
         zones.add_zone()
         zones.add_zone()
@@ -480,7 +476,7 @@ class TestScanZoneSettings:
         assert restored.enabled is True
         assert restored.geometry.is_empty
 
-    def test_zone_settings_drops_colour_alpha(self):
+    def test_zone_settings_drops_color_alpha(self):
         # Alpha is deliberately not persisted: the wire form is "#rrggbb"
         # even though parse_color accepts "#rrggbbaa" on input.
         zone = ScanZone("Pads", parse_color("#ff000080", QColor("#000000")))
@@ -507,8 +503,9 @@ class TestScanZonesSettings:
     def test_settings_round_trip(self):
         zones = ScanZones()
         zones.add_zone(name="A", color="#ff0000", geometry=_square())
-        zones.add_zone(name="B", color="#0000ff", enabled=False,
-                       geometry=_square(x=5.0))
+        zones.add_zone(
+            name="B", color="#0000ff", enabled=False, geometry=_square(x=5.0)
+        )
         zones.active_index = 1
         zones.density = 42
         data = zones.settings
@@ -598,9 +595,7 @@ class TestScanZonesSettings:
                 {"name": "Good", "geometry": shapely_to_yaml(_square())},
                 {
                     "name": "Bad",
-                    "geometry": {
-                        "polygon": {"exterior": [{"x": 1}], "interiors": []}
-                    },
+                    "geometry": {"polygon": {"exterior": [{"x": 1}], "interiors": []}},
                 },
             ],
         }

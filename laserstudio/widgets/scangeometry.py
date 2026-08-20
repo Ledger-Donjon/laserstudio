@@ -33,13 +33,15 @@ class _ZoneVertexHandle(QGraphicsRectItem):
     index.
     """
 
+    RING_INDEX_EXTERIOR = -1
+
     def __init__(
         self,
         owner: ScanGeometry,
         zone_id: int,
         geom_index: int,
         ring_index: int,
-        vertex_index: int,
+        handle_index: int,
     ):
         # Not parented to the ScanGeometry group: a QGraphicsItemGroup would
         # intercept its children's mouse events (and Qt6 removed the
@@ -54,9 +56,9 @@ class _ZoneVertexHandle(QGraphicsRectItem):
         setattr(self, EDIT_HANDLE_ATTR, True)
         self._owner = owner
         self.zone_id = zone_id
-        self.geom_index = geom_index
+        self.polygon_index = geom_index
         self.ring_index = ring_index
-        self.vertex_index = vertex_index
+        self.handle_index = handle_index
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations, True)
         self.setZValue(20)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
@@ -88,19 +90,19 @@ class _ZoneVertexHandle(QGraphicsRectItem):
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None):
         if event is None:
             return
-        self._owner._begin_vertex_edit(self)
+        self._owner._begin_handle_move(self)
         event.accept()
 
     def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent | None):
         if event is None:
             return
-        self._owner._move_vertex(self, event.scenePos())
+        self._owner._handle_move(self, event.scenePos())
         event.accept()
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent | None):
         if event is None:
             return
-        self._owner._end_vertex_edit()
+        self._owner._end_handle_move()
         event.accept()
 
 
@@ -153,7 +155,7 @@ class ScanGeometry(QGraphicsItemGroup):
     """Scene representation of a :class:`ScanZones` model.
 
     Draws one path item per rendered zone in that zone's color, plus the scan
-    path, and owns the interactive vertex handles. Holds no geometry of its
+    path, and owns the interactive handles. Holds no geometry of its
     own: several instances (one per viewer) can render the same model.
 
     Rendering rules: an enabled zone gets a solid outline and a translucent
@@ -173,13 +175,18 @@ class ScanGeometry(QGraphicsItemGroup):
         self.__scan_path = ScanPath(diameter=zones.point_diameter)
         self.addToGroup(self.__scan_path)
 
-        # Interactive vertex-edition state.
-        self.__vertex_handles: list[_ZoneVertexHandle] = []
+        # Interactive handle-edition state.
+        self.__handles: list[_ZoneVertexHandle] = []
         self.__handles_dragging = False
         self.__editing_zone: ScanZone | None = None
+        # Working copy of the edited zone's polygons, live during a drag, and
+        # the pre-drag shapes used to roll back an edit that ends up invalid.
+        self.__edit_polygons: list[Polygon] = []
+        self.__pre_polygons: list[Polygon] = []
 
         zones.zone_changed.connect(self.__on_zones_changed)
         zones.path_changed.connect(self.__update_scan_path)
+        zones.active_zone_changed.connect(self.__on_zones_changed)
         self.__on_zones_changed(-1)
 
     # -- Drawing gestures (called by the Viewer) ---------------------------- #
@@ -215,9 +222,14 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def __clear_scan_geometry_items(self):
         """Clear the scan geometry items."""
+        scene = self.scene()
         for child in self.__scan_geometry_items.childItems():
+            # Unparenting alone is not enough: an item detached from a group
+            # stays in the scene as a top-level item, and the stale outlines
+            # would pile up on top of the freshly built ones.
             child.setParentItem(None)
-            del child
+            if scene is not None:
+                scene.removeItem(child)
 
     def __on_zones_changed(self, zone_id: int):
         """Rebuild all scene items from the model."""
@@ -293,28 +305,28 @@ class ScanGeometry(QGraphicsItemGroup):
         """Pop the next scan point from the shared model."""
         return self.zones.next_point()
 
-    # -- Interactive vertex edition ----------------------------------------- #
+    # -- Interactive zone edition with handles ----------------------------------------- #
 
     @staticmethod
     def __ring_coords(poly: Polygon, ring_index: int) -> list[tuple[float, float]]:
-        if ring_index < 0:
+        if ring_index == _ZoneVertexHandle.RING_INDEX_EXTERIOR:
             ring = poly.exterior
+        elif 0 <= ring_index < len(list(poly.interiors)):
+            ring = list(poly.interiors)[ring_index]
         else:
-            interiors = list(poly.interiors)
-            if ring_index >= len(interiors):
-                return []
-            ring = interiors[ring_index]
+            return []
+
         # Drop the closing duplicate point.
         return [(float(x), float(y)) for x, y in list(ring.coords)[:-1]]
 
     def __rebuild_handles(self):
-        """Recreate the vertex handles from the model."""
+        """Recreate the handles from the model."""
         scene = self.scene()
-        for handle in self.__vertex_handles:
+        for handle in self.__handles:
             handle_scene = handle.scene()
             if handle_scene is not None:
                 handle_scene.removeItem(handle)
-        self.__vertex_handles = []
+        self.__handles = []
 
         # The handles are top-level scene items; if we are not in a scene yet
         # there is nothing to attach them to.
@@ -325,48 +337,44 @@ class ScanGeometry(QGraphicsItemGroup):
             for geom_index, poly in enumerate(zone.polygons):
                 if not poly.is_valid:
                     continue
-                rings = [-1] + list(range(len(list(poly.interiors))))
+                rings = [_ZoneVertexHandle.RING_INDEX_EXTERIOR] + list(
+                    range(len(list(poly.interiors)))
+                )
                 for ring_index in rings:
-                    for vertex_index, (x, y) in enumerate(
+                    for handle_index, (x, y) in enumerate(
                         self.__ring_coords(poly, ring_index)
                     ):
                         handle = _ZoneVertexHandle(
-                            self, zone.id, geom_index, ring_index, vertex_index
+                            self, zone.id, geom_index, ring_index, handle_index
                         )
                         handle.set_color(zone.color)
                         handle.setPos(QPointF(x, y))
                         handle.setVisible(False)
                         scene.addItem(handle)
-                        self.__vertex_handles.append(handle)
+                        self.__handles.append(handle)
 
     def __reposition_handles(self):
-        """Update handle positions from the edited zone (no recreation)."""
+        """Update handle positions from the edit copy (do not recreate)."""
         if self.__editing_zone is None:
             return
-        for handle in self.__vertex_handles:
+        for handle in self.__handles:
             if handle.zone_id != self.__editing_zone.id:
-                logging.getLogger("laserstudio").debug(
-                    f"handle {handle.zone_id} is not the editing zone"
-                )
                 continue
-            if handle.geom_index >= len(self.__editing_zone.polygons):
-                logging.getLogger("laserstudio").debug(
-                    f"handle {handle.zone_id} {handle.geom_index} is out of range"
-                )
+            if handle.polygon_index >= len(self.__edit_polygons):
                 continue
-            poly = self.__editing_zone.polygons[handle.geom_index]
+            poly = self.__edit_polygons[handle.polygon_index]
             coords = self.__ring_coords(poly, handle.ring_index)
-            if handle.vertex_index < len(coords):
-                x, y = coords[handle.vertex_index]
+            if handle.handle_index < len(coords):
+                x, y = coords[handle.handle_index]
                 handle.setPos(QPointF(x, y))
 
     def update_cursor_proximity(
         self, scene_point: QPointF | None, threshold: float
     ) -> None:
-        """Show a vertex handle when the cursor gets close to it."""
+        """Show a handle when the cursor gets close to it."""
         if self.__handles_dragging:
             return
-        for handle in self.__vertex_handles:
+        for handle in self.__handles:
             if scene_point is None:
                 handle.setVisible(False)
                 continue
@@ -374,58 +382,25 @@ class ScanGeometry(QGraphicsItemGroup):
             distance = math.hypot(pos.x() - scene_point.x(), pos.y() - scene_point.y())
             handle.setVisible(distance <= threshold)
 
-    def _begin_vertex_edit(self, handle: _ZoneVertexHandle):
-        self.__handles_dragging = True
+    def _begin_handle_move(self, handle: _ZoneVertexHandle):
+        """Begin a handle drag."""
         try:
-            logging.getLogger("laserstudio").debug(
-                f"begin vertex edit for zone {handle.zone_id}"
-            )
-            self.__editing_zone = self.zones.zone(handle.zone_id)
+            zone = self.zones.zone(handle.zone_id)
         except KeyError:
             logging.getLogger("laserstudio").debug(f"zone {handle.zone_id} not found")
             self.__editing_zone = None
+            self.__handles_dragging = False
             return
 
-        # Keep the pre-drag polygons so a drag that ends up invalid can
-        self.__pre_polygons = self.__editing_zone.polygons
-
-    def _move_vertex(self, handle: _ZoneVertexHandle, scene_point: QPointF):
-        if self.__editing_zone is None or handle.zone_id != self.__editing_zone.id:
-            logging.getLogger("laserstudio").debug(
-                f"move vertex for zone {handle.zone_id} is not the editing zone"
-            )
-            return
-        if handle.geom_index >= len(self.__editing_zone.polygons):
-            logging.getLogger("laserstudio").debug(
-                f"move vertex for zone {handle.zone_id} {handle.geom_index} is out of range"
-            )
-            return
-
-        poly = self.__editing_zone.polygons[handle.geom_index]
-        exterior = self.__ring_coords(poly, -1)
-        interiors = [
-            self.__ring_coords(poly, i) for i in range(len(list(poly.interiors)))
-        ]
-        point = (scene_point.x(), scene_point.y())
-        if handle.ring_index < 0:
-            if handle.vertex_index < len(exterior):
-                exterior[handle.vertex_index] = point
-        elif handle.ring_index < len(interiors):
-            ring = interiors[handle.ring_index]
-            if handle.vertex_index < len(ring):
-                ring[handle.vertex_index] = point
-
-        try:
-            self.zones.zones[self.__editing_zone.id].polygons[handle.geom_index] = (
-                Polygon(exterior, interiors)
-            )
-        except Exception:
-            logging.getLogger("laserstudio").debug(
-                f"move vertex for zone {handle.zone_id} {handle.geom_index} is invalid"
-            )
-            return
-        self.__render_edit_polys()
-        self.__reposition_handles()
+        self.__editing_zone = zone
+        self.__handles_dragging = True
+        # The drag works on a snapshot of the zone: re-reading ``polygons``
+        # after every move would re-merge the zone, and the merge is free to
+        # reorder the polygons and to renumber a ring's vertices, so the
+        # handle indices would name a different vertex mid-drag.
+        # ``__pre_polygons`` is the fallback for an edit that ends up invalid.
+        self.__edit_polygons = list(zone.polygons)
+        self.__pre_polygons = list(zone.polygons)
 
     def __render_edit_polys(self):
         """Render the raw (non-merged) edited polygons during a drag."""
@@ -436,10 +411,9 @@ class ScanGeometry(QGraphicsItemGroup):
 
         active = self.zones.active_zone is edited
         # Other zones keep being drawn normally while one is edited. The
-        # edited zone is skipped by identity: if a zone before
-        # it in the list was removed mid-drag, ``__edit_zone_index`` no
-        # longer names it, and skipping by index would either miss it (drawn
-        # twice, once here and once below) or skip the wrong zone.
+        # edited zone is skipped by identity, so that a concurrent change to
+        # the zone list mid-drag cannot make it be drawn twice (once from the
+        # model here, once from the edit copy below) or skip another zone.
         for zone in self.__rendered_zones():
             if zone is edited:
                 continue
@@ -449,51 +423,95 @@ class ScanGeometry(QGraphicsItemGroup):
                         poly,
                         zone.color,
                         filled=zone.enabled,
-                        active=active,
+                        active=self.zones.active_zone is zone,
                     )
                 )
-        for poly in edited.polygons:
+
+        for poly in self.__edit_polygons:
             if not isinstance(poly, Polygon) or poly.is_empty:
                 continue
-            try:
-                item = _poly_to_path_item(
+            # The edit copy is drawn as-is, even while it is momentarily
+            # self-intersecting, so the shape follows the cursor. Whether it
+            # is kept is decided on release.
+            self.__scan_geometry_items.addToGroup(
+                _poly_to_path_item(
                     poly, edited.color, filled=edited.enabled, active=active
                 )
-            except Exception:
-                continue
-            self.__scan_geometry_items.addToGroup(item)
+            )
 
-    def _end_vertex_edit(self):
-        self.__handles_dragging = False
-        if self.__editing_zone is None:
+    def _handle_move(self, handle: _ZoneVertexHandle, scene_point: QPointF):
+        """Move a handle during a drag."""
+        if self.__editing_zone is None or handle.zone_id != self.__editing_zone.id:
             return
+        if not 0 <= handle.polygon_index < len(self.__edit_polygons):
+            return
+
+        poly = self.__edit_polygons[handle.polygon_index]
+        exterior = self.__ring_coords(poly, _ZoneVertexHandle.RING_INDEX_EXTERIOR)
+        interiors = [
+            self.__ring_coords(poly, i) for i in range(len(list(poly.interiors)))
+        ]
+        point = (scene_point.x(), scene_point.y())
+        if handle.ring_index == _ZoneVertexHandle.RING_INDEX_EXTERIOR:
+            ring = exterior
+        elif 0 <= handle.ring_index < len(interiors):
+            ring = interiors[handle.ring_index]
+        else:
+            return
+        if not 0 <= handle.handle_index < len(ring):
+            return
+        ring[handle.handle_index] = point
+
+        try:
+            edited_poly = Polygon(exterior, interiors)
+        except Exception:
+            logging.getLogger("laserstudio").debug(
+                f"move handle for zone {handle.zone_id}: cannot build a polygon "
+                f"from {exterior=} {interiors=}"
+            )
+            return
+
+        # The model is left untouched until the drag ends: committing on every
+        # move would re-merge the zone and renumber the vertices under the
+        # handles, and would broadcast a half-finished shape to the other views.
+        self.__edit_polygons[handle.polygon_index] = edited_poly
+        handle.setPos(scene_point)
+        self.__reposition_handles()
+        self.__render_edit_polys()
+
+    def _end_handle_move(self):
+        """End a handle drag."""
+        self.__handles_dragging = False
         zone = self.__editing_zone
         self.__editing_zone = None
+        edited, pre = self.__edit_polygons, self.__pre_polygons
+        self.__edit_polygons, self.__pre_polygons = [], []
+        if zone is None:
+            return
 
         # Confirm the zone is still present by identity (not ``in``, which
         # would fall back to ``__eq__``): it may have been removed by a
         # concurrent mutation (e.g. a REST client) while the drag was live.
-        if zone is None or not any(z is zone for z in self.zones.zones):
+        if not any(z is zone for z in self.zones.zones.values()):
             # The edited zone is gone: drop the edit and do a full repaint so
-            # the surviving zones come back instead of leaving a blank
-            # canvas (the raw edit-polygon rendering used during the drag
-            # only draws the other zones, not a merged commit).
+            # the surviving zones come back instead of keeping the edit copy
+            # of a zone that no longer exists on screen.
             self.__on_zones_changed(zone.id)
             return
 
         polys: list[Polygon] = []
-        for index, poly in enumerate(zone.polygons):
+        for index, poly in enumerate(edited):
             if isinstance(poly, Polygon) and poly.is_valid and not poly.is_empty:
                 polys.append(poly)
                 continue
-            # An invalid or empty edit (e.g. a dragged vertex crossing an
+            # An invalid or empty edit (e.g. a dragged handle crossing an
             # edge, making the polygon self-intersecting) must not delete
             # the polygon: keep its pre-drag shape instead.
             logging.getLogger("laserstudio").warning(
                 "Discarding invalid edited polygon, keeping the pre-drag "
                 f"shape instead: {poly=}"
             )
-            if index < len(self.__pre_polygons):
-                polys.append(self.__pre_polygons[index])
+            if index < len(pre):
+                polys.append(pre[index])
         zone.set_polygons(polys)
         self.zones.refresh_geometry()

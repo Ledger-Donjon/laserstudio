@@ -3,7 +3,7 @@
 These build the panel headlessly (QT_QPA_PLATFORM=offscreen, no real display)
 and drive it exactly like a user would: editing a row's QLineEdit and emitting
 ``editingFinished``, flipping a row's ``ToggleSwitch``, clicking the trash
-button, etc. ``QMenu.exec`` (used by the colour-swatch picker) blocks, so
+button, etc. ``QMenu.exec`` (used by the color-swatch picker) blocks, so
 ``_pick_color`` itself is never invoked here — ``_set_color`` (the part that
 actually touches the model) is tested directly instead.
 
@@ -129,9 +129,7 @@ def _button_labelled(panel, label: str) -> QPushButton:
     matching is done on the stripped text.
     """
     matches = [
-        btn
-        for btn in panel.findChildren(QPushButton)
-        if btn.text().strip() == label
+        btn for btn in panel.findChildren(QPushButton) if btn.text().strip() == label
     ]
     assert len(matches) == 1, (
         f"expected exactly one button labelled {label!r}, found {len(matches)}"
@@ -277,7 +275,7 @@ def test_delete_each_row_in_turn_removes_correct_zone(workspace, zones):
         assert [z.name for z in zones.zones] == expected_survivors
 
 
-# ── Colour swatch: _set_color directly (never _pick_color — QMenu.exec blocks) ──
+# ── Color swatch: _set_color directly (never _pick_color — QMenu.exec blocks) ──
 
 
 def test_set_color_updates_the_right_zone(workspace, zones):
@@ -307,7 +305,7 @@ def test_clicking_a_row_activates_it(workspace, zones):
     assert zones.active_index == 1
 
 
-# ── 8. Density / point size / path colour write to the model ───────────────
+# ── 8. Density / point size / path color write to the model ───────────────
 
 
 def test_density_field_writes_to_model(workspace, zones):
@@ -431,9 +429,7 @@ def test_build_panel_twice_does_not_double_connect(qapp, zones, window):
     assert rebuild_count[0] == 1  # not 2
 
 
-def test_control_handlers_are_safe_after_the_panel_is_destroyed(
-    qapp, zones, window
-):
+def test_control_handlers_are_safe_after_the_panel_is_destroyed(qapp, zones, window):
     """The scan-control handlers must be no-ops once their widgets are gone.
 
     ``_on_density``/``_on_point_size``/``_on_path_color`` used to read
@@ -457,7 +453,7 @@ def test_control_handlers_are_safe_after_the_panel_is_destroyed(
     assert (zones.density, zones.point_diameter, zones.path_color.name()) == before
 
 
-# ── Fix 2: density / point size / path colour must sync *from* the model ──
+# ── Fix 2: density / point size / path color must sync *from* the model ──
 
 
 def test_scan_controls_sync_from_model_changes(workspace, zones):
@@ -486,15 +482,15 @@ def test_scan_controls_sync_does_not_write_back_into_model(workspace, zones):
     # fired for an unrelated reason. If pushing the model's values into the
     # widgets looped back through their on-change handlers into the model,
     # one of these would drift (e.g. rounding, or picking a different combo
-    # entry than the exact colour already stored).
+    # entry than the exact color already stored).
     workspace._sync_scan_controls()
 
     after = (zones.density, zones.point_diameter, zones.path_color.name())
     assert after == before
 
 
-def test_scan_controls_sync_leaves_combo_alone_for_unlisted_colour(workspace, zones):
-    """The model's colour need not be one of MARKERS_COLORS — in that case
+def test_scan_controls_sync_leaves_combo_alone_for_unlisted_color(workspace, zones):
+    """The model's color need not be one of MARKERS_COLORS — in that case
     the combo must be left as-is, not forced to index 0."""
     workspace._path_color.setCurrentIndex(2)
     zones.path_color = QColor(17, 18, 19)  # not one of the offered swatches
@@ -566,7 +562,7 @@ def _active_chip(row) -> QLabel | None:
 
 def test_active_row_is_visually_distinct(workspace, zones):
     """Only the active row carries the ACTIVE marker, and its stylesheet
-    picks up that zone's own colour as an accent — so which zone a drawing
+    picks up that zone's own color as an accent — so which zone a drawing
     gesture will land in is readable at a glance, not inferred from a
     one-pixel border."""
     zones.add_zone(name="A", color="#ff5300")
@@ -576,7 +572,7 @@ def test_active_row_is_visually_distinct(workspace, zones):
     first, second = _rows(workspace)
     assert _active_chip(first) is not None
     assert _active_chip(second) is None
-    # The accent uses the active zone's colour, not a generic highlight.
+    # The accent uses the active zone's color, not a generic highlight.
     assert "#ff5300" in first.styleSheet()
     assert "#00c8ff" not in second.styleSheet()
     assert first.styleSheet() != second.styleSheet()
