@@ -54,16 +54,16 @@ The zone list is available through the {doc}`rest`:
 
 - `GET /scangeometry/zones` — the zones and the active zone id
 - `POST /scangeometry/zones` — create a zone (`name`, `color`, `enabled`,
-  `geometry` are all optional); returns `{"index": <id>, "zone": {...}}`
-- `PATCH /scangeometry/zones/{id}` — update any subset of those fields;
-  returns `{"index": <id>, "zone": {...}}`
-- `DELETE /scangeometry/zones/{id}` — delete a zone
+  `geometry` are all optional); returns `{"id": <zone_id>, "zone": {...}}`
+- `PATCH /scangeometry/zones/{zone_id}` — update any subset of those fields;
+  returns `{"id": <zone_id>, "zone": {...}}`
+- `DELETE /scangeometry/zones/{zone_id}` — delete a zone
 
 Each zone carries a stable integer `id` assigned once at creation — the first
 zone gets `id=1`, then `max(existing ids) + 1`. This is **not** a list
 position: deleting a zone does not renumber the remaining ones. The `id` field
 appears in the body of each zone object returned by `GET /scangeometry/zones`;
-the URL path parameter `{id}` refers to that same value.
+the URL path parameter `{zone_id}` refers to that same value.
 
 Colors are returned as `#rrggbb` strings; `#rrggbbaa` is also accepted on
 input, but the alpha byte is not persisted, so it will not survive a later
@@ -91,8 +91,8 @@ from laserstudio.lsapi import LSAPI
 lsapi = LSAPI()
 
 # Create a disabled zone and switch it on later.
-# add_scan_zone returns {"index": <zone_id>, "zone": {...}}; the id is stable.
-zone_id = lsapi.add_scan_zone(name="Corner pads", color="#ff5300", enabled=False)["index"]
+# add_scan_zone returns {"id": <zone_id>, "zone": {...}}; the id is stable.
+zone_id = lsapi.add_scan_zone(name="Corner pads", color="#ff5300", enabled=False)["id"]
 lsapi.update_scan_zone(zone_id, enabled=True)
 
 # Scan only that zone by disabling the others.

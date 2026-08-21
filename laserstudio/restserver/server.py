@@ -172,18 +172,18 @@ class RestProxy(QObject):
 
     def handle_update_scan_zone(
         self,
-        index: int,
+        zone_id: int,
         name: str | None,
         color: str | None,
         enabled: bool | None,
         geometry: dict[str, Any] | None,
     ) -> Config:
         return self.laser_studio.handle_update_scan_zone(
-            index, name, color, enabled, geometry
+            zone_id, name, color, enabled, geometry
         )
 
-    def handle_delete_scan_zone(self, index: int) -> Config:
-        return self.laser_studio.handle_delete_scan_zone(index)
+    def handle_delete_scan_zone(self, zone_id: int) -> Config:
+        return self.laser_studio.handle_delete_scan_zone(zone_id)
 
 
 class RestThread(QThread):
@@ -679,28 +679,28 @@ def delete_scangeometry():
 
 @scangeometry_router.get("/zones")
 def get_scan_zones():
-    """Return the list of scan zones and the active zone index."""
+    """Return the list of scan zones and the active zone id."""
     return RestServer.run("handle_scan_zones")
 
 
 @scangeometry_router.post("/zones", responses={400: _ERR})
 def post_scan_zone(body: ScanZoneBody):
-    """Create a scan zone and return its index and settings."""
+    """Create a scan zone and return its id and settings."""
     return RestServer.run(
         "handle_add_scan_zone", body.name, body.color, body.enabled, body.geometry
     )
 
 
-@scangeometry_router.patch("/zones/{index}", responses={404: _ERR, 400: _ERR})
-def patch_scan_zone(index: int, body: ScanZoneBody):
-    """Update a scan zone and return its index and settings.
+@scangeometry_router.patch("/zones/{zone_id}", responses={404: _ERR, 400: _ERR})
+def patch_scan_zone(zone_id: int, body: ScanZoneBody):
+    """Update a scan zone and return its id and settings.
 
     Omitted or ``null`` fields are left unchanged; a PATCH with an empty
     body is a no-op.
     """
     return RestServer.run(
         "handle_update_scan_zone",
-        index,
+        zone_id,
         body.name,
         body.color,
         body.enabled,
@@ -708,10 +708,10 @@ def patch_scan_zone(index: int, body: ScanZoneBody):
     )
 
 
-@scangeometry_router.delete("/zones/{index}", responses={404: _ERR})
-def delete_scan_zone(index: int):
+@scangeometry_router.delete("/zones/{zone_id}", responses={404: _ERR})
+def delete_scan_zone(zone_id: int):
     """Delete a scan zone and return the remaining zones."""
-    return RestServer.run("handle_delete_scan_zone", index)
+    return RestServer.run("handle_delete_scan_zone", zone_id)
 
 
 for _router in (

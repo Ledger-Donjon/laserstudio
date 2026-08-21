@@ -90,17 +90,17 @@ class MemoryPointNotFoundError(LaserStudioError):
 
 
 class ScanZoneNotFoundError(LaserStudioError):
-    """No scan zone matches the requested index."""
+    """No scan zone matches the requested id."""
 
     code = "SCAN_ZONE_NOT_FOUND"
     http_status = HTTPStatus.NOT_FOUND
 
-    def __init__(self, index: int, *, details: dict[str, Any] | None = None):
-        merged: dict[str, Any] = {"index": index}
+    def __init__(self, zone_id: int, *, details: dict[str, Any] | None = None):
+        merged: dict[str, Any] = {"id": zone_id}
         if details:
             merged.update(details)
         super().__init__(
-            f"No scan zone exists at index {index}.", details=merged
+            f"No scan zone exists with id {zone_id}.", details=merged
         )
 
 

@@ -589,7 +589,7 @@ class LaserStudio(QMainWindow):
         :param zone_id: Identifier of the zone to update.
         :param color: ``#rrggbb`` color.
         :param geometry: Serialized shape.
-        :raises ScanZoneNotFoundError: if ``index`` is out of range.
+        :raises ScanZoneNotFoundError: if no zone has this id.
         :raises InvalidParameterError: if ``geometry`` is not a valid geometry.
         :raises InvalidParameterError: if ``color`` is not a valid color."""
         if zone_id is not None:
@@ -637,7 +637,7 @@ class LaserStudio(QMainWindow):
         :param color: ``#rrggbb`` color. Defaults to the next zone color.
         :param enabled: Whether the zone is scanned. Defaults to True.
         :param geometry: Serialized shape. Defaults to an empty zone.
-        :return: The new zone's index and settings.
+        :return: The new zone's id and settings.
         :raises InvalidParameterError: if ``color`` or ``geometry`` is given
             but unusable.
         """
@@ -648,7 +648,7 @@ class LaserStudio(QMainWindow):
             enabled=True if enabled is None else enabled,
             geometry=geometry,
         )
-        return {"index": zone.id, "zone": zone.settings}
+        return {"id": zone.id, "zone": zone.settings}
 
     def handle_update_scan_zone(
         self,
@@ -660,9 +660,9 @@ class LaserStudio(QMainWindow):
     ) -> Config:
         """Update any subset of a scan zone's attributes.
 
-        :param index: 0-based index of the zone to update.
-        :return: The zone's index and updated settings.
-        :raises ScanZoneNotFoundError: if the index is out of range.
+        :param zone_id: Stable id of the zone to update.
+        :return: The zone's id and updated settings.
+        :raises ScanZoneNotFoundError: if no zone has this id.
         :raises InvalidParameterError: if ``color`` or ``geometry`` is given
             but unusable.
         """
@@ -670,14 +670,14 @@ class LaserStudio(QMainWindow):
         self.instruments.scans.update_zone_params(
             zone_id, name=name, color=color, enabled=enabled, geometry=geometry
         )
-        return {"index": zone_id, "zone": self.instruments.scans.zone(zone_id).settings}
+        return {"id": zone_id, "zone": self.instruments.scans.zone(zone_id).settings}
 
     def handle_delete_scan_zone(self, zone_id: int) -> Config:
         """Delete a scan zone.
 
         :param zone_id: Identifier of the zone to delete.
-        :return: The remaining zones and the active zone index.
-        :raises ScanZoneNotFoundError: if the index is out of range.
+        :return: The remaining zones and the active zone id.
+        :raises ScanZoneNotFoundError: if no zone has this id.
         """
         self.__check_scans_parameters(zone_id=zone_id)
         self.instruments.scans.remove_zone(zone_id)
