@@ -132,9 +132,10 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
     ) -> dict[str, Any]:
         """Rename, recolor, enable/disable or reshape the scan zone at `index`.
 
-        `index` is the 0-based position reported by get_scan_zones. Only the
-        given fields change. Disabling a zone excludes it from point
-        generation without deleting it.
+        `index` is the stable zone id from the `id` field reported by
+        get_scan_zones — not a list position. It does not change when other
+        zones are deleted. Only the given fields change. Disabling a zone
+        excludes it from point generation without deleting it.
 
         `geometry` shapes: polygon
         `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
@@ -147,12 +148,12 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
 
     @mcp.tool()
     def delete_scan_zone(index: int) -> dict[str, Any]:
-        """Delete the scan zone at `index` (0-based, from get_scan_zones) and
-        return the remaining zones.
+        """Delete the scan zone identified by `index` (the `id` field from
+        get_scan_zones) and return the remaining zones.
 
-        Deleting shifts the indices of every zone after it, so when deleting
-        several zones, re-list with get_scan_zones between calls rather than
-        reusing indices computed before earlier deletes.
+        Zone ids are stable: deleting a zone does not renumber the remaining
+        ones, so you can safely pass multiple ids collected from a single
+        get_scan_zones call without re-listing between deletes.
         """
         return call(api.delete_scan_zone, index)
 
