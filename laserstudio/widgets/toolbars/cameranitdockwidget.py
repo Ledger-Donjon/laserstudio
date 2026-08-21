@@ -4,7 +4,6 @@ import logging
 from typing import TYPE_CHECKING, Any
 import pickle
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QDockWidget,
     QPushButton,
@@ -18,7 +17,7 @@ from PyQt6.QtWidgets import (
 from ..coloredbutton import ColoredPushButton
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ...instruments.camera_nit import CameraNITInstrument
-from ...utils import util
+from .cameradockwidget import fill_objective_combobox, _objective_combobox_index
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -98,11 +97,7 @@ class CameraNITDockWidget(QDockWidget):
         vbox.addLayout(hbox)
         hbox.addWidget(QLabel("Objective:"))
         w = self.obj_combobox = QComboBox()
-        for x in [5, 10, 20, 50]:
-            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
-            w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
+        fill_objective_combobox(w, self.camera)
         w.setStyleSheet("QListView::item {height:24px;}")
         w.currentIndexChanged.connect(self.obj_changed)
         hbox.addWidget(w)
@@ -139,12 +134,12 @@ class CameraNITDockWidget(QDockWidget):
     def camera_parameter_changed(self, parameter: str, value: Any):
         if parameter == "objective" and isinstance(value, float):
             self.obj_combobox.blockSignals(True)
-            index = self.obj_combobox.findText(f"{value:.0f} X")
+            index = _objective_combobox_index(self.obj_combobox, value)
             if index != -1:
                 self.obj_combobox.setCurrentIndex(index)
             else:
                 logging.getLogger("laserstudio").warning(
-                    f"Received unsupported objective value from camera: {value:.0f} X. "
+                    f"Received unsupported objective value from camera: {value:g} X. "
                     "The combobox will not reflect the actual value."
                 )
             self.obj_combobox.blockSignals(False)
@@ -190,9 +185,15 @@ class CameraNITDockWidget(QDockWidget):
         Called when the magnification is changed in the UI.
         """
         logging.getLogger("laserstudio").debug(
-            f"Objective changed to {self.obj_combobox.currentText().split()[0]}"
+            f"Objective changed to {self.obj_combobox.currentText()}"
         )
-        self.camera.select_objective(float(self.obj_combobox.currentText().split()[0]))
+        data = self.obj_combobox.currentData()
+        if isinstance(data, (float, int)):
+            self.camera.select_objective(float(data))
+        else:
+            self.camera.select_objective(
+                float(self.obj_combobox.currentText().split()[0])
+            )
         assert self.laser_studio.viewer.stage_sight is not None
         self.laser_studio.viewer.stage_sight.update_size()
 

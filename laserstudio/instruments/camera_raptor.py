@@ -163,6 +163,8 @@ class RaptorCommand(bytes, Enum):
 class CameraRaptorInstrument(CameraUSBInstrument):
     """Class to implement the Raptor cameras"""
 
+    DEFAULT_OBJECTIVES: list[float] = [5.0, 10.0, 20.0, 50.0]
+
     def _should_probe_resolutions(self) -> bool:
         return False
 
@@ -203,6 +205,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         # Objective on this camera is 10x by default
         objective = cast(float, config.get("objective", 10.0))
         self.select_objective(objective)
+        self.include_current_objective()
 
         # The value of a white pixel
         self.white_value = 2**14 - 1

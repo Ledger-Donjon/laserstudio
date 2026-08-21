@@ -22,6 +22,7 @@ from ..stagesight import StageSightViewer, StageSight
 from ..camerawizards import CameraDistortionWizard, ProbesPositionWizard
 from ..return_line_edit import ReturnSpinBox
 from ...instruments.camera_usb import CameraUSBInstrument
+from ...instruments.camera import CameraInstrument
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -29,6 +30,32 @@ if TYPE_CHECKING:
 
 def _resolution_label(width: int, height: int) -> str:
     return f"{width}\xa0×\xa0{height}"
+
+
+def fill_objective_combobox(combobox: QComboBox, camera: CameraInstrument) -> None:
+    """Fill a combo box with the magnifications listed on the camera."""
+    combobox.blockSignals(True)
+    combobox.clear()
+    selected_index = 0
+    for mag in camera.objectives:
+        mag_f = float(mag)
+        icon = QIcon()
+        if mag_f == int(mag_f):
+            icon = QIcon(util.resource_path(f":/icons/obj-{int(mag_f)}x.png"))
+        combobox.addItem(icon, f"{mag_f:g} X", mag_f)
+        if abs(mag_f - camera.objective) < 0.01:
+            selected_index = combobox.count() - 1
+    if combobox.count() > 0:
+        combobox.setCurrentIndex(selected_index)
+    combobox.blockSignals(False)
+
+
+def _objective_combobox_index(combobox: QComboBox, magnification: float) -> int:
+    for index in range(combobox.count()):
+        data = combobox.itemData(index)
+        if isinstance(data, (float, int)) and abs(float(data) - magnification) < 0.01:
+            return index
+    return -1
 
 
 def _resolution_combobox_index(
@@ -343,11 +370,7 @@ class CameraDockWidget(QDockWidget):
 
         # Objective selector
         self.obj_combobox = w = QComboBox()
-        for x in [1, 5, 10, 20, 50]:
-            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
-            w.addItem(icon, f"{x} X")
-            if x == self.camera.objective:
-                w.setCurrentIndex(w.count() - 1)
+        fill_objective_combobox(w, self.camera)
         w.setStyleSheet("QListView::item {height:24px;}")
         w.currentIndexChanged.connect(self.obj_changed)
         grid.addWidget(QLabel("Objective:"), next_row, 1)
@@ -371,12 +394,12 @@ class CameraDockWidget(QDockWidget):
         )
         if parameter == "objective" and isinstance(value, float):
             self.obj_combobox.blockSignals(True)
-            index = self.obj_combobox.findText(f"{value:.0f} X")
+            index = _objective_combobox_index(self.obj_combobox, value)
             if index != -1:
                 self.obj_combobox.setCurrentIndex(index)
             else:
                 logging.getLogger("laserstudio").warning(
-                    f"Received unsupported objective value from camera: {value:.0f} X. "
+                    f"Received unsupported objective value from camera: {value:g} X. "
                     "The combobox will not reflect the actual value."
                 )
 
@@ -415,7 +438,11 @@ class CameraDockWidget(QDockWidget):
             f"Objective changed to {self.obj_combobox.currentText()}"
         )
         try:
-            objective = float(self.obj_combobox.currentText().split()[0])
+            data = self.obj_combobox.currentData()
+            if isinstance(data, (float, int)):
+                objective = float(data)
+            else:
+                objective = float(self.obj_combobox.currentText().split()[0])
         except Exception:
             logging.getLogger("laserstudio").warning(
                 f"Failed to parse objective from combobox current text: '{self.obj_combobox.currentText()}'."

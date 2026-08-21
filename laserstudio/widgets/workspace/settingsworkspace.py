@@ -27,8 +27,6 @@ from PyQt6.QtWidgets import (
 )
 
 from ...instruments.camera import CameraInstrument
-from ...instruments.camera_nit import CameraNITInstrument
-from ...instruments.camera_raptor import CameraRaptorInstrument
 from ...instruments.camera_usb import CameraUSBInstrument
 from ...instruments.shutter import ShutterInstrument
 from ...instruments.stage import StageInstrument, Vector
@@ -287,15 +285,6 @@ def _format_coords(coords: list[float]) -> str:
     while len(parts) < 3:
         parts.append("+0.0")
     return ", ".join(parts)
-
-
-def available_objectives(camera: CameraInstrument) -> list[float]:
-    """Magnifications offered for this camera type (matches classic dock widgets)."""
-    if isinstance(camera, CameraRaptorInstrument):
-        return [10.0, 20.0]
-    if isinstance(camera, CameraNITInstrument):
-        return [5.0, 10.0, 20.0, 50.0]
-    return [1.0, 5.0, 10.0, 20.0, 50.0]
 
 
 def pixel_size_um(camera: CameraInstrument) -> float:
@@ -1443,7 +1432,7 @@ class SettingsWorkspace(Workspace):
         combo.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        for mag in available_objectives(camera):
+        for mag in camera.objectives:
             combo.addItem(lucide.objective_icon(mag, 20), f"{mag:g}×", mag)
             if abs(mag - camera.objective) < 0.01:
                 combo.setCurrentIndex(combo.count() - 1)
