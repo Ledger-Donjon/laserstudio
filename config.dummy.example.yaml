@@ -6,15 +6,8 @@ camera:
   refresh_interval_ms: 50
   index: 0
   objective: 5.0
-  objectives:
-  - 1
-  - 5
-  - 10
-  - 20
-  - 50
-  pixel_size_in_um:
-  - 15
-  - 15
+  objectives: [1, 5, 10, 20, 50]
+  pixel_size_in_um: [15, 15]
   invert_vertical: false
 stage:
   enable: true
