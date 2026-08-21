@@ -34,11 +34,8 @@ __all__ = [
     "EmptyGeometryError",
 ]
 
-#: A pre-zones payload describing an empty scan geometry. Nothing in this
-#: code base uses it any more — :meth:`handle_clear_scangeometry` clears the
-#: zone list directly — but it is kept because it is a public attribute that
-#: external scripts may import, and it is still a valid
-#: :meth:`handle_scangeometry` argument.
+#: A pre-zones payload describing an empty scan geometry. Kept as a public
+#: attribute for external scripts that may import it.
 EMPTY_SCAN_GEOMETRY: Config = {
     "geometry": {"polygon": {"exterior": [], "interiors": []}}
 }

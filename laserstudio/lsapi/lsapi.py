@@ -396,29 +396,6 @@ class LSAPI:
         """
         return self.send(f"instruments/{label}/settings").json()["settings"]
 
-    def scangeometry(self) -> dict[str, Any]:
-        """Return the current scan geometry settings."""
-        result: dict[str, Any] = self.send("scangeometry").json()
-        return result
-
-    def set_scangeometry(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update and return the scan geometry settings."""
-        result: dict[str, Any] = self.send(
-            "scangeometry", {"settings": settings}, is_put=True
-        ).json()
-        return result
-
-    def delete_scangeometry(self) -> dict[str, Any]:
-        """Delete **every** scan zone and return the new settings.
-
-        This removes the zones entirely — their names, colors and enabled
-        flags go with them, not just their shapes. To empty one zone's shape
-        while keeping the zone, use
-        :meth:`update_scan_zone` with ``geometry={"geometrycollection": None}``.
-        """
-        result: dict[str, Any] = self.send("scangeometry", is_delete=True).json()
-        return result
-
     def scan_zones(self) -> dict[str, Any]:
         """Return the list of scan zones and the active zone identifier."""
         result: dict[str, Any] = self.send("scangeometry/zones").json()

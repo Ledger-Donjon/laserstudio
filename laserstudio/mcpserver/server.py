@@ -77,26 +77,6 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
     # -- Scan geometry ------------------------------------------------------ #
 
     @mcp.tool()
-    def get_scangeometry() -> dict[str, Any]:
-        """Get the current scan geometry settings (polygons and density)."""
-        return call(api.scangeometry)
-
-    @mcp.tool()
-    def set_scangeometry(settings: dict[str, Any]) -> dict[str, Any]:
-        """Update the scan geometry settings (polygons and optional density)."""
-        return call(api.set_scangeometry, settings)
-
-    @mcp.tool()
-    def delete_scangeometry() -> dict[str, Any]:
-        """Delete EVERY scan zone, including their names, colors and enabled
-        flags — not just their shapes.
-
-        To empty one zone's shape while keeping the zone itself, call
-        `update_scan_zone` with `geometry={"geometrycollection": null}`.
-        """
-        return call(api.delete_scangeometry)
-
-    @mcp.tool()
     def get_scan_zones() -> dict[str, Any]:
         """List the scan zones (name, color, enabled, shape) and which is active."""
         return call(api.scan_zones)

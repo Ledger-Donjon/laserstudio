@@ -14,9 +14,9 @@ It covers the verb-selection rules of ``send()``:
   sent as PUT/PATCH (with an empty body) rather than silently becoming a GET.
 - Passing more than one of ``is_put``/``is_patch``/``is_delete`` raises
   ``ValueError``.
-- A handful of real client methods (``go_to``, ``set_scangeometry``,
-  ``update_scan_zone``, ``delete_scan_zone``) produce the verb and URL their
-  corresponding server route actually accepts.
+- A handful of real client methods (``go_to``, ``update_scan_zone``,
+  ``delete_scan_zone``) produce the verb and URL their corresponding server
+  route actually accepts.
 """
 
 from __future__ import annotations
@@ -155,13 +155,6 @@ class TestRealCallSites:
         assert verb == "PUT"
         assert url.endswith("/motion/go_to_memory_point/3")
         assert json is None
-
-    def test_set_scangeometry_is_a_put(self, api: LSAPI) -> None:
-        api.set_scangeometry({"zones": []})
-        verb, url, json = _last_call(api)
-        assert verb == "PUT"
-        assert url.endswith("/scangeometry")
-        assert json == {"settings": {"zones": []}}
 
     def test_update_scan_zone_is_a_patch(self, api: LSAPI) -> None:
         api.update_scan_zone(2, enabled=False)
