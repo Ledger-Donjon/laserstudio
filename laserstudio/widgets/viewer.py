@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal, QEvent
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -608,7 +608,7 @@ class Viewer(QGraphicsView):
         ``StageInstrument.position`` (which emits ``position_changed``).
         """
         stage = self.stage_sight.stage if self.stage_sight is not None else None
-        if stage is None:
+        if stage is None or self.stage_sight is None:
             return
         center = self.stage_sight.pos()
         self.max_distance_item.set_center(center.x(), center.y())
@@ -1011,12 +1011,12 @@ class Viewer(QGraphicsView):
 
         return super().mouseDoubleClickEvent(event)
 
-    def leaveEvent(self, event: Any):
+    def leaveEvent(self, a0: QEvent | None):
         """Hide the edit handles when the cursor leaves the view."""
         self.soft_limits_item.update_cursor_proximity(None, 0.0)
         self.max_distance_item.update_cursor_proximity(None, 0.0)
         self.scan_geometry.update_cursor_proximity(None, 0.0)
-        super().leaveEvent(event)
+        super().leaveEvent(a0)
 
     def keyPressEvent(self, event: QKeyEvent | None):
         """
