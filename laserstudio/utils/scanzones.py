@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-
-# from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor
 from shapely.geometry import GeometryCollection, MultiPolygon, Polygon
 from shapely.geometry.base import BaseGeometry
@@ -248,6 +246,15 @@ class ScanZone:
             self.set_polygons([])
 
     @property
+    def name(self) -> str:
+        """The zone's name."""
+        return self._name or f"Zone {self.id}"
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
+
+    @property
     def geometry(self) -> BaseGeometry:
         """The merged shape of this zone (a ``Polygon`` or ``MultiPolygon``)."""
         if self._geometry_cache is None:
@@ -299,28 +306,18 @@ class ScanZone:
         if "geometry" in settings:
             self.set_geometry(yaml_to_shapely(settings["geometry"]))
 
-    @property
-    def name(self) -> str:
-        """The zone's name."""
-        return self._name or f"Zone {self.id}"
+    @classmethod
+    def from_settings(cls, data: dict[str, Any], id: int) -> ScanZone:
+        """Build the zone ``id`` from :attr:`settings`, filling in what is missing.
 
-    @name.setter
-    def name(self, value: str) -> None:
-        self._name = value
-        self.invalidate()
+        The ``id`` is given by the caller rather than read from ``data``:
+        the model keys its zones by id, so deciding which id a malformed or
+        duplicated entry gets is the caller's job.
 
-    # @classmethod
-    # def from_settings(cls, data: dict[str, Any], index: int = 0) -> "ScanZone":
-    #     """Build a zone from :attr:`settings`, filling in missing fields.
-
-    #     :param index: Position of the zone, used for the default name/color.
-    #     """
-    #     zone = cls(
-    #         name=str(data.get("name") or f"Zone {index + 1}"),
-    #         color=parse_color(data.get("color"), default_zone_color(index)),
-    #         enabled=bool(data.get("enabled", True)),
-    #     )
-    #     geometry = data.get("geometry")
-    #     if isinstance(geometry, dict):
-    #         zone.set_geometry(yaml_to_shapely(geometry))
-    #     return zone
+        :raises KeyError: if ``data`` holds a malformed geometry, so that the
+            caller can skip the whole entry instead of loading a zone with a
+            silently emptied shape.
+        """
+        zone = cls(id=id)
+        zone.settings = data
+        return zone

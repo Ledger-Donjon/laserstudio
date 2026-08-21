@@ -266,36 +266,22 @@ class ScansInstrument(Instrument):
         logging.getLogger("laserstudio").debug(f"Scan zones settings: {data}...")
 
         zones_data = data.get("zones")
-        new_zones: list[ScanZone] | None = None
+        new_zones: dict[int, ScanZone] | None = None
         if isinstance(zones_data, list):
-            new_zones = []
+            new_zones = {}
             for index, item in enumerate(zones_data):
                 if not isinstance(item, dict):
+                    logging.getLogger("laserstudio").warning(
+                        f"Skipping malformed scan zone entry: {item=}"
+                    )
                     continue
+                id = self.__zone_id_from_settings(item, index, new_zones)
                 try:
-                    new_zones.append(ScanZone.from_settings(item, index))
+                    new_zones[id] = ScanZone.from_settings(item, id)
                 except Exception:
                     logging.getLogger("laserstudio").warning(
                         f"Skipping malformed scan zone entry: {item=}"
                     )
-        else:
-            try:
-                legacy = self.__legacy_geometry(data)
-            except Exception:
-                logging.getLogger("laserstudio").warning(
-                    f"Skipping malformed legacy scan geometry: {data=}"
-                )
-                legacy = None
-            else:
-                if legacy is None:
-                    logging.getLogger("laserstudio").warning(
-                        "Invalid data for scan geometry (expected a 'zones' "
-                        f"list or a 'geometry' key): {data=}"
-                    )
-            if legacy is not None:
-                zone = ScanZone(name="Zone 1", color=default_zone_color(0))
-                zone.set_geometry(legacy)
-                new_zones = [zone]
 
         density = data.get("density")
         if isinstance(density, int) and not isinstance(density, bool):
@@ -308,26 +294,39 @@ class ScansInstrument(Instrument):
 
         if new_zones is not None:
             # Mutate in place rather than rebinding: ``zones`` is public, and
-            # ``clear()``/``remove_zone()`` keep the same list object, so views
-            # holding a reference stay correct across a settings load too.
-            self.zones[:] = new_zones
+            # ``clear()``/``remove_zone()`` keep the same dictionary object, so
+            # views holding a reference stay correct across a settings load too.
+            self.zones.clear()
+            self.zones.update(new_zones)
 
+        # The active zone is stored by id; an unknown one means "no active
+        # zone" rather than an arbitrary fallback, which would silently send
+        # the next drawing gesture into someone else's zone.
         active = data.get("active")
-        self._active_index = self.__clamp_index(
-            active if isinstance(active, int) and not isinstance(active, bool) else 0
+        self.active_zone = (
+            self.zones.get(active)
+            if isinstance(active, int) and not isinstance(active, bool)
+            else None
         )
         self.refresh_geometry()
 
     @staticmethod
-    def __legacy_geometry(data: dict[str, Any]) -> BaseGeometry | None:
-        """Read the pre-zones payload: a bare or nested single geometry."""
-        for key in ("polygon", "multipolygon", "geometrycollection"):
-            if key in data:
-                return yaml_to_shapely(data)
-        geometry = data.get("geometry")
-        if isinstance(geometry, dict):
-            return yaml_to_shapely(geometry)
-        return None
+    def __zone_id_from_settings(
+        item: dict[str, Any], index: int, taken: dict[int, ScanZone]
+    ) -> int:
+        """:return: The id to give the zone described by ``item``.
+
+        A missing, non-integer or already-used id falls back to the first free
+        one, so a hand-edited or partially written file still loads all its
+        zones instead of collapsing several of them onto the same key.
+        """
+        id = item.get("id")
+        if isinstance(id, int) and not isinstance(id, bool) and id not in taken:
+            return id
+        candidate = index + 1
+        while candidate in taken:
+            candidate += 1
+        return candidate
 
     @staticmethod
     def is_valid_scan_zone_color(color: Any) -> bool:

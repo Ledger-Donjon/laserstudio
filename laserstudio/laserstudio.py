@@ -620,7 +620,7 @@ class LaserStudio(QMainWindow):
         """:return: The list of scan zones and the active zone identifier."""
         zones = self.instruments.scans
         return {
-            "zones": [zone.settings for zone in zones.zones],
+            "zones": [zone.settings for zone in zones.zones.values()],
             "active": zones.active_zone.id if zones.active_zone is not None else None,
         }
 
