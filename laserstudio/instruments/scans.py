@@ -8,6 +8,7 @@ from .instrument import Instrument
 from ..utils.yaml_types import Config
 from ..utils.scanzones import (
     parse_color,
+    default_zone_color,
     _is_valid_polygon,
     ScanZone,
     BaseGeometry,
@@ -19,6 +20,19 @@ from ..utils.scanzones import (
     EmptyGeometryError,
 )
 
+__all__ = [
+    "ScansInstrument",
+    "default_zone_color",
+    "parse_color",
+    "ScanZone",
+    "BaseGeometry",
+    "ScanPathGenerator",
+    "MultiPolygon",
+    "Polygon",
+    "shapely_to_yaml",
+    "yaml_to_shapely",
+    "EmptyGeometryError",
+]
 
 #: A pre-zones payload describing an empty scan geometry. Nothing in this
 #: code base uses it any more — :meth:`handle_clear_scangeometry` clears the
