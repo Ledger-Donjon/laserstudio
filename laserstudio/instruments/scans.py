@@ -7,7 +7,7 @@ import logging
 from .instrument import Instrument
 from ..utils.yaml_types import Config
 from ..utils.scanzones import (
-    default_zone_color,
+    parse_color,
     _is_valid_polygon,
     ScanZone,
     BaseGeometry,
@@ -99,6 +99,27 @@ class ScansInstrument(Instrument):
 
     def update_zone(self, zone: ScanZone) -> None:
         """Update a zone resulting actions."""
+        self.refresh_geometry()
+        self.zone_changed.emit(zone.id)
+
+    def update_zone_params(
+        self,
+        zone_id: int,
+        name: str | None = None,
+        color: QColor | str | None = None,
+        enabled: bool | None = None,
+        geometry: BaseGeometry | dict[str, Any] | None = None,
+    ) -> None:
+        """Update a zone."""
+        zone = self.zone(zone_id)
+        if name is not None:
+            zone.name = name
+        if color is not None:
+            zone.color = parse_color(color, default=zone.color)
+        if geometry is not None:
+            zone.set_geometry(self.__as_geometry(geometry))
+        if enabled is not None:
+            zone.enabled = enabled
         self.refresh_geometry()
         self.zone_changed.emit(zone.id)
 

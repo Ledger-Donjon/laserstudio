@@ -642,19 +642,17 @@ class LaserStudio(QMainWindow):
             but unusable.
         """
         self.__check_scans_parameters(color=color, geometry=geometry)
-
-        zones = self.instruments.scans.scan_zones
         zone = self.instruments.scans.add_zone(
             name=name,
             color=color,
             enabled=True if enabled is None else enabled,
             geometry=geometry,
         )
-        return {"index": zone.index, "zone": zones.zone(index).settings}
+        return {"index": zone.id, "zone": zone.settings}
 
     def handle_update_scan_zone(
         self,
-        index: int,
+        zone_id: int,
         name: str | None = None,
         color: str | None = None,
         enabled: bool | None = None,
@@ -668,21 +666,21 @@ class LaserStudio(QMainWindow):
         :raises InvalidParameterError: if ``color`` or ``geometry`` is given
             but unusable.
         """
-        self.__check_scans_parameters(index=index, color=color, geometry=geometry)
-        zone = self.instruments.scans.update_zone(
-            index, name=name, color=color, enabled=enabled, geometry=geometry
+        self.__check_scans_parameters(zone_id=zone_id, color=color, geometry=geometry)
+        self.instruments.scans.update_zone_params(
+            zone_id, name=name, color=color, enabled=enabled, geometry=geometry
         )
-        return {"index": index, "zone": zone.settings}
+        return {"index": zone_id, "zone": self.instruments.scans.zone(zone_id).settings}
 
-    def handle_delete_scan_zone(self, index: int) -> Config:
+    def handle_delete_scan_zone(self, zone_id: int) -> Config:
         """Delete a scan zone.
 
-        :param index: 0-based index of the zone to delete.
+        :param zone_id: Identifier of the zone to delete.
         :return: The remaining zones and the active zone index.
         :raises ScanZoneNotFoundError: if the index is out of range.
         """
-        self.__check_scans_parameters(index=index)
-        self.instruments.scans.scan_zones.remove_zone(index)
+        self.__check_scans_parameters(zone_id=zone_id)
+        self.instruments.scans.remove_zone(zone_id)
         return self.handle_scan_zones()
 
     def handle_go_to_memory_point(self, index: int):
