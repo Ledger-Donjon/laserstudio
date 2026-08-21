@@ -4,6 +4,7 @@ camera:
   pixel_size_in_um: [14.84375, 14.84375]
   type: Raptor
   objective: 20.0
+  objectives: [5, 10, 20, 50]
   refresh_interval_ms: 10
   label: Raptor
   invert_vertical: true

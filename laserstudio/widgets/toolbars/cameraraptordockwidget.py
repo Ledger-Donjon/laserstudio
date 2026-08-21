@@ -6,7 +6,7 @@ from ...instruments.camera_raptor import (
     RaptorCameraControlReg0,
     RaptorCameraControlReg1,
 )
-from .cameradockwidget import CameraDockWidget
+from .cameradockwidget import CameraDockWidget, fill_objective_combobox
 from PyQt6.QtWidgets import (
     QVBoxLayout,
     QCheckBox,
@@ -15,8 +15,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QImage
-from ...utils import util
+from PyQt6.QtGui import QImage
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -103,18 +102,7 @@ class CameraRaptorDockWidget(CameraDockWidget):
         vbox.addWidget(w)
 
         w_cb = self.obj_combobox
-        w_cb.blockSignals(True)
-        w_cb.clear()
-        selected_index: int | None = None
-        for x in [10, 20]:
-            icon = QIcon(util.resource_path(f":/icons/obj-{x}x.png"))
-            w_cb.addItem(icon, f"{x} X")
-            if float(x) == self.camera.objective:
-                selected_index = w_cb.count() - 1
-        w_cb.blockSignals(False)
-
-        if selected_index is not None:
-            w_cb.setCurrentIndex(selected_index)
+        fill_objective_combobox(w_cb, self.camera)
 
         # Show last image number
         self.frame_no_label = w_l = QLabel(f"{self.camera.last_frame_number}")

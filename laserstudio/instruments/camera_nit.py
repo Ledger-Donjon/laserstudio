@@ -10,6 +10,8 @@ from ..utils.yaml_types import Config
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
 
+    DEFAULT_OBJECTIVES: list[float] = [5.0, 10.0, 20.0, 50.0]
+
     def __init__(self, config: Config):
         super().__init__(config)
         try:
@@ -36,6 +38,7 @@ class CameraNITInstrument(CameraInstrument):
         # Objective
         objective = cast(float, config.get("objective", 5.0))
         self.select_objective(objective)
+        self.include_current_objective()
 
     def capture_image(self) -> NDArray[Any] | None:
         width, height, _, data = self.pynit.get_last_image()

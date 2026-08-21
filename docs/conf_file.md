@@ -39,6 +39,7 @@ camera:
   nuc_filepath: "/home/donjon/laserstudio/nuc/25mhz/NUCFactory_2000us.yml"
   bpr_filepath: "/home/donjon/laserstudio/nuc/25mhz/BPM.yml"
   objective: 20.0
+  objectives: [5, 10, 20, 50]
 stage:
   enable: true
   label: "Main Stage"
