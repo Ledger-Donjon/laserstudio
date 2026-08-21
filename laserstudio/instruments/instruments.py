@@ -175,6 +175,9 @@ class Instruments:
         all.extend(self.probes)
         if self.light is not None:
             all.append(self.light)
+        all.append(self.scans)
+        if self.focus_helper is not None:
+            all.append(self.focus_helper)
         return all
 
     def get_instrument_with_label(self, label: str) -> Instrument | None:

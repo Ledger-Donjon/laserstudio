@@ -26,10 +26,10 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, manage scan zones (create, rename, recolor, enable or
-disable, delete), read or update the overall scan geometry, read or move the
-stage, run scans (go_next), focus, manage markers, and capture camera images or
-screenshots.
+instrument settings (including the ``Scan Zones`` and ``Focus`` instruments),
+manage scan zones (create, rename, recolor, enable or disable, delete), read or
+move the stage, run scans (go_next), focus, manage markers, and capture camera
+images or screenshots.
 
 Scanning runs on the union of the *enabled* zones: disable a zone to exclude it
 from go_next without losing its shape.

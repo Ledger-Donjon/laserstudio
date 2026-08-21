@@ -69,19 +69,10 @@ Colors are returned as `#rrggbb` strings; `#rrggbbaa` is also accepted on
 input, but the alpha byte is not persisted, so it will not survive a later
 `GET`. `POST` and `PATCH` reject a malformed `color` or `geometry` with a
 `400 INVALID_PARAMETER` error; a missing or deleted zone id returns `404
-SCAN_ZONE_NOT_FOUND`. `PUT /scangeometry`, by contrast, is the same code path
-used to load `settings.yaml`: a malformed zone entry there is skipped and
-logged rather than rejected, so a bad entry elsewhere in the payload does not
-prevent the rest of the file from loading.
+SCAN_ZONE_NOT_FOUND`.
 
-`GET /scangeometry` returns `density`, `active`, the `zones` list and a
-`geometry` key holding the flattened union of the enabled zones. `PUT
-/scangeometry` accepts either the `zones` form or the historical single
-`geometry` form, which loads as one zone.
-
-`DELETE /scangeometry` deletes **every** zone, names and colors included — not
-just their shapes. To empty a single zone's shape while keeping the zone, patch
-it with `{"geometry": {"geometrycollection": null}}`.
+To empty a single zone's shape while keeping the zone, patch it with
+`{"geometry": {"geometrycollection": null}}`.
 
 With the {doc}`lsapi` client:
 

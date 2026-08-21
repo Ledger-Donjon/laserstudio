@@ -8,7 +8,8 @@ class Instrument(QObject):
 
     def __init__(self, config: Config):
         super().__init__()
-        self.label: str | None = str(config.get("label"))
+        label = config.get("label")
+        self.label: str | None = str(label) if label is not None else None
 
     @property
     def settings(self) -> Config:
