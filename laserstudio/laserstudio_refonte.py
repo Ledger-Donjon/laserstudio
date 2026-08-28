@@ -66,8 +66,9 @@ class LaserStudioRefonte(QMainWindow):
             SettingsWorkspace(self),
             PhotoemissionWorkspace(),
             ScanWorkspace(),
-            AnalyzeWorkspace(),
+            AnalyzeWorkspace(self),
         ]
+        self._current_workspace = -1
 
         root = QWidget()
         root.setObjectName("ls-root")
@@ -136,6 +137,9 @@ class LaserStudioRefonte(QMainWindow):
         )
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self).activated.connect(
             lambda: self.viewer.select_mode(Viewer.Mode.NONE)
+        )
+        QShortcut(QKeySequence(Qt.Key.Key_L), self).activated.connect(
+            lambda: self.viewer.select_mode(Viewer.Mode.RULER)
         )
 
     @property
@@ -275,8 +279,12 @@ class LaserStudioRefonte(QMainWindow):
     # ── Workspace switching ───────────────────────────────────────────────────
 
     def _select_workspace(self, index: int) -> None:
+        if self._current_workspace not in (index, -1):
+            self._workspaces[self._current_workspace].on_deactivated()
+        self._current_workspace = index
         self._sidebar.setCurrentIndex(index)
         ws = self._workspaces[index]
+        ws.on_activated()
         for j, btn in enumerate(self._tab_buttons):
             active = j == index
             btn.setChecked(active)

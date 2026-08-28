@@ -112,6 +112,25 @@ class RestProxy(QObject):
     def handle_delete_markers(self, ids: list[int] | None) -> Config:
         return self.laser_studio.handle_delete_markers(ids)
 
+    def handle_add_rulers(
+        self,
+        segments: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
+        graduation: float | None,
+        graduation_count: float | None,
+        visible: bool | None,
+    ) -> Config:
+        return self.laser_studio.handle_add_rulers(
+            segments, color, label, graduation, graduation_count, visible
+        )
+
+    def handle_rulers(self) -> list[Config]:
+        return self.laser_studio.handle_rulers()
+
+    def handle_delete_rulers(self, ids: list[int] | None) -> Config:
+        return self.laser_studio.handle_delete_rulers(ids)
+
     def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
         return self.laser_studio.handle_pixel_to_position(pixels)
 
@@ -302,6 +321,38 @@ class DeleteMarkerBody(BaseModel):
         default=None,
         description="Identifiers of the markers to delete. "
         "If omitted or null, all markers are removed.",
+        examples=[[1, 2, 3]],
+    )
+
+
+class RulerBody(BaseModel):
+    segments: list[list[float]] | None = Field(
+        default=None,
+        description="Ruler segments, each given as [x1, y1, x2, y2].",
+        examples=[[[0.0, 0.0, 100.0, 50.0]]],
+    )
+    color: list[float] | None = Field(default=None, examples=[[0.87, 1.0, 0.0, 1.0]])
+    label: str | None = None
+    graduation: float | None = Field(
+        default=None,
+        description="Graduation interval in µm. Omitted or 0 draws a plain line.",
+        examples=[10.0],
+    )
+    graduation_count: float | None = Field(
+        default=None,
+        description="Number of graduations over the whole ruler, as an alternative "
+        "to 'graduation': the ruler keeps that count and derives its interval from "
+        "its length. Giving both is an error.",
+        examples=[10.0],
+    )
+    visible: bool = True
+
+
+class DeleteRulerBody(BaseModel):
+    ids: list[int] | None = Field(
+        default=None,
+        description="Identifiers of the rulers to delete. "
+        "If omitted or null, all rulers are removed.",
         examples=[[1, 2, 3]],
     )
 
@@ -530,6 +581,37 @@ def delete_markers(body: DeleteMarkerBody | None = None):
     """
     ids = body.ids if body is not None else None
     return RestServer.run("handle_delete_markers", ids)
+
+
+@annotation_router.put("/add_rulers", responses={400: _ERR})
+@annotation_router.put("/add_ruler", responses={400: _ERR})
+def add_rulers(body: RulerBody):
+    """Add one or several rulers and return their identifier(s) and length(s)."""
+    return RestServer.run(
+        "handle_add_rulers",
+        body.segments,
+        body.color,
+        body.label,
+        body.graduation,
+        body.graduation_count,
+        body.visible,
+    )
+
+
+@annotation_router.get("/rulers")
+def get_rulers():
+    """Return the list of rulers currently in the scene."""
+    return RestServer.run("handle_rulers")
+
+
+@annotation_router.delete("/rulers", responses={400: _ERR})
+def delete_rulers(body: DeleteRulerBody | None = None):
+    """Delete ruler(s) by id, or all rulers when no id is given.
+
+    Returns the list of deleted ruler identifiers under the ``deleted`` key.
+    """
+    ids = body.ids if body is not None else None
+    return RestServer.run("handle_delete_rulers", ids)
 
 
 @annotation_router.post("/pixel_to_position", responses={400: _ERR, 503: _ERR})

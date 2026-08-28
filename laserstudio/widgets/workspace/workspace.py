@@ -39,6 +39,16 @@ class Workspace:
         """Return the right-side content, or ``None`` to use the viewer."""
         return None
 
+    def on_activated(self) -> None:
+        """Called when this workspace's tab becomes the current one."""
+
+    def on_deactivated(self) -> None:
+        """Called when another workspace's tab is selected.
+
+        Workspaces that put the shared viewer in a specific mode use this to
+        leave that mode behind.
+        """
+
 
 def placeholder_panel(label: str) -> QWidget:
     """A simple 'not yet implemented' left panel, used by unfinished workspaces."""

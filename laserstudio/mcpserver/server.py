@@ -27,8 +27,8 @@ Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
 instrument settings, read or update scan geometry, read or move the stage, run
-scans (go_next), focus, manage markers, and capture camera images or
-screenshots.
+scans (go_next), focus, manage markers and rulers, and capture camera images
+or screenshots.
 
 Tools fail with an explicit error message prefixed by a machine-readable code
 (e.g. INSTRUMENT_NOT_FOUND, DEVICE_UNAVAILABLE, INVALID_PARAMETER) when an
@@ -167,6 +167,54 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         :return: A dict with the list of deleted identifiers under ``deleted``.
         """
         return call(api.delete_markers, ids)
+
+    @mcp.tool()
+    def list_rulers() -> list[dict[str, Any]]:
+        """List the rulers (distance measurements) currently in the viewer."""
+        return call(api.rulers)
+
+    @mcp.tool()
+    def add_ruler(
+        segment: list[float],
+        color: list[float] | None = None,
+        label: str | None = None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        """Add a ruler measuring the distance between two viewer positions.
+
+        :param segment: ``[x1, y1, x2, y2]`` viewer coordinates of the two ends.
+        :param color: ``[r, g, b]`` or ``[r, g, b, a]`` channels in ``[0, 1]``.
+        :param label: Optional label for the ruler.
+        :param graduation: Graduation interval in µm. If omitted or 0, the ruler
+            is drawn as a plain line.
+        :param graduation_count: Number of graduations over the whole ruler, as an
+            alternative to ``graduation``: the ruler keeps that count and derives
+            its interval from its length (10 graduations on a 150 µm ruler means a
+            15 µm interval, and the count stays 10 if the ruler is resized).
+        :param visible: If False, the ruler is created but not displayed.
+        """
+        rgba = tuple(color) if color is not None else None
+        return call(
+            api.ruler,
+            segments=(segment[0], segment[1], segment[2], segment[3]),
+            color=rgba,  # type: ignore[arg-type]
+            label=label,
+            graduation=graduation,
+            graduation_count=graduation_count,
+            visible=visible,
+        )
+
+    @mcp.tool()
+    def delete_rulers(ids: list[int] | None = None) -> dict[str, Any]:
+        """Delete rulers from the viewer.
+
+        :param ids: Identifiers of the rulers to delete (as returned by
+            ``list_rulers`` / ``add_ruler``). If omitted, all rulers are removed.
+        :return: A dict with the list of deleted identifiers under ``deleted``.
+        """
+        return call(api.delete_rulers, ids)
 
     @mcp.tool()
     def pixel_to_position(pixels: list[list[float]]) -> list[list[float]]:
