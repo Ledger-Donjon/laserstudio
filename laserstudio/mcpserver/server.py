@@ -14,7 +14,8 @@ explicit reason when something fails (unknown instrument, no camera, ...).
 from __future__ import annotations
 
 import io
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from mcp.server.fastmcp import FastMCP, Image
 
@@ -66,9 +67,7 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         return call(api.get_instrument_settings, label)
 
     @mcp.tool()
-    def set_instrument_settings(
-        label: str, settings: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_instrument_settings(label: str, settings: dict[str, Any]) -> dict[str, Any]:
         """Update the settings of the instrument identified by its label."""
         return call(api.set_instrument_settings, label, settings)
 

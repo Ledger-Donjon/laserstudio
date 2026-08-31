@@ -1,9 +1,11 @@
 """Settings workspace — sub-category panels (camera, positioning, focus, …)."""
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PyQt6.QtGui import QFocusEvent, QKeyEvent
@@ -12,7 +14,6 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDoubleSpinBox,
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -34,14 +35,14 @@ from ..keyboardbox import Direction, arrow_key_direction, direction_axis
 from ..newui import lucide, theme
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..viewer import Viewer
-from .schemaform import ToggleSwitch, _INPUT_SS
+from .schemaform import _INPUT_SS, ToggleSwitch
 from .workspace import Workspace
 
 # PDM lasers are optional (require the pypdm driver); import defensively so the
 # whole Settings UI still loads if the driver is unavailable.
 try:
-    from ...instruments.pdm import PDMInstrument, InterlockStatus
-except Exception:  # pragma: no cover - pypdm is an optional dependency
+    from ...instruments.pdm import InterlockStatus, PDMInstrument
+except ImportError:  # pragma: no cover - pypdm is an optional dependency
     PDMInstrument = None  # type: ignore[assignment,misc]
     InterlockStatus = None  # type: ignore[assignment,misc]
 
@@ -293,6 +294,7 @@ def pixel_size_um(camera: CameraInstrument) -> float:
 
 # ── Small UI helpers ───────────────────────────────────────────────────────────
 
+
 def _mono_label(text: str) -> QLabel:
     lbl = QLabel(text)
     lbl.setStyleSheet(_MONO_MUTED)
@@ -307,12 +309,8 @@ def _value_box(text: str) -> QLabel:
         " border-radius: 5px; padding: 5px 10px;"
     )
     lbl.setFixedHeight(_FIELD_CONTROL_H)
-    lbl.setSizePolicy(
-        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-    )
-    lbl.setAlignment(
-        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
-    )
+    lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
     return lbl
 
 
@@ -331,9 +329,7 @@ def _param_grid_cell(label: str, control: QWidget) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(6)
     layout.addWidget(_mono_label(label))
-    control.setSizePolicy(
-        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-    )
+    control.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     layout.addWidget(control)
     return cell
 
@@ -434,9 +430,9 @@ class _SliderRow(QWidget):
         self._value.setText(self._fmt(val))
         self._slider.blockSignals(False)
 
-    def setEnabled(self, enabled: bool) -> None:  # noqa: N802
-        super().setEnabled(enabled)
-        self._slider.setEnabled(enabled)
+    def setEnabled(self, a0: bool) -> None:
+        super().setEnabled(a0)
+        self._slider.setEnabled(a0)
 
 
 class _ShutterSection(QWidget):
@@ -471,7 +467,7 @@ class _ShutterSection(QWidget):
         header_layout.addStretch()
         self._status_lbl = QLabel()
         self._status_lbl.setStyleSheet(
-            f"font-family: monospace; font-size: 10px; letter-spacing: 1px;"
+            "font-family: monospace; font-size: 10px; letter-spacing: 1px;"
             " background: transparent;"
         )
         header_layout.addWidget(self._status_lbl)
@@ -640,10 +636,12 @@ class _LaserSection(QWidget):
             lambda: self._apply("offset_current", self._offset_spin.value())
         )
         root.addWidget(
-            _two_col_param_grid([
-                ("PULSE POWER", self._power_spin),
-                ("OFFSET CURRENT", self._offset_spin),
-            ])
+            _two_col_param_grid(
+                [
+                    ("PULSE POWER", self._power_spin),
+                    ("OFFSET CURRENT", self._offset_spin),
+                ]
+            )
         )
 
         # Pulse width (ps) + delay (ps).
@@ -656,10 +654,12 @@ class _LaserSection(QWidget):
             lambda: self._apply("delay", self._delay_spin.value())
         )
         root.addWidget(
-            _two_col_param_grid([
-                ("PULSE WIDTH", self._pw_spin),
-                ("DELAY", self._delay_spin),
-            ])
+            _two_col_param_grid(
+                [
+                    ("PULSE WIDTH", self._pw_spin),
+                    ("DELAY", self._delay_spin),
+                ]
+            )
         )
 
         # Temperature (read-only).
@@ -711,9 +711,7 @@ class _LaserSection(QWidget):
         spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         return spin
 
-    def _int_field(
-        self, minimum: int, maximum: int, suffix: str
-    ) -> ReturnSpinBox:
+    def _int_field(self, minimum: int, maximum: int, suffix: str) -> ReturnSpinBox:
         spin = ReturnSpinBox()
         spin.setStyleSheet(_INPUT_SS)
         spin.setFixedHeight(_FIELD_CONTROL_H)
@@ -736,9 +734,7 @@ class _LaserSection(QWidget):
         try:
             self._laser.on_off = self._arm_btn.isChecked()
         except Exception as exc:
-            logging.getLogger("laserstudio").warning(
-                f"Failed to toggle laser: {exc}"
-            )
+            logging.getLogger("laserstudio").warning(f"Failed to toggle laser: {exc}")
         self._sync_arm()
 
     def _sync_arm(self, on: bool | None = None) -> None:
@@ -748,12 +744,8 @@ class _LaserSection(QWidget):
         self._arm_btn.setChecked(on)
         self._arm_btn.blockSignals(False)
         self._arm_btn.setText("ARMED" if on else "ARM")
-        self._arm_btn.setStyleSheet(
-            _LASER_ARM_ARMED_SS if on else _LASER_ARM_SAFE_SS
-        )
-        self._arm_btn.setIcon(
-            lucide.icon("zap", 14, "#0A0A0A" if on else theme.ACCENT)
-        )
+        self._arm_btn.setStyleSheet(_LASER_ARM_ARMED_SS if on else _LASER_ARM_SAFE_SS)
+        self._arm_btn.setIcon(lucide.icon("zap", 14, "#0A0A0A" if on else theme.ACCENT))
         self._arm_status.setText(f"ARM · {'ARMED' if on else 'SAFE'}")
         self._arm_status.setStyleSheet(
             f"color: {theme.ACCENT if on else theme.GREEN};"
@@ -825,9 +817,7 @@ class _SubPanelStack(QStackedWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
     def sizeHint(self) -> QSize:  # type: ignore[override]
         current = self.currentWidget()
@@ -863,9 +853,7 @@ class SubCategoryBar(QWidget):
         super().__init__(parent)
         self.setObjectName("ls-sub-bar")
         self.setStyleSheet(_SUB_BAR_SS)
-        self.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
-        )
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -884,9 +872,7 @@ class SubCategoryBar(QWidget):
             btn.setIcon(lucide.icon(icon_name, 14, theme.TAB_INACTIVE))
             btn.setIconSize(QSize(14, 14))
             btn.setToolTip(label)
-            btn.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-            )
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn.clicked.connect(lambda _c=False, k=key: on_select(k))
             self._group.addButton(btn)
             grid.addWidget(btn, i // self._COLS, i % self._COLS)
@@ -937,9 +923,7 @@ class DpadWidget(QWidget):
         self._num_axis = stage.num_axis
         self._displacement_xy = 100.0
         self._displacement_z = 10.0
-        self.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-        )
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -1080,14 +1064,10 @@ class DpadWidget(QWidget):
         btn.move(pad.width() - btn.width(), pad.height() - btn.height())
         btn.raise_()
 
-    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
-        if (
-            obj is self._pad
-            and event is not None
-            and event.type() == QEvent.Type.Resize
-        ):
+    def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
+        if a0 is self._pad and a1 is not None and a1.type() == QEvent.Type.Resize:
             self._reposition_keyboard_button()
-        return super().eventFilter(obj, event)
+        return super().eventFilter(a0, a1)
 
     def _set_keyboard_active(self, active: bool) -> None:
         color = theme.PURPLE if active else theme.TEXT_DIM
@@ -1150,9 +1130,7 @@ class _SafetyLimitsSection(QWidget):
         self._distance_toggle = ToggleSwitch(self._stage.guardrail_enabled)
         self._distance_toggle.toggled.connect(self._on_distance_enabled)
         root.addWidget(self._sub_header("Max move distance", self._distance_toggle))
-        root.addWidget(
-            self._hint("Block any single move longer than this distance.")
-        )
+        root.addWidget(self._hint("Block any single move longer than this distance."))
         self._distance_spin = QDoubleSpinBox()
         self._distance_spin.setStyleSheet(_INPUT_SS)
         self._distance_spin.setFixedHeight(_FIELD_CONTROL_H)
@@ -1407,9 +1385,7 @@ class SettingsWorkspace(Workspace):
 
     def _build_camera_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
@@ -1429,24 +1405,22 @@ class SettingsWorkspace(Workspace):
         combo.setStyleSheet(_INPUT_SS)
         combo.setFixedHeight(_FIELD_CONTROL_H)
         combo.setIconSize(QSize(20, 20))
-        combo.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
+        combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         for mag in camera.objectives:
             combo.addItem(lucide.objective_icon(mag, 20), f"{mag:g}×", mag)
             if abs(mag - camera.objective) < 0.01:
                 combo.setCurrentIndex(combo.count() - 1)
         combo.currentIndexChanged.connect(self._on_objective_changed)
 
-        self._pixel_size_lbl = _readout_field(
-            f"{pixel_size_um(camera):.1f}\xa0µm"
-        )
+        self._pixel_size_lbl = _readout_field(f"{pixel_size_um(camera):.1f}\xa0µm")
 
         layout.addWidget(
-            _two_col_param_grid([
-                ("OBJECTIVE", combo),
-                ("PIXEL SIZE", self._pixel_size_lbl),
-            ])
+            _two_col_param_grid(
+                [
+                    ("OBJECTIVE", combo),
+                    ("PIXEL SIZE", self._pixel_size_lbl),
+                ]
+            )
         )
 
         camera.parameter_changed.connect(self._on_camera_parameter_changed)
@@ -1454,31 +1428,48 @@ class SettingsWorkspace(Workspace):
         # Sliders
         if isinstance(camera, CameraUSBInstrument):
             try:
-                layout.addWidget(_SliderRow(
-                    "EXPOSURE",
-                    0, 100, min(100, max(0, int(camera.exposure))),
-                    lambda v: f"{v} ms",
-                    lambda v: setattr(camera, "exposure", float(v)),
-                ))
+                layout.addWidget(
+                    _SliderRow(
+                        "EXPOSURE",
+                        0,
+                        100,
+                        min(100, max(0, int(camera.exposure))),
+                        lambda v: f"{v} ms",
+                        lambda v: setattr(camera, "exposure", float(v)),
+                    )
+                )
             except Exception:
+                logging.getLogger("laserstudio").error("Failed to add exposure slider")
                 pass
             try:
-                layout.addWidget(_SliderRow(
-                    "GAIN",
-                    0, 100, min(100, max(0, int(camera.gain))),
-                    lambda v: f"{v:.1f} dB",
-                    lambda v: setattr(camera, "gain", float(v)),
-                ))
+                layout.addWidget(
+                    _SliderRow(
+                        "GAIN",
+                        0,
+                        100,
+                        min(100, max(0, int(camera.gain))),
+                        lambda v: f"{v:.1f} dB",
+                        lambda v: setattr(camera, "gain", float(v)),
+                    )
+                )
             except Exception:
+                logging.getLogger("laserstudio").error("Failed to add gain slider")
                 pass
             try:
-                layout.addWidget(_SliderRow(
-                    "BRIGHTNESS",
-                    0, 255, min(255, max(0, int(camera.brightness))),
-                    lambda v: f"{int(v * 100 / 255)} %",
-                    lambda v: setattr(camera, "brightness", float(v)),
-                ))
+                layout.addWidget(
+                    _SliderRow(
+                        "BRIGHTNESS",
+                        0,
+                        255,
+                        min(255, max(0, int(camera.brightness))),
+                        lambda v: f"{int(v * 100 / 255)} %",
+                        lambda v: setattr(camera, "brightness", float(v)),
+                    )
+                )
             except Exception:
+                logging.getLogger("laserstudio").error(
+                    "Failed to add brightness slider"
+                )
                 pass
 
         # Light
@@ -1490,12 +1481,16 @@ class SettingsWorkspace(Workspace):
             hint = QLabel(dtype.upper())
             hint.setAlignment(Qt.AlignmentFlag.AlignRight)
             hint.setStyleSheet(_MONO_DIM)
-            layout.addWidget(_SliderRow(
-                "LIGHT LEVEL",
-                0, 100, int(light.intensity * 100),
-                lambda v: f"{v} %",
-                lambda v: setattr(light, "intensity", v / 100.0),
-            ))
+            layout.addWidget(
+                _SliderRow(
+                    "LIGHT LEVEL",
+                    0,
+                    100,
+                    int(light.intensity * 100),
+                    lambda v: f"{v} %",
+                    lambda v: setattr(light, "intensity", v / 100.0),
+                )
+            )
 
         # Shutter
         if camera.shutter is not None:
@@ -1546,9 +1541,7 @@ class SettingsWorkspace(Workspace):
 
     def _build_positioning_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
@@ -1603,9 +1596,7 @@ class SettingsWorkspace(Workspace):
 
     def _build_focus_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
@@ -1619,9 +1610,7 @@ class SettingsWorkspace(Workspace):
 
     def _build_reference_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
@@ -1630,9 +1619,7 @@ class SettingsWorkspace(Workspace):
         browse_row = QWidget()
         browse_row.setStyleSheet("background: transparent;")
         browse_row.setFixedHeight(theme.BTN_MIN_H)
-        browse_row.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        browse_row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         browse_layout = QHBoxLayout(browse_row)
         browse_layout.setContentsMargins(0, 0, 0, 0)
         browse_layout.setSpacing(8)
@@ -1671,9 +1658,7 @@ class SettingsWorkspace(Workspace):
 
         status_row = QWidget()
         status_row.setFixedHeight(theme.BTN_MIN_H)
-        status_row.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        status_row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         status_row.setStyleSheet(
             f"background: {theme.BG_CARD}; border: 1px solid {theme.BORDER};"
             " border-radius: 5px;"
@@ -1694,9 +1679,7 @@ class SettingsWorkspace(Workspace):
 
         dist_row = QWidget()
         dist_row.setFixedHeight(theme.BTN_MIN_H)
-        dist_row.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        dist_row.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         dist_layout = QHBoxLayout(dist_row)
         dist_layout.setContentsMargins(0, 0, 0, 0)
         dist_layout.setSpacing(8)
@@ -1725,9 +1708,7 @@ class SettingsWorkspace(Workspace):
             "(affine transform). Does not correct the live camera feed."
         )
         align_hint.setWordWrap(True)
-        align_hint.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        align_hint.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         align_hint.setStyleSheet(
             f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
         )
@@ -1763,9 +1744,7 @@ class SettingsWorkspace(Workspace):
             cam_status_layout.addWidget(self._ref_cam_status_val)
             layout.addWidget(cam_status_row)
 
-            wizard_btn = _sidebar_btn(
-                QPushButton("Launch distortion wizard")
-            )
+            wizard_btn = _sidebar_btn(QPushButton("Launch distortion wizard"))
             wizard_btn.setIcon(lucide.icon("grid-3x3", 14, theme.TEXT_DIM))
             wizard_btn.setStyleSheet(theme.GHOST_BTN)
             wizard_btn.setEnabled(False)
@@ -1785,8 +1764,7 @@ class SettingsWorkspace(Workspace):
                 QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
             )
             cam_hint.setStyleSheet(
-                f"color: {theme.TEXT_DIM}; font-size: 10px;"
-                " background: transparent;"
+                f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
             )
             layout.addWidget(cam_hint)
 
@@ -1796,9 +1774,7 @@ class SettingsWorkspace(Workspace):
 
     def _build_lasers_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
-        )
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
@@ -1837,9 +1813,7 @@ class SettingsWorkspace(Workspace):
         active = mode_id == int(Viewer.Mode.STAGE)
         btn.blockSignals(True)
         btn.setChecked(active)
-        btn.setIcon(
-            lucide.icon("move", 15, theme.PURPLE if active else theme.TEXT)
-        )
+        btn.setIcon(lucide.icon("move", 15, theme.PURPLE if active else theme.TEXT))
         btn.blockSignals(False)
 
     def _save_memory_point(self) -> None:
@@ -1913,9 +1887,7 @@ class SettingsWorkspace(Workspace):
 
         if self._ref_cam_status_val is not None:
             camera = self._window.instruments.camera
-            cam_corrected = (
-                camera is not None and camera.correction_matrix is not None
-            )
+            cam_corrected = camera is not None and camera.correction_matrix is not None
             if cam_corrected:
                 self._ref_cam_status_val.setText("CORRECTED · QUAD-TO-QUAD")
                 self._ref_cam_status_val.setStyleSheet(

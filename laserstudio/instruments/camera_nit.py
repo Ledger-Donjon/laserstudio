@@ -1,16 +1,19 @@
 from __future__ import annotations
-from typing import cast, Any
-from numpy import frombuffer, resize, uint8, zeros, float32
+
+from typing import Any, ClassVar, cast
+
+from numpy import float32, frombuffer, resize, uint8, zeros
 from numpy.typing import NDArray
-from .camera import CameraInstrument
+
 from ..utils.util import expand_path
 from ..utils.yaml_types import Config
+from .camera import CameraInstrument
 
 
 class CameraNITInstrument(CameraInstrument):
     """Class to implement the New Imaging Technologies cameras, using pyNit"""
 
-    DEFAULT_OBJECTIVES: list[float] = [5.0, 10.0, 20.0, 50.0]
+    DEFAULT_OBJECTIVES: ClassVar[tuple[float, ...]] = (5.0, 10.0, 20.0, 50.0)
 
     def __init__(self, config: Config):
         super().__init__(config)
@@ -26,9 +29,9 @@ class CameraNITInstrument(CameraInstrument):
         nuc_filepath = config.get("nuc_filepath", "./nuc/25mhz/NUCFactory_2000us.yml")
         bpr_filepath = config.get("bpr_filepath", "./nuc/25mhz/BPM.yml")
         if not isinstance(nuc_filepath, str):
-            raise ValueError("nuc_filepath must be a string")
+            raise TypeError("nuc_filepath must be a string")
         if not isinstance(bpr_filepath, str):
-            raise ValueError("bpr_filepath must be a string")
+            raise TypeError("bpr_filepath must be a string")
 
         nuc_filepath = expand_path(nuc_filepath)
         bpr_filepath = expand_path(bpr_filepath)

@@ -225,7 +225,6 @@ class StageInstrument(Instrument):
             if self.refresh_interval is None:
                 self.refresh_interval = 200
 
-
         elif device_type == "PI":
             logging.getLogger("laserstudio").info(
                 "Creating a PI/Mercury stage... "
@@ -234,6 +233,16 @@ class StageInstrument(Instrument):
             adresses = config.get("adresses", [1, 2, 3])
             logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
             self.stage = PI(dev=dev, addresses=adresses)
+            self._pi_joystick_velocity_mm_s = self._expand_per_axis_config(
+                config.get("joystick_velocity_mm_s", 0.5), len(adresses)
+            )
+            self._pi_joystick_acceleration_mm_s2 = self._expand_per_axis_config(
+                config.get("joystick_acceleration_mm_s2", 1.0), len(adresses)
+            )
+            self._pi_joystick_deceleration_mm_s2 = self._expand_per_axis_config(
+                config.get("joystick_deceleration_mm_s2", 1.0), len(adresses)
+            )
+            self._pi_saved_motion_params: tuple[list[float], list[float], list[float]] | None = None
         elif device_type == "SMC100":
             logging.getLogger("laserstudio").info(
                 "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
@@ -323,9 +332,7 @@ class StageInstrument(Instrument):
         # When enabled, a move whose target falls outside [min, max] on any
         # constrained axis is rejected. These are independent from any firmware
         # soft limits (e.g. GRBL $20).
-        self._soft_limits_enabled: bool = bool(
-            config.get("soft_limits_enabled", False)
-        )
+        self._soft_limits_enabled: bool = bool(config.get("soft_limits_enabled", False))
         self._soft_limits_min: list[float] | None = None
         self._soft_limits_max: list[float] | None = None
         soft_min = config.get("soft_limits_min")
@@ -344,7 +351,7 @@ class StageInstrument(Instrument):
 
     def _handle_cnc_error(self, error: CNCError, *, notify: bool = False) -> None:
         message = format_grbl_alarm_message(error)
-        alarm_key = (error.alarm_code, error.args[0] if error.args else "")
+        alarm_key = (error.status.substate, error.args[0] if error.args else "")
         if alarm_key != self._last_reported_alarm:
             self._last_reported_alarm = alarm_key
             logging.getLogger("laserstudio").warning(message)
@@ -362,9 +369,17 @@ class StageInstrument(Instrument):
             values += [0.0] * (self.num_axis - len(values))
         return values
 
-    def _set_soft_limits_raw(
-        self, minimum: list[float], maximum: list[float]
-    ) -> None:
+    @staticmethod
+    def _expand_per_axis_config(value: float | int | list[float], count: int) -> list[float]:
+        """Expand a scalar or list config value to one entry per axis."""
+        if isinstance(value, (int, float)):
+            return [float(value)] * count
+        values = [float(v) for v in value]
+        if len(values) < count:
+            values += [values[-1]] * (count - len(values))
+        return values[:count]
+
+    def _set_soft_limits_raw(self, minimum: list[float], maximum: list[float]) -> None:
         """Set the soft limits without emitting any signal (used at init)."""
         minimum = self._pad_axes([float(v) for v in minimum])
         maximum = self._pad_axes([float(v) for v in maximum])
@@ -433,9 +448,7 @@ class StageInstrument(Instrument):
         """True if a software limit box has been defined."""
         return self._soft_limits_min is not None and self._soft_limits_max is not None
 
-    def set_soft_limits(
-        self, minimum: list[float], maximum: list[float]
-    ) -> None:
+    def set_soft_limits(self, minimum: list[float], maximum: list[float]) -> None:
         """Define the software limit box (stage µm coordinates) and notify."""
         self._set_soft_limits_raw(minimum, maximum)
         self.soft_limits_changed.emit()
@@ -568,9 +581,7 @@ class StageInstrument(Instrument):
                 f"Warning: Bad response!: {repr(e)}"
             )
         except Exception as e:
-            logging.getLogger("laserstudio").error(
-                f"Error: {repr(e)}", exc_info=True
-            )
+            logging.getLogger("laserstudio").error(f"Error: {repr(e)}", exc_info=True)
         else:
             self.position_changed.emit(position)
         finally:
@@ -642,7 +653,9 @@ class StageInstrument(Instrument):
 
         within_limits, violated_axis = self._is_within_soft_limits(position)
         if not within_limits and violated_axis is not None:
-            axis_name = "XYZ"[violated_axis] if violated_axis < 3 else str(violated_axis)
+            axis_name = (
+                "XYZ"[violated_axis] if violated_axis < 3 else str(violated_axis)
+            )
             message = (
                 f"Move blocked by software limits: axis {axis_name} target "
                 f"{position[violated_axis]:.1f}\xa0µm is outside the allowed area."
@@ -727,6 +740,99 @@ class StageInstrument(Instrument):
             logging.getLogger("laserstudio").error(
                 f"Stage of type {type(self.stage)} does not support setting device's origin. Skipping operation."
             )
+
+    def enable_joystick(self, enabled: bool):
+        """
+        Enable the joystick for the stage.
+        """
+        if isinstance(self.stage, Corvus):
+            self.stage.enable_joystick()
+        elif isinstance(self.stage, PI):
+            self.stage.enable_joystick()
+            self._enable_pi_joystick(enabled)
+
+    def _pi_query_axis_float(self, pi_stage: PI, address: int, command: str) -> float:
+        """Read a single-axis float parameter from a PI controller (e.g. VEL, ACC, DEC)."""
+        res = pi_stage.query(command, address, args=["1"])[0]
+        parts = res.split("=", 1)
+        if len(parts) != 2:
+            raise ProtocolError(
+                query=f"{address} {command}? 1",
+                response=res,
+                expected="2 parts in the response, separated by =",
+            )
+        return float(parts[1].strip())
+
+    def _enable_pi_joystick(self, enabled: bool) -> None:
+        """Enable or disable the analog joystick on PI/Mercury controllers.
+
+        Joystick velocity is proportional to the closed-loop VEL setting (see
+        C-863 manual §8.6). We lower VEL/ACC/DEC before activation to avoid
+        over-current protection when the stick is moved quickly, and restore
+        the previous values when the joystick is disabled.
+        """
+        log = logging.getLogger("laserstudio")
+        pi_stage = self.stage
+        assert isinstance(pi_stage, PI)
+        self.mutex.lock()
+        try:
+            
+            if enabled:
+                pi_stage.enable_joystick()
+                self._pi_saved_motion_params = (pi_stage.velocity, pi_stage.acceleration, pi_stage.deceleration)
+                for i, address in enumerate(pi_stage.addresses):
+                    log.info(
+                        f"PI address {address}: saved motion params "
+                        f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
+                        f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
+                        f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
+                    )
+            else:
+                pi_stage.disable_joystick()
+                if self._pi_saved_motion_params is not None:
+                    pi_stage.velocity = self._pi_saved_motion_params[0]
+                    pi_stage.acceleration = self._pi_saved_motion_params[1]
+                    pi_stage.deceleration = self._pi_saved_motion_params[2]
+
+                    for i, address in enumerate(pi_stage.addresses):
+                                log.info(
+                                    f"PI address {address}: restored motion params "
+                                    f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
+                                    f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
+                                    f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
+                            )
+                                
+            for i, address in enumerate(pi_stage.addresses):
+                res = pi_stage.query("JON", address, args=["1"])[0]
+                log.info(f"Joystick state on address {address}: {res}")
+                errors = pi_stage.error()
+                if errors:
+                    log.error(f"PI controller {address} errors after joystick toggle: {errors}")
+                else:
+                    log.info(f"PI controller {address}: no errors")
+        finally:
+            self.mutex.unlock()
+
+    def reboot(self):
+        """
+        Reboot the stage.
+        """
+        if isinstance(self.stage, PI):
+            # Send command RBT
+            for a in self.stage.addresses:
+                self.stage.send(a, "RBT")
+
+    def home(self, wait: bool = False):
+        """
+        Home the stage.
+        """
+        self.stage.home(wait=wait)
+        if isinstance(self.stage, PI):
+            errors = self.stage.error()
+            if errors:
+                logging.getLogger("laserstudio").error(f"Errors: {errors}")
+            else:
+                logging.getLogger("laserstudio").info("No errors")
 
     @property
     def settings(self) -> Config:

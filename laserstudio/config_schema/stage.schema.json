@@ -151,6 +151,66 @@
             "type": "integer"
           },
           "default": [1, 2, 3]
+        },
+        "joystick_velocity_mm_s": {
+          "description": "Closed-loop velocity (mm/s) applied on each PI controller before enabling the analog joystick. Joystick speed is a fraction of this value (see PI C-863 manual). Lower values reduce overspeed and over-current trips.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "default": 0.5,
+              "suffix": "mm/s"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s"
+              }
+            }
+          ]
+        },
+        "joystick_acceleration_mm_s2": {
+          "description": "Closed-loop acceleration (mm/s²) applied before enabling the PI analog joystick.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "suffix": "mm/s²"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s²"
+              }
+            }
+          ]
+        },
+        "joystick_deceleration_mm_s2": {
+          "description": "Closed-loop deceleration (mm/s²) applied before enabling the PI analog joystick.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "default": 1.0,
+              "suffix": "mm/s²"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s²"
+              }
+            }
+          ]
         }
       }
     },

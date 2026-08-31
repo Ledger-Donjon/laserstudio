@@ -1,6 +1,7 @@
 import os
 import logging
-from typing import Literal, cast, Any
+from collections.abc import Sequence
+from typing import ClassVar, Literal, cast, Any
 import numpy
 from numpy.typing import NDArray
 import cv2
@@ -13,7 +14,7 @@ from .shutter import ShutterInstrument, TicShutterInstrument
 from ..utils.yaml_types import Config
 
 
-def parse_objectives(config: Config, default: list[float]) -> list[float]:
+def parse_objectives(config: Config, default: Sequence[float]) -> list[float]:
     """Read available objective magnifications from config, or return a copy of default."""
     raw = config.get("objectives")
     if not isinstance(raw, list):
@@ -33,7 +34,7 @@ class CameraInstrument(Instrument):
     new_image = pyqtSignal(QImage)
 
     # Magnifications offered in the UI when `objectives` is omitted from config.
-    DEFAULT_OBJECTIVES: list[float] = [1.0, 5.0, 10.0, 20.0, 50.0]
+    DEFAULT_OBJECTIVES: ClassVar[tuple[float, ...]] = (1.0, 5.0, 10.0, 20.0, 50.0)
 
     def __init__(self, config: Config):
         """

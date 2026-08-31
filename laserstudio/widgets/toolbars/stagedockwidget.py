@@ -1,44 +1,52 @@
-import os
-from typing import TYPE_CHECKING, Callable
 import logging
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
+import os
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
+
+from PyQt6.QtCore import QSize, Qt, QThread, pyqtBoundSignal, pyqtSignal
+from PyQt6.QtGui import QAction, QFont, QGuiApplication, QIcon
 from PyQt6.QtWidgets import (
-    QPushButton,
+    QCheckBox,
     QComboBox,
-    QHBoxLayout,
-    QVBoxLayout,
-    QGridLayout,
-    QLabel,
-    QWidget,
-    QMessageBox,
-    QDockWidget,
-    QDoubleSpinBox,
     QDialog,
     QDialogButtonBox,
-    QSizePolicy,
+    QDockWidget,
+    QDoubleSpinBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
     QMenu,
-    QCheckBox,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtGui import QGuiApplication, QFont, QAction, QIcon
-from ..coloredbutton import ColoredPushButton
-from ..keyboardbox import KeyboardBox, Direction
-from ...instruments.stage import (
-    MoveFor,
-    StageInstrument,
-    CNCRouter,
-    SMC100,
-    Corvus,
-    Vector,
-)
-from ...instruments.joysticks import JoystickInstrument
-from ...instruments.joysticksHID import JoystickHIDInstrument, HIDGAMEPAD
-from ..marker import IdMarker
-from ...utils.util import create_color_qicon
 from pystages.grbl import GRBLSetting
 
+from ...instruments.joysticks import JoystickInstrument
+from ...instruments.joysticksHID import HIDGAMEPAD, JoystickHIDInstrument
+from ...instruments.stage import (
+    PI,
+    SMC100,
+    CNCRouter,
+    Corvus,
+    MoveFor,
+    StageInstrument,
+    Vector,
+)
+from ...utils.util import create_color_qicon
+from ..coloredbutton import ColoredPushButton
+from ..keyboardbox import Direction, KeyboardBox
+from ..marker import IdMarker
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
+
+
+def _connect_queued(signal: pyqtBoundSignal, slot: Callable[..., None]) -> None:
+    """Connect with QueuedConnection (PyQt6 stubs omit the ``type`` parameter)."""
+    cast(Any, signal.connect)(slot, type=Qt.ConnectionType.QueuedConnection)
 
 
 class GrblSerialThread(QThread):
@@ -67,8 +75,8 @@ class GrblSerialThread(QThread):
                 if not ok:
                     self.finished_with_result.emit(
                         False,
-                        "Could not unlock ($X). Try \"Reset GRBL\" first, "
-                        "then \"Unlock\" if needed.",
+                        'Could not unlock ($X). Try "Reset GRBL" first, '
+                        'then "Unlock" if needed.',
                         None,
                     )
                     return
@@ -235,12 +243,10 @@ class StageDockWidget(QDockWidget):
         self._limit_violation_box: QMessageBox | None = None
 
         if isinstance(self.stage.stage, CNCRouter):
-            self.stage.grbl_alarm.connect(
-                self.show_grbl_alarm, Qt.ConnectionType.QueuedConnection
-            )
+            _connect_queued(self.stage.grbl_alarm, self.show_grbl_alarm)
 
-        self.stage.soft_limit_violation.connect(
-            self.show_soft_limit_violation, Qt.ConnectionType.QueuedConnection
+        _connect_queued(
+            self.stage.soft_limit_violation, self.show_soft_limit_violation
         )
 
         # Activate stage-move mode
@@ -349,7 +355,6 @@ class StageDockWidget(QDockWidget):
             self.soft_limits_checkbox = soft_limits_checkbox
             self._refresh_soft_limits_checkbox()
 
-
         elif isinstance(stage := self.stage.stage, SMC100):
             w = QPushButton(self)
             w.setText("Reset")
@@ -372,6 +377,18 @@ class StageDockWidget(QDockWidget):
             w = QPushButton(self)
             w.setText("Enable Joystick")
             w.clicked.connect(stage.enable_joystick)
+            grid.addWidget(w, 3, 1)
+
+        elif isinstance(stage := self.stage.stage, PI):
+            w = QPushButton(self)
+            w.setCheckable(True)
+            w.setText("Enable Joystick")
+            w.toggled.connect(self.stage.enable_joystick)
+            grid.addWidget(w, 3, 0)
+
+            w = QPushButton(self)
+            w.setText("Reboot")
+            w.clicked.connect(self.stage.reboot)
             grid.addWidget(w, 3, 1)
 
         # Software limit area (LaserStudio-side, editable in the viewer)
@@ -615,7 +632,7 @@ class StageDockWidget(QDockWidget):
             buttons=QMessageBox.StandardButton.Abort | QMessageBox.StandardButton.Apply,
             defaultButton=QMessageBox.StandardButton.Abort,
         ):
-            self.stage.stage.home(wait=True)
+            self.stage.home(wait=True)
 
     def move_for_selection(self, index: int):
         """
@@ -726,10 +743,8 @@ class StageDockWidget(QDockWidget):
             return
         self._grbl_thread = GrblSerialThread(self.stage, operation, payload=payload)
         if on_finished is None:
-            on_finished = (
-                lambda ok, msg, _val: self._on_grbl_operation_finished(
-                    operation, title, ok, msg
-                )
+            on_finished = lambda ok, msg, _val: self._on_grbl_operation_finished(
+                operation, title, ok, msg
             )
         self._grbl_thread.finished_with_result.connect(on_finished)
         self._grbl_thread.start()
@@ -775,7 +790,9 @@ class StageDockWidget(QDockWidget):
             "set_soft_limits",
             "Soft limits",
             payload=enabled,
-            on_finished=lambda ok, msg, _val: self._on_soft_limits_set(ok, msg, enabled),
+            on_finished=lambda ok, msg, _val: self._on_soft_limits_set(
+                ok, msg, enabled
+            ),
         )
 
     def _on_soft_limits_set(self, ok: bool, error_msg: str, enabled: bool):

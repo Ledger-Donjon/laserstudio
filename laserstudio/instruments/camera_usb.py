@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+import numpy
+
 from ..utils.yaml_types import Config
 from .camera import CameraInstrument
 from .camera_usb_probe import native_resolutions
@@ -91,7 +93,7 @@ class CameraUSBInstrument(CameraInstrument):
     def __del__(self):
         self.__video_capture.release()
 
-    def capture_image(self):
+    def capture_image(self) -> numpy.ndarray | None:
         ret, frame = self.__video_capture.read()
         if not ret:
             return None
