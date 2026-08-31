@@ -76,6 +76,9 @@ For example:
 | `list_markers` | List the markers in the viewer. |
 | `add_marker` | Add a marker in the viewer. |
 | `delete_markers` | Delete markers by id, or all markers when no id is given. |
+| `list_rulers` | List the rulers (distance measurements) in the viewer. |
+| `add_ruler` | Add a ruler measuring the distance between two positions. |
+| `delete_rulers` | Delete rulers by id, or all rulers when no id is given. |
 | `pixel_to_position` | Convert camera-image pixel coordinates to viewer coordinates. |
 | `get_camera_image` | Capture the main camera image (PNG). |
 | `get_screenshot` | Capture a screenshot of the viewer (PNG). |

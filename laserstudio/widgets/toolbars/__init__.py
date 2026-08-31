@@ -7,6 +7,7 @@ from .lightdockwidget import LightDockWidget
 from .laserdriverdockwidget import LaserDriverDockWidget
 from .maintoolbar import MainToolBar
 from .markerstoolbar import MarkersToolBar, MarkersListDockWidget
+from .rulerstoolbar import RulersToolBar, RulersListDockWidget
 from .scantoolbar import ScanToolBar
 from .picturetoolbar import PictureToolBar
 from .stagedockwidget import StageDockWidget
@@ -29,6 +30,8 @@ __all__ = [
     "PDMDockWidget",
     "MarkersToolBar",
     "MarkersListDockWidget",
+    "RulersToolBar",
+    "RulersListDockWidget",
     "LightDockWidget",
     "FocusToolBar",
     "MagicFocusDockWidget",

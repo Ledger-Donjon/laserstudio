@@ -38,6 +38,7 @@ from .stagesight import (
     LaserInstrument,
 )
 from .marker import IdMarker, Marker
+from .ruler import Ruler
 from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from .maxdistance import MaxDistanceItem
@@ -64,6 +65,7 @@ class Viewer(QGraphicsView):
         ZONE_POLY = auto()
         PIN = auto()
         OFFSET_ORIGIN = auto()
+        RULER = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -73,6 +75,12 @@ class Viewer(QGraphicsView):
     follow_stage_sight_changed = pyqtSignal(bool)
     # Background reference image state
     background_changed = pyqtSignal()
+    # Signal emitted when a ruler is added or removed
+    rulers_changed = pyqtSignal()
+
+    # A left click shorter than this distance (in pixels) does not create a
+    # ruler, so a misclick in RULER mode does not leave a zero-length item.
+    MIN_RULER_DRAG_PIXELS = 5.0
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -148,6 +156,14 @@ class Viewer(QGraphicsView):
         }
 
         self.default_marker_size = 20.0
+
+        # Rulers (measurement annotations)
+        self.__rulers: list[Ruler] = []
+        # Appearance applied to the next created ruler
+        self.default_ruler_color: QColor = LedgerColors.Grellow.value
+        self.default_ruler_graduation: float | None = None
+        # Ruler being drawn by the user, if any
+        self._ruler_in_progress: Ruler | None = None
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
@@ -631,6 +647,11 @@ class Viewer(QGraphicsView):
 
     @mode.setter
     def mode(self, new_mode: Mode):
+        # Leaving the mode in the middle of a drag must not leave a half-drawn
+        # ruler behind.
+        if self._ruler_in_progress is not None and new_mode != Viewer.Mode.RULER:
+            self.remove_ruler(self._ruler_in_progress)
+            self._ruler_in_progress = None
         self.__mode = new_mode
         self.__update_drag_mode()
         self.__update_selection_color()
@@ -802,11 +823,12 @@ class Viewer(QGraphicsView):
                     return
                 item = item.parentItem()
 
-        # We want to catch a right-click on a marker
+        # We want to catch a right-click on a marker or on a ruler, to let their
+        # own context menu open instead of starting a pan.
         if event.button() == Qt.MouseButton.RightButton:
             item = self.itemAt(event.pos())
             while item is not None:
-                if isinstance(item, Marker):
+                if isinstance(item, (Marker, Ruler)):
                     super().mousePressEvent(event)
                     return
                 item = item.parentItem()
@@ -850,6 +872,11 @@ class Viewer(QGraphicsView):
                     scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y()
                 )
                 self.offset_origin_line.show()
+
+            elif self.mode == Viewer.Mode.RULER:
+                self._start_ruler(scene_pos)
+                event.accept()
+                return
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
@@ -901,6 +928,9 @@ class Viewer(QGraphicsView):
             if self.max_distance_item.isVisible():
                 self.max_distance_item.update_cursor_proximity(scene_pos, threshold)
             self.scan_geometry.update_cursor_proximity(scene_pos, threshold)
+            for ruler in self.__rulers:
+                if ruler is not self._ruler_in_progress:
+                    ruler.update_cursor_proximity(scene_pos, threshold)
 
             if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
                 # Check if mouse button is pressed
@@ -927,6 +957,10 @@ class Viewer(QGraphicsView):
                 self.offset_origin_line.setLine(
                     p1.x(), p1.y(), scene_pos.x(), scene_pos.y()
                 )
+
+            elif self.mode == Viewer.Mode.RULER:
+                if (ruler := self._ruler_in_progress) is not None:
+                    ruler.set_endpoint(1, scene_pos)
 
         if self.mode in [
             Viewer.Mode.ZONE,
@@ -976,6 +1010,9 @@ class Viewer(QGraphicsView):
                     self.stage_sight.stage.offset_origin[i] += offset[i]
             self.offset_origin_line.hide()
 
+        elif self.mode == Viewer.Mode.RULER and is_left:
+            self._finish_ruler()
+
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
@@ -999,6 +1036,8 @@ class Viewer(QGraphicsView):
         self.soft_limits_item.update_cursor_proximity(None, 0.0)
         self.max_distance_item.update_cursor_proximity(None, 0.0)
         self.scan_geometry.update_cursor_proximity(None, 0.0)
+        for ruler in self.__rulers:
+            ruler.update_cursor_proximity(None, 0.0)
         super().leaveEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent | None):
@@ -1240,11 +1279,102 @@ class Viewer(QGraphicsView):
         logging.getLogger("laserstudio").info(f"Marker {marker} removed")
         marker.viewer = None
 
+    # Rulers
+    @property
+    def rulers(self) -> list[Ruler]:
+        return list(self.__rulers)
+
+    def add_ruler(
+        self,
+        p1: tuple[float, float] | QPointF,
+        p2: tuple[float, float] | QPointF,
+        color: QColor
+        | Qt.GlobalColor
+        | int
+        | list[float]
+        | LedgerColors
+        | None = None,
+        label: str | None = None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool = True,
+    ) -> Ruler:
+        """
+        Add a ruler measuring the distance between two positions.
+
+        :param p1: The position of the first endpoint.
+        :param p2: The position of the second endpoint.
+        :param color: The color of the ruler. If None, the viewer's default is used.
+        :param label: The label of the ruler.
+        :param graduation: The graduation interval, in micrometers. If None, the
+            ruler is drawn without graduations.
+        :param graduation_count: The number of graduations wanted over the whole
+            ruler, as an alternative to *graduation*: the ruler keeps that count
+            and derives the interval from its length. Ignored when *graduation*
+            is given.
+        :param visible: If False, the ruler is created but not displayed.
+        :return: The added ruler.
+        """
+        if color is None:
+            color = self.default_ruler_color
+        if graduation is None and not graduation_count:
+            graduation = self.default_ruler_graduation
+
+        ruler = Ruler(
+            p1,
+            p2,
+            viewer=self,
+            color=color,
+            label=label,
+            graduation=graduation,
+            graduation_count=graduation_count,
+        )
+        ruler.setVisible(visible)
+        self.__rulers.append(ruler)
+        self.__scene.addItem(ruler)
+        self.rulers_changed.emit()
+        return ruler
+
+    def remove_ruler(self, ruler: Ruler):
+        """Remove a specific ruler from the scene."""
+        if ruler not in self.__rulers:
+            return
+        self.__scene.removeItem(ruler)
+        self.__rulers.remove(ruler)
+        ruler.viewer = None
+        logging.getLogger("laserstudio").info(f"Ruler {ruler} removed")
+        self.rulers_changed.emit()
+
+    def clear_rulers(self):
+        """Remove all rulers."""
+        if not self.__rulers:
+            return
+        for ruler in self.__rulers:
+            self.__scene.removeItem(ruler)
+            ruler.viewer = None
+        self.__rulers.clear()
+        self.rulers_changed.emit()
+
+    def _start_ruler(self, scene_pos: QPointF):
+        """Begin drawing a ruler; both endpoints start at the same position."""
+        self._ruler_in_progress = self.add_ruler(scene_pos, scene_pos)
+
+    def _finish_ruler(self):
+        """Commit the ruler being drawn, or discard it if it is too short."""
+        ruler = self._ruler_in_progress
+        if ruler is None:
+            return
+        self._ruler_in_progress = None
+        if ruler.length * self.zoom < self.MIN_RULER_DRAG_PIXELS:
+            self.remove_ruler(ruler)
+
     @property
     def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         data: dict[str, Any] = {}
         data["marker_size"] = self.default_marker_size
+        if self.__rulers:
+            data["rulers"] = [ruler.to_dict() for ruler in self.__rulers]
 
         if self.background_picture_path is not None:
             data["background_picture_path"] = self.background_picture_path
@@ -1269,6 +1399,19 @@ class Viewer(QGraphicsView):
         """Import settings from a dict."""
         if (marker_size := data.get("marker_size")) is not None:
             self.marker_size(marker_size)
+        if (rulers := data.get("rulers")) is not None:
+            self.clear_rulers()
+            for ruler in rulers:
+                p1, p2 = ruler["p1"], ruler["p2"]
+                self.add_ruler(
+                    (p1[0], p1[1]),
+                    (p2[0], p2[1]),
+                    color=ruler.get("color", [1.0, 1.0, 0.0, 1.0]),
+                    label=ruler.get("label"),
+                    graduation=ruler.get("graduation"),
+                    graduation_count=ruler.get("graduation_count"),
+                    visible=not ruler.get("hidden", False),
+                )
         if (path := data.get("background_picture_path")) is not None:
             self.load_picture(path)
             if (opacity := data.get("background_picture_opacity")) is not None:

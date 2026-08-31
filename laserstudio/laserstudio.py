@@ -39,6 +39,7 @@ from .widgets.toolbars import (
     CameraImageAdjustementDockWidget,
     MainToolBar,
     MarkersToolBar,
+    RulersToolBar,
     PDMDockWidget,
     LaserDriverDockWidget,
     CameraNITDockWidget,
@@ -47,6 +48,7 @@ from .widgets.toolbars import (
     LightDockWidget,
     FocusToolBar,
 )
+from .widgets import rulerapi
 from .restserver.server import RestProxy
 from .restserver.errors import (
     DeviceUnavailableError,
@@ -136,6 +138,17 @@ class LaserStudio(QMainWindow):
         self.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget
         )
+
+        # ToolBar: Rulers
+        rulers_toolbar = RulersToolBar(self.viewer)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, rulers_toolbar)
+        # Dock widget: Rulers list
+        self.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea,
+            rulers_toolbar.rulers_list_dockwidget,
+        )
+        # Shown on demand with the toolbar's "Show list" button.
+        rulers_toolbar.rulers_list_dockwidget.hide()
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
@@ -227,6 +240,9 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.PIN))
+        # "L" for length: "R" is already taken by the rectangular zone mode.
+        shortcut = QShortcut(Qt.Key.Key_L, self)
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.RULER))
         if (stage := self.instruments.stage) is not None and stage.num_axis > 2:
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(
@@ -548,6 +564,34 @@ class LaserStudio(QMainWindow):
                 deleted.append(marker.id)
         return {"deleted": deleted}
 
+    def handle_rulers(self) -> list[Config]:
+        """Handle a Rulers API request to get the list of rulers."""
+        return rulerapi.rulers(self.viewer)
+
+    def handle_add_rulers(
+        self,
+        segments: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool | None = True,
+    ) -> Config:
+        """Add ruler(s) to the viewer. See :func:`rulerapi.add_rulers`."""
+        return rulerapi.add_rulers(
+            self.viewer,
+            segments,
+            color,
+            label,
+            graduation,
+            graduation_count,
+            visible,
+        )
+
+    def handle_delete_rulers(self, ids: list[int] | None = None) -> Config:
+        """Delete ruler(s) from the viewer. See :func:`rulerapi.delete_rulers`."""
+        return rulerapi.delete_rulers(self.viewer, ids)
+
     def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
         """Convert camera-image pixel coordinates into viewer coordinates.
 
@@ -650,6 +694,7 @@ class LaserStudio(QMainWindow):
             Viewer.Mode.ZONE_POLY: "Mode: Poly Zone",
             Viewer.Mode.PIN: "Mode: Pin (P)",
             Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
+            Viewer.Mode.RULER: "Mode: Ruler (L)",
         }
         return labels.get(mode, f"Mode: {mode.name}")
 
