@@ -523,8 +523,8 @@ class _ShutterSection(QWidget):
             btn.blockSignals(True)
             btn.setChecked(checked)
             btn.blockSignals(False)
-        # Icons follow the active state colour (green open / orange closed),
-        # muted otherwise — matching the button text colour like the design.
+        # Icons follow the active state color (green open / orange closed),
+        # muted otherwise — matching the button text color like the design.
         self._open_btn.setIcon(
             lucide.icon(
                 "circle-dot",
@@ -1399,7 +1399,7 @@ class SettingsWorkspace(Workspace):
             return panel
 
         # Objective + pixel size — compact 2-column grid (design).
-        # Each entry carries a microscope-objective icon whose coloured band is
+        # Each entry carries a microscope-objective icon whose colored band is
         # the physical magnification ring (kept identical to the classic UI).
         self._objective_combo = combo = QComboBox()
         combo.setStyleSheet(_INPUT_SS)

@@ -9,15 +9,16 @@ shows the shared spatial viewer instead.
 Concrete workspaces live in their own modules next to this one
 (``configworkspace.py``, ``settingsworkspace.py``, …).
 """
+
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt
 from PyQt6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ..newui import theme
 
 
-class Workspace:
+class Workspace(QObject):
     """
     Base class for a Laser Studio workspace tab.
 

@@ -35,6 +35,7 @@ error codes and HTTP statuses is:
 | `INVALID_PARAMETER` | `400 Bad Request` | A parameter is missing or invalid. |
 | `INSTRUMENT_NOT_FOUND` | `404 Not Found` | No instrument matches the given label. |
 | `MEMORY_POINT_NOT_FOUND` | `404 Not Found` | No memory point matches the given index. |
+| `SCAN_ZONE_NOT_FOUND` | `404 Not Found` | No scan zone matches the given index. |
 | `CONFLICT` | `409 Conflict` | The action cannot be performed in the current state (e.g. scanning not enabled). |
 | `NOT_IMPLEMENTED` | `501 Not Implemented` | The action is not implemented yet. |
 | `DEVICE_UNAVAILABLE` | `503 Service Unavailable` | A required device (camera, stage, focus helper...) is not available. |

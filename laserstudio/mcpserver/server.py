@@ -27,9 +27,13 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, read or update scan geometry, read or move the stage, run
-scans (go_next), focus, manage markers and rulers, and capture camera images
-or screenshots.
+instrument settings (including the ``Scan Zones`` and ``Focus`` instruments),
+manage scan zones (create, rename, recolor, enable or disable, delete), read or
+move the stage, run scans (go_next), focus, manage markers and rulers, and capture camera
+images or screenshots.
+
+Scanning runs on the union of the *enabled* zones: disable a zone to exclude it
+from go_next without losing its shape.
 
 Tools fail with an explicit error message prefixed by a machine-readable code
 (e.g. INSTRUMENT_NOT_FOUND, DEVICE_UNAVAILABLE, INVALID_PARAMETER) when an
@@ -74,19 +78,65 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
     # -- Scan geometry ------------------------------------------------------ #
 
     @mcp.tool()
-    def get_scangeometry() -> dict[str, Any]:
-        """Get the current scan geometry settings (polygons and density)."""
-        return call(api.scangeometry)
+    def get_scan_zones() -> dict[str, Any]:
+        """List the scan zones (name, color, enabled, shape) and which is active."""
+        return call(api.scan_zones)
 
     @mcp.tool()
-    def set_scangeometry(settings: dict[str, Any]) -> dict[str, Any]:
-        """Update the scan geometry settings (polygons and optional density)."""
-        return call(api.set_scangeometry, settings)
+    def add_scan_zone(
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a scan zone.
+
+        Defaults: name "Zone <n>", the next color of the zone palette,
+        enabled, and an empty shape. `color` is "#rrggbb".
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see an
+        existing zone's geometry as a template.
+        """
+        return call(api.add_scan_zone, name, color, enabled, geometry)
 
     @mcp.tool()
-    def delete_scangeometry() -> dict[str, Any]:
-        """Clear the scan geometry by setting an empty polygon."""
-        return call(api.delete_scangeometry)
+    def update_scan_zone(
+        index: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Rename, recolor, enable/disable or reshape the scan zone at `index`.
+
+        `index` is the stable zone id from the `id` field reported by
+        get_scan_zones — not a list position. It does not change when other
+        zones are deleted. Only the given fields change. Disabling a zone
+        excludes it from point generation without deleting it.
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see the
+        zone's current geometry as a template.
+        """
+        return call(api.update_scan_zone, index, name, color, enabled, geometry)
+
+    @mcp.tool()
+    def delete_scan_zone(index: int) -> dict[str, Any]:
+        """Delete the scan zone identified by `index` (the `id` field from
+        get_scan_zones) and return the remaining zones.
+
+        Zone ids are stable: deleting a zone does not renumber the remaining
+        ones, so you can safely pass multiple ids collected from a single
+        get_scan_zones call without re-listing between deletes.
+        """
+        return call(api.delete_scan_zone, index)
 
     # -- Motion ------------------------------------------------------------- #
 

@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal, QEvent
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -29,7 +29,6 @@ from typing import Any
 from shapely import Polygon
 import logging
 import json
-import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -43,6 +42,7 @@ from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from .maxdistance import MaxDistanceItem
 from ..instruments.stage import MoveFor, Vector
+from ..instruments.scans import ScansInstrument, default_zone_color
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
 from ..utils.background_align import BackgroundPin, compute_affine_transform
@@ -82,7 +82,14 @@ class Viewer(QGraphicsView):
     # ruler, so a misclick in RULER mode does not leave a zero-length item.
     MIN_RULER_DRAG_PIXELS = 5.0
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        scans: ScansInstrument | None = None,
+    ):
+        """
+        :param parent: Parent widget.
+        """
         super().__init__(parent)
 
         # # Align objects to the center
@@ -117,9 +124,11 @@ class Viewer(QGraphicsView):
         self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
-        # Scanning geometry object and its representative item in the view.
-        # Also includes the scan path
-        self.scan_geometry = ScanGeometry()
+        # Scan Instrument for the management of scan zones
+        self.scans: ScansInstrument = (
+            scans if scans is not None else ScansInstrument({})
+        )
+        self.scan_geometry = ScanGeometry(self.scans)
         self.__scene.addItem(self.scan_geometry)
         self.scan_geometry.setZValue(3)
 
@@ -602,9 +611,7 @@ class Viewer(QGraphicsView):
         stage = self.stage_sight.stage if self.stage_sight is not None else None
         if stage is None:
             return
-        stage.set_soft_limits_xy(
-            rect.left(), rect.top(), rect.right(), rect.bottom()
-        )
+        stage.set_soft_limits_xy(rect.left(), rect.top(), rect.right(), rect.bottom())
 
     def _on_stage_sight_moved(self, scene_pos: QPointF) -> None:
         """Recenter the max-distance circle on the stage sight scene position."""
@@ -617,7 +624,7 @@ class Viewer(QGraphicsView):
         ``StageInstrument.position`` (which emits ``position_changed``).
         """
         stage = self.stage_sight.stage if self.stage_sight is not None else None
-        if stage is None:
+        if stage is None or self.stage_sight is None:
             return
         center = self.stage_sight.pos()
         self.max_distance_item.set_center(center.x(), center.y())
@@ -678,9 +685,9 @@ class Viewer(QGraphicsView):
         """
         result: Config = {}
 
-        if self.scan_geometry and self.stage_sight is not None:
-            """Get position of the next point from the scan geometry"""
-            next_point_tuple = self.scan_geometry.next_point()
+        if self.stage_sight is not None:
+            """Get position of the next point from the shared scan zones"""
+            next_point_tuple = self.scans.next_point()
 
             if next_point_tuple is not None:
                 next_point = list(next_point_tuple)
@@ -705,19 +712,29 @@ class Viewer(QGraphicsView):
                 Qt.KeyboardModifier.ShiftModifier
                 in QGuiApplication.queryKeyboardModifiers()
             )
-        color = ("red" if has_shift else "green") if is_valid else "orange"
-        self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
-        c = (
-            (QColorConstants.Red if has_shift else QColorConstants.Green)
-            if is_valid
-            else QColorConstants.DarkYellow
+        if not is_valid:
+            # Self-intersecting outline: neither adding nor removing would work.
+            base = QColor(QColorConstants.DarkYellow)
+        elif has_shift:
+            # Subtracting is an erase gesture, so it keeps its own red signal
+            # rather than borrowing the zone's color.
+            base = QColor(QColorConstants.Red)
+        else:
+            # Adding: draw in the color of the zone the shape will land in, so
+            # it is obvious which zone the gesture targets. With no zone yet,
+            # preview the color the about-to-be-created Zone 1 will get.
+            zone = self.scans.active_zone
+            base = QColor(zone.color) if zone is not None else default_zone_color(0)
+
+        self.setStyleSheet(
+            f"QGraphicsView {{ selection-background-color: {base.name()}; }}"
         )
-        pen = QPen(c)
-        if isinstance(c, QColor):
-            c.setAlpha(64)
+        pen = QPen(base)
         pen.setCosmetic(True)
+        fill = QColor(base)
+        fill.setAlpha(64)
         self.zone_poly_item.setPen(pen)
-        self.zone_poly_item.setBrush(QBrush(c))
+        self.zone_poly_item.setBrush(QBrush(fill))
 
     def __update_drag_mode(self):
         if self.mode == Viewer.Mode.ZONE:
@@ -1031,14 +1048,14 @@ class Viewer(QGraphicsView):
 
         return super().mouseDoubleClickEvent(event)
 
-    def leaveEvent(self, event: Any):
+    def leaveEvent(self, a0: QEvent | None):
         """Hide the edit handles when the cursor leaves the view."""
         self.soft_limits_item.update_cursor_proximity(None, 0.0)
         self.max_distance_item.update_cursor_proximity(None, 0.0)
         self.scan_geometry.update_cursor_proximity(None, 0.0)
         for ruler in self.__rulers:
             ruler.update_cursor_proximity(None, 0.0)
-        super().leaveEvent(event)
+        super().leaveEvent(a0)
 
     def keyPressEvent(self, event: QKeyEvent | None):
         """
@@ -1107,9 +1124,7 @@ class Viewer(QGraphicsView):
 
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
-            bg_pins = [
-                BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins
-            ]
+            bg_pins = [BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins]
             self.commit_background_alignment(bg_pins)
             self.mode = self.Mode.NONE
         else:

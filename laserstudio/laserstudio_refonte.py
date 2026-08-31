@@ -60,12 +60,15 @@ class LaserStudioRefonte(QMainWindow):
         self.setWindowTitle("Laser Studio · New UI")
         self.setMinimumSize(1200, 720)
 
+        # Viewer must exist before workspace panels are built (Settings wires it).
+        self._viewer_area = self._build_viewer_area()
+
         # The ordered set of workspaces shown as tabs.
         self._workspaces: list[Workspace] = [
             ConfigWorkspace(yaml_config, config_path, config_loaded, self),
             SettingsWorkspace(self),
             PhotoemissionWorkspace(),
-            ScanWorkspace(),
+            ScanWorkspace(self._viewer_area.viewer, self.instruments.scans),
             AnalyzeWorkspace(self),
         ]
         self._current_workspace = -1
@@ -88,9 +91,6 @@ class LaserStudioRefonte(QMainWindow):
         hbox = QHBoxLayout(content)
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(0)
-
-        # Viewer must exist before workspace panels are built (Settings wires it).
-        self._viewer_area = self._build_viewer_area()
 
         # Left column: one panel per workspace.
         self._sidebar = QStackedWidget()
@@ -164,9 +164,7 @@ class LaserStudioRefonte(QMainWindow):
 
         ledger_logo = QLabel()
         ledger_logo.setPixmap(
-            lucide.svg_file_pixmap(
-                resource_path(":/icons/ledger-single-white.svg"), 18
-            )
+            lucide.svg_file_pixmap(resource_path(":/icons/ledger-single-white.svg"), 18)
         )
         ledger_logo.setFixedSize(18, 18)
         ledger_logo.setStyleSheet("background: transparent;")
@@ -232,7 +230,7 @@ class LaserStudioRefonte(QMainWindow):
     # ── Viewer area ───────────────────────────────────────────────────────────
 
     def _build_viewer_area(self) -> ViewerArea:
-        area = ViewerArea()
+        area = ViewerArea(scans=self.instruments.scans)
         instr = self.instruments
         if instr.stage is not None or instr.camera is not None:
             area.viewer.add_stage_sight(

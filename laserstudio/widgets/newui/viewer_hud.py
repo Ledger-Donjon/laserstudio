@@ -1,11 +1,19 @@
 """HUD overlay drawn on top of the spatial viewer."""
+
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QLabel, QWidget
 
+from laserstudio.instruments.scans import ScansInstrument
+
 from . import theme
+
+if TYPE_CHECKING:
+    from ...utils.scanzones import ScanZones
 
 _BRACKET = QColor(255, 255, 255, 115)  # rgba(255,255,255,0.45)
 _SCALE_COLOR = QColor(theme.TEXT_MUTED)
@@ -52,9 +60,7 @@ class ViewerHud(QWidget):
         )
 
         self._tr = QLabel(self)
-        self._tr.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; background: transparent;"
-        )
+        self._tr.setStyleSheet(f"color: {theme.TEXT_MUTED}; background: transparent;")
         self._tr.setFont(theme.mono_font(10))
 
         self._scale_lbl = QLabel(self)
@@ -77,11 +83,7 @@ class ViewerHud(QWidget):
     def set_scale(self, scale_um: float, scale_px: float) -> None:
         self._scale_um = scale_um
         self._scale_px = max(20.0, min(scale_px, 160.0))
-        um_text = (
-            f"{int(scale_um)}"
-            if scale_um == int(scale_um)
-            else f"{scale_um:g}"
-        )
+        um_text = f"{int(scale_um)}" if scale_um == int(scale_um) else f"{scale_um:g}"
         self._scale_lbl.setText(f"{um_text} µm")
         self._reposition()
         self.update()
@@ -151,14 +153,19 @@ class ViewerHud(QWidget):
 class ViewerArea(QWidget):
     """Viewer widget with a HUD overlay on top."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        scans: ScansInstrument,
+        parent: QWidget | None = None,
+    ) -> None:
+        """:param scans: Scan instrument model, forwarded to the Viewer."""
         super().__init__(parent)
         self.setObjectName("ls-viewer-area")
         self.setStyleSheet(f"QWidget#ls-viewer-area {{ background: {theme.BG_MAIN}; }}")
 
         from ..viewer import Viewer
 
-        self.viewer = Viewer(self)
+        self.viewer = Viewer(self, scans=scans)
         self.hud = ViewerHud(self)
         self._distortion_overlay = None
 
@@ -223,4 +230,3 @@ class _ViewerScaleSync(QObject):
         if event.type() in (QEvent.Type.Wheel, QEvent.Type.Resize):
             self._area.update_scale_from_viewer()
         return False
-
