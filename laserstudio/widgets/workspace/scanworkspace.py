@@ -92,6 +92,36 @@ QPushButton:hover {{
 }}
 """
 
+_DRAW_BTN_SS = f"""
+QPushButton#ls-draw-btn {{
+    background-color: rgba(255,255,255,0.05);
+    color: {theme.TEXT};
+    border: 1px solid {theme.BORDER_SUBTLE};
+    border-radius: 5px;
+    font-family: "Brut Grotesque";
+    font-size: 11px;
+    padding: 6px 10px;
+    text-align: left;
+}}
+QPushButton#ls-draw-btn:hover {{
+    background-color: rgba(255,255,255,0.09);
+    border-color: {theme.BORDER_HOVER};
+}}
+QPushButton#ls-draw-btn:checked {{
+    background-color: rgba(255,83,0,0.12);
+    color: {theme.ACCENT};
+    border: 1px solid rgba(255,83,0,0.40);
+}}
+"""
+
+_DRAW_MODES = frozenset(
+    {
+        Viewer.Mode.ZONE,
+        Viewer.Mode.ZONE_TILTED,
+        Viewer.Mode.ZONE_POLY,
+    }
+)
+
 
 class _ZoneRow(QFrame):
     """One row of the zone list.
@@ -135,6 +165,8 @@ class ScanWorkspace(Workspace):
         self._syncing = False
 
         self._mode_buttons: QButtonGroup | None = None
+        self._draw_mode_by_button: dict[QPushButton, Viewer.Mode] = {}
+        self._draw_icon_by_mode: dict[Viewer.Mode, str] = {}
         self._density: ReturnSpinBox | None = None
         self._point_size: ReturnDoubleSpinBox | None = None
         self._path_color: QComboBox | None = None
@@ -174,6 +206,8 @@ class ScanWorkspace(Workspace):
         layout.addWidget(theme.separator())
         layout.addWidget(theme.section_title("Draw", "spline"))
         layout.addWidget(self._draw_section())
+        self.viewer.mode_changed.connect(self._on_viewer_mode_changed)
+        self._on_viewer_mode_changed(int(self.viewer.mode))
 
         layout.addWidget(theme.separator())
         layout.addWidget(theme.section_title("Scan", "crosshair"))
@@ -189,6 +223,14 @@ class ScanWorkspace(Workspace):
         self._sync_rows()
         self._sync_scan_controls()
         return scroll
+
+    def on_activated(self) -> None:
+        self._on_viewer_mode_changed(int(self.viewer.mode))
+
+    def on_deactivated(self) -> None:
+        """Leave zone-drawing mode when switching to another workspace tab."""
+        if Viewer.Mode(self.viewer.mode) in _DRAW_MODES:
+            self.viewer.select_mode(Viewer.Mode.NONE)
 
     def _on_changed(self) -> None:
         self._sync_rows()
@@ -419,22 +461,39 @@ class ScanWorkspace(Workspace):
         ]
         for text, icon_path, mode in modes:
             btn = QPushButton(f"  {text}")
-            # colored_image takes a QColor, not a CSS string like theme.TEXT.
+            btn.setObjectName("ls-draw-btn")
+            btn.setStyleSheet(_DRAW_BTN_SS)
             btn.setIcon(QIcon(colored_image(icon_path, QColor(theme.TEXT))))
             btn.setIconSize(QSize(16, 16))
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setToolTip(
                 f"Draw a {text.lower()} zone. Hold Shift to subtract from the "
-                "active zone."
+                "active zone. Click again to deselect."
             )
             btn.clicked.connect(lambda _checked, m=mode: self._select_mode(m))
             self._mode_buttons.addButton(btn)
+            self._draw_mode_by_button[btn] = mode
+            self._draw_icon_by_mode[mode] = icon_path
             hl.addWidget(btn)
         return box
 
     def _select_mode(self, mode: Viewer.Mode) -> None:
         self.viewer.select_mode(mode, toggle=True)
+
+    def _on_viewer_mode_changed(self, mode_id: int) -> None:
+        """Keep Draw buttons in sync with the viewer (toggle off / tab change)."""
+        if not self._draw_mode_by_button:
+            return
+        mode = Viewer.Mode(mode_id)
+        for btn, btn_mode in self._draw_mode_by_button.items():
+            checked = mode in _DRAW_MODES and mode == btn_mode
+            btn.blockSignals(True)
+            btn.setChecked(checked)
+            icon_path = self._draw_icon_by_mode[btn_mode]
+            tint = QColor(theme.ACCENT if checked else theme.TEXT)
+            btn.setIcon(QIcon(colored_image(icon_path, tint)))
+            btn.blockSignals(False)
 
     def _scan_section(self) -> QWidget:
         box = QWidget()

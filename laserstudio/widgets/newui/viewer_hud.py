@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent, QShowEvent
 from PyQt6.QtWidgets import QLabel, QWidget
 
-from laserstudio.instruments.scans import ScansInstrument
+from laserstudio.instruments.instruments import Instruments
 
 from . import theme
-
-if TYPE_CHECKING:
-    from ...utils.scanzones import ScanZones
 
 _BRACKET = QColor(255, 255, 255, 115)  # rgba(255,255,255,0.45)
 _SCALE_COLOR = QColor(theme.TEXT_MUTED)
@@ -118,11 +113,11 @@ class ViewerHud(QWidget):
             max(m, self.height() - m - self._scale_lbl.height()),
         )
 
-    def resizeEvent(self, a0) -> None:  # noqa: N802
+    def resizeEvent(self, a0: QResizeEvent | None) -> None:
         super().resizeEvent(a0)
         self._reposition()
 
-    def paintEvent(self, a0) -> None:  # noqa: N802
+    def paintEvent(self, a0: QPaintEvent | None) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         pen = QPen(_BRACKET)
@@ -155,17 +150,27 @@ class ViewerArea(QWidget):
 
     def __init__(
         self,
-        scans: ScansInstrument,
+        instruments: Instruments,
         parent: QWidget | None = None,
     ) -> None:
-        """:param scans: Scan instrument model, forwarded to the Viewer."""
+        """
+        :param instruments: Instruments model, forwarded to the Viewer.
+        :param parent: Parent widget.
+        """
         super().__init__(parent)
+        scans = instruments.scans
+        annotations = instruments.annotations
+
         self.setObjectName("ls-viewer-area")
         self.setStyleSheet(f"QWidget#ls-viewer-area {{ background: {theme.BG_MAIN}; }}")
 
         from ..viewer import Viewer
 
-        self.viewer = Viewer(self, scans=scans)
+        self.viewer = Viewer(
+            self,
+            scans=scans,
+            annotations=annotations,
+        )
         self.hud = ViewerHud(self)
         self._distortion_overlay = None
 
@@ -181,7 +186,7 @@ class ViewerArea(QWidget):
         self.viewer.schedule_fit_view()
         QTimer.singleShot(0, self.update_scale_from_viewer)
 
-    def resizeEvent(self, a0) -> None:  # noqa: N802
+    def resizeEvent(self, a0: QResizeEvent | None) -> None:
         super().resizeEvent(a0)
         self.viewer.setGeometry(self.rect())
         self.hud.setGeometry(self.rect())
@@ -195,7 +200,7 @@ class ViewerArea(QWidget):
             self.hud.raise_()
         QTimer.singleShot(0, self.update_scale_from_viewer)
 
-    def showEvent(self, a0) -> None:  # noqa: N802
+    def showEvent(self, a0: QShowEvent | None) -> None:
         super().showEvent(a0)
         self.fit_view()
 
@@ -226,7 +231,9 @@ class _ViewerScaleSync(QObject):
         super().__init__(area)
         self._area = area
 
-    def eventFilter(self, watched, event) -> bool:  # noqa: N802
-        if event.type() in (QEvent.Type.Wheel, QEvent.Type.Resize):
+    def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
+        if a0 is None or a1 is None:
+            return False
+        if a1.type() in (QEvent.Type.Wheel, QEvent.Type.Resize):
             self._area.update_scale_from_viewer()
         return False

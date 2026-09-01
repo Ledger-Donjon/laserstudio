@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QPen, QColor, QColorConstants
 from PyQt6.QtCore import Qt, QPointF, QPoint
+from collections.abc import Callable
 from ..instruments.probe import ProbeInstrument
 from ..instruments.laser import LaserInstrument
 from ..utils.colors import LedgerColors, MARKERS_COLORS
@@ -279,9 +280,18 @@ class IdMarker(Marker):
         | LedgerColors = QColorConstants.Red,
         position: None | tuple[float, float] = None,
         label: str | None = None,
+        *,
+        marker_id: int | None = None,
     ) -> None:
-        self._id = IdMarker.__id
-        IdMarker.__id += 1
+        if marker_id is not None:
+            self._id = marker_id
+            IdMarker.__id = max(IdMarker.__id, marker_id + 1)
+        else:
+            self._id = IdMarker.__id
+            IdMarker.__id += 1
+
+        # Must exist before setPos(): itemChange can fire during construction.
+        self._position_changed_callback: Callable[[], None] | None = None
 
         if isinstance(color, LedgerColors):
             color = color.value
@@ -303,6 +313,21 @@ class IdMarker(Marker):
             self.setPos(QPointF(*position))
         self.setZValue(2)
         self._label = label
+
+    def set_position_changed_callback(
+        self, callback: Callable[[], None] | None
+    ) -> None:
+        self._position_changed_callback = callback
+
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any):
+        result = super().itemChange(change, value)
+        callback = getattr(self, "_position_changed_callback", None)
+        if (
+            change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged
+            and callback is not None
+        ):
+            callback()
+        return result
 
     @property
     def id(self):

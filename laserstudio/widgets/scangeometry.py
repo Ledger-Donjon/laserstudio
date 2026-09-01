@@ -247,8 +247,6 @@ class ScanGeometry(QGraphicsItemGroup):
                 )
                 self.__scan_geometry_items.addToGroup(item)
 
-        self.__scan_path.color = self.zones.path_color
-        self.__scan_path.diameter = self.zones.point_diameter
         self.__update_scan_path()
 
         if self.__editing_zone is None:
@@ -256,6 +254,7 @@ class ScanGeometry(QGraphicsItemGroup):
 
     def __update_scan_path(self):
         """Update scanning path display."""
+        self.__scan_path.color = self.zones.path_color
         generator = self.zones.scan_path_generator
         if generator.is_empty():
             points_hist: list[tuple[float, float]] = []
@@ -264,7 +263,7 @@ class ScanGeometry(QGraphicsItemGroup):
             points_hist = generator.hist_list(10)
             points_next = generator.next_list(10)
         qPoints = [QPointF(*p) for p in points_hist + points_next]
-        self.__scan_path.set(qPoints, len(points_hist), self.__scan_path.diameter)
+        self.__scan_path.set(qPoints, len(points_hist), self.zones.point_diameter)
 
     # -- Delegating properties (kept for the classic toolbar) --------------- #
 

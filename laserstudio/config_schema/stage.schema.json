@@ -211,6 +211,63 @@
               }
             }
           ]
+        },
+        "velocity_mm_s": {
+          "description": "Closed-loop velocity (mm/s) for each PI controller axis. Applied at startup and saved in settings.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "suffix": "mm/s"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s"
+              }
+            }
+          ]
+        },
+        "acceleration_mm_s2": {
+          "description": "Closed-loop acceleration (mm/s²) for each PI controller axis.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "suffix": "mm/s²"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s²"
+              }
+            }
+          ]
+        },
+        "deceleration_mm_s2": {
+          "description": "Closed-loop deceleration (mm/s²) for each PI controller axis.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "suffix": "mm/s²"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "suffix": "mm/s²"
+              }
+            }
+          ]
         }
       }
     },

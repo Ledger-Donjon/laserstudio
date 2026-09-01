@@ -621,3 +621,18 @@ class TestScansInstrumentSettings:
         }
         assert [z.name for z in scans.zones.values()] == ["A", "B"]
         assert set(scans.zones) == {1, 2}
+
+
+class TestScanGeometryPathDisplay:
+    def test_path_color_change_updates_view(self, qapp, scans):
+        from PyQt6.QtWidgets import QGraphicsScene
+
+        from laserstudio.widgets.scangeometry import ScanGeometry
+
+        scene = QGraphicsScene()
+        view = ScanGeometry(scans)
+        scene.addItem(view)
+
+        red = QColor("#ff0000")
+        scans.path_color = red
+        assert view._ScanGeometry__scan_path.color == red

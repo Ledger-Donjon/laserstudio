@@ -1,25 +1,28 @@
-from typing import Any, Sequence
-from .stage import StageInstrument
-from .list_serials import DeviceSearchError
+import logging
+import sys
+from collections.abc import Sequence
+from typing import Any
+
+from ..utils.yaml_types import Config
+from .annotations import AnnotationsInstrument
 from .camera import CameraInstrument
-from .camera_rest import CameraRESTInstrument
-from .camera_usb import CameraUSBInstrument
 from .camera_nit import CameraNITInstrument
 from .camera_raptor import CameraRaptorInstrument
-from .light import LightInstrument
-from .hayashilight import HayashiLRInstrument
+from .camera_rest import CameraRESTInstrument
+from .camera_usb import CameraUSBInstrument
 from .focus import FocusInstrument
-from .scans import ScansInstrument
+from .hayashilight import HayashiLRInstrument
 from .instrument import Instrument
-from .lmscontroller import LMSControllerInstrument
 from .laser import LaserInstrument
 from .laser_dummy import LaserDummy
 from .laserdriver import LaserDriverInstrument
+from .light import LightInstrument
+from .list_serials import DeviceSearchError
+from .lmscontroller import LMSControllerInstrument
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
-from ..utils.yaml_types import Config
-import sys
-import logging
+from .scans import ScansInstrument
+from .stage import StageInstrument
 
 
 class Instruments:
@@ -42,11 +45,11 @@ class Instruments:
                     self.stage = StageInstrument(stage_config)
                 except DeviceSearchError as e:
                     logging.getLogger("laserstudio").warning(
-                        f"Stage is enabled but device {str(e)} is not found... Skipping."
+                        f"Stage is enabled but device {e!s} is not found... Skipping."
                     )
                 except Exception as e:
                     logging.getLogger("laserstudio").warning(
-                        f"Stage is enabled but device could not be created: {str(e)}... Skipping."
+                        f"Stage is enabled but device could not be created: {e!s}... Skipping."
                     )
                     self.stage = None
 
@@ -67,7 +70,7 @@ class Instruments:
                         self.camera = CameraRESTInstrument(camera_config)
                     elif device_type == "NIT":
                         if sys.platform != "linux" and sys.platform != "win32":
-                            raise Exception(
+                            raise RuntimeError(
                                 "The NIT camera is not supported on other platforms than Linux or Windows."
                             )
                         self.camera = CameraNITInstrument(camera_config)
@@ -75,7 +78,7 @@ class Instruments:
                         self.camera = CameraRaptorInstrument(camera_config)
                 except Exception as e:
                     logging.getLogger("laserstudio").warning(
-                        f"Camera is enabled but device of type {device_type} could not be created: {str(e)}... Skipping."
+                        f"Camera is enabled but device of type {device_type} could not be created: {e!s}... Skipping."
                     )
 
         # Laser modules
@@ -102,7 +105,7 @@ class Instruments:
                         )
                 except Exception as e:
                     logging.getLogger("laserstudio").warning(
-                        f"Laser {i + 1} is enabled but device of type {device_type} could not be created: {str(e)}... Skipping."
+                        f"Laser {i + 1} is enabled but device of type {device_type} could not be created: {e!s}... Skipping."
                     )
 
         # Probes
@@ -148,7 +151,7 @@ class Instruments:
                         )
                 except Exception as e:
                     logging.getLogger("laserstudio").warning(
-                        f"Lighting system is enabled but device of type {device_type} could not be created: {str(e)}... Skipping."
+                        f"Lighting system is enabled but device of type {device_type} could not be created: {e!s}... Skipping."
                     )
 
         # Scan zones
@@ -157,6 +160,13 @@ class Instruments:
             self.scans = ScansInstrument(scans_config)
         else:
             self.scans = ScansInstrument({})
+
+        # Rulers and user markers
+        annotations_config = config.get("annotations")
+        if type(annotations_config) is dict:
+            self.annotations = AnnotationsInstrument(annotations_config)
+        else:
+            self.annotations = AnnotationsInstrument({})
 
     def go_next(self) -> Config:
         results: list[dict[str, Any]] = []
@@ -176,6 +186,7 @@ class Instruments:
         if self.light is not None:
             all.append(self.light)
         all.append(self.scans)
+        all.append(self.annotations)
         if self.focus_helper is not None:
             all.append(self.focus_helper)
         return all

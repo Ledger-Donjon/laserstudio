@@ -1,4 +1,4 @@
-"""Analyze workspace — measurement annotations (rulers) over the viewer."""
+"""Analyze workspace — measurement annotations (rulers and markers) over the viewer."""
 from __future__ import annotations
 
 from typing import Any
@@ -21,6 +21,7 @@ from ...utils.colors import LedgerColors, MARKERS_COLORS
 from ...utils.util import create_color_qicon
 from ..newui import theme
 from ..rulerslist import RulersView
+from ..markerslist import MarkersView
 from ..viewer import Viewer
 from .workspace import Workspace
 
@@ -91,7 +92,7 @@ def _field_row(label_text: str, control: QWidget) -> QWidget:
 
 
 class AnalyzeWorkspace(Workspace):
-    """Workspace holding the ruler tool and the list of measurements."""
+    """Workspace holding ruler/marker tools and their lists."""
 
     label = "Analyze"
     icon = "activity"
@@ -128,9 +129,9 @@ class AnalyzeWorkspace(Workspace):
         btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         btn.setToolTip(
             "Measure a distance by dragging in the viewer. "
-            "Shortcut: L — leave with Esc."
+            "Shortcut: L — click again or Esc to deselect."
         )
-        btn.toggled.connect(self._on_ruler_toggled)
+        btn.clicked.connect(self._on_ruler_clicked)
         viewer.mode_changed.connect(self._on_viewer_mode_changed)
         layout.addWidget(btn)
 
@@ -177,21 +178,48 @@ class AnalyzeWorkspace(Workspace):
         clear_btn.clicked.connect(viewer.clear_rulers)
         layout.addWidget(clear_btn)
 
+        layout.addWidget(theme.section_title("Markers", "crosshair"))
+
+        markers_list = MarkersView(viewer)
+        markers_list.setStyleSheet(_LIST_SS)
+        markers_list.setMinimumHeight(160)
+        markers_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        layout.addWidget(markers_list, 1)
+
+        markers_clear_btn = QPushButton("Clear all markers")
+        markers_clear_btn.setStyleSheet(theme.GHOST_BTN)
+        markers_clear_btn.setFixedHeight(theme.BTN_MIN_H)
+        markers_clear_btn.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        markers_clear_btn.clicked.connect(viewer.clear_markers)
+        layout.addWidget(markers_clear_btn)
+
         self._on_viewer_mode_changed(int(viewer.mode))
         scroll.setWidget(inner)
         return scroll
 
-    def on_deactivated(self) -> None:
-        """Leave the ruler mode, so a click in another workspace does not draw."""
+    def on_activated(self) -> None:
         viewer: Viewer | None = self._window.viewer
-        if viewer is not None and viewer.mode == Viewer.Mode.RULER:
-            viewer.select_mode(Viewer.Mode.NONE)
+        if viewer is not None:
+            self._on_viewer_mode_changed(int(viewer.mode))
 
-    def _on_ruler_toggled(self, checked: bool) -> None:
+    def on_deactivated(self) -> None:
+        """Leave ruler mode when switching to another workspace tab."""
         viewer: Viewer | None = self._window.viewer
         if viewer is None:
             return
-        viewer.select_mode(Viewer.Mode.RULER if checked else Viewer.Mode.NONE)
+        if viewer.mode == Viewer.Mode.RULER:
+            viewer.select_mode(Viewer.Mode.NONE)
+        self._on_viewer_mode_changed(int(viewer.mode))
+
+    def _on_ruler_clicked(self) -> None:
+        viewer: Viewer | None = self._window.viewer
+        if viewer is None:
+            return
+        viewer.select_mode(Viewer.Mode.RULER, toggle=True)
 
     def _on_viewer_mode_changed(self, mode_id: int) -> None:
         btn = self._ruler_btn

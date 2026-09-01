@@ -91,7 +91,10 @@ class LaserStudio(QMainWindow):
         self.instruments = Instruments(config)
 
         # Creation of Viewer as the central widget
-        self.viewer = Viewer(scans=self.instruments.scans)
+        self.viewer = Viewer(
+            scans=self.instruments.scans,
+            annotations=self.instruments.annotations,
+        )
         self.setCentralWidget(self.viewer)
 
         # Add StageSight if there is a Stage instrument or a camera
@@ -796,6 +799,9 @@ class LaserStudio(QMainWindow):
         # Scanning geometry
         data["scans"] = self.instruments.scans.settings
 
+        # Rulers and markers
+        data["annotations"] = self.instruments.annotations.settings
+
         # Lighting
         if self.instruments.light is not None:
             data["light"] = self.instruments.light.settings
@@ -860,6 +866,21 @@ class LaserStudio(QMainWindow):
         logging.getLogger("laserstudio").debug(f"Scans settings: {scans}...")
         if scans is not None:
             self.instruments.scans.settings = scans
+
+        # Annotations (rulers, markers) — fall back to legacy viewer section.
+        annotations = data.get("annotations")
+        if annotations is not None:
+            self.instruments.annotations.settings = annotations
+        else:
+            viewer_legacy = data.get("viewer")
+            if isinstance(viewer_legacy, dict):
+                migrated: dict[str, Any] = {}
+                if "marker_size" in viewer_legacy:
+                    migrated["marker_size"] = viewer_legacy["marker_size"]
+                if "rulers" in viewer_legacy:
+                    migrated["rulers"] = viewer_legacy["rulers"]
+                if migrated:
+                    self.instruments.annotations.settings = migrated
 
         # Probes
         probes = data.get("probes", [])

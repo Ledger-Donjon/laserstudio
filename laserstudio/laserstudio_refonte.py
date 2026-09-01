@@ -230,7 +230,7 @@ class LaserStudioRefonte(QMainWindow):
     # ── Viewer area ───────────────────────────────────────────────────────────
 
     def _build_viewer_area(self) -> ViewerArea:
-        area = ViewerArea(scans=self.instruments.scans)
+        area = ViewerArea(instruments=self.instruments)
         instr = self.instruments
         if instr.stage is not None or instr.camera is not None:
             area.viewer.add_stage_sight(

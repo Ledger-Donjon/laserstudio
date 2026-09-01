@@ -435,6 +435,256 @@ class _SliderRow(QWidget):
         self._slider.setEnabled(a0)
 
 
+class _FloatSliderRow(QWidget):
+    """Labelled slider for a floating-point range, with a live value readout."""
+
+    def __init__(
+        self,
+        caption: str,
+        minimum: float,
+        maximum: float,
+        value: float,
+        *,
+        scale: int = 1000,
+        suffix: str = "",
+        decimals: int = 3,
+        on_change: Callable[[float], None],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._scale = scale
+        self._decimals = decimals
+        self._suffix = suffix
+        self._on_change = on_change
+        self._minimum = minimum
+        self._maximum = maximum
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        header = QHBoxLayout()
+        self._caption = QLabel(caption)
+        self._caption.setStyleSheet(_MONO_MUTED)
+        self._value = QLabel(self._format(value))
+        self._value.setStyleSheet(
+            f"color: {theme.TEXT}; font-family: monospace; font-size: 10px;"
+            " background: transparent;"
+        )
+        header.addWidget(self._caption)
+        header.addStretch()
+        header.addWidget(self._value)
+        layout.addLayout(header)
+
+        slider_min = int(round(minimum * scale))
+        slider_max = max(slider_min + 1, int(round(maximum * scale)))
+        slider_val = min(slider_max, max(slider_min, int(round(value * scale))))
+
+        self._slider = QSlider(Qt.Orientation.Horizontal)
+        self._slider.setRange(slider_min, slider_max)
+        self._slider.setValue(slider_val)
+        self._slider.setStyleSheet(
+            "QSlider::groove:horizontal { height: 4px; background: #1E1E1E;"
+            " border-radius: 2px; }"
+            f"QSlider::sub-page:horizontal {{ background: {theme.PURPLE};"
+            " border-radius: 2px; }"
+            "QSlider::handle:horizontal { width: 12px; margin: -4px 0;"
+            f" background: {theme.PURPLE}; border-radius: 6px; }}"
+        )
+        self._slider.valueChanged.connect(self._on_changed)
+        layout.addWidget(self._slider)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(_SLIDER_ROW_H)
+
+    def _format(self, value: float) -> str:
+        return f"{value:.{self._decimals}f}{self._suffix}"
+
+    def _on_changed(self, raw: int) -> None:
+        value = raw / self._scale
+        value = min(self._maximum, max(self._minimum, value))
+        self._value.setText(self._format(value))
+        self._on_change(value)
+
+    def set_value(self, value: float) -> None:
+        raw = int(round(min(self._maximum, max(self._minimum, value)) * self._scale))
+        self._slider.blockSignals(True)
+        self._slider.setValue(raw)
+        self._value.setText(self._format(value))
+        self._slider.blockSignals(False)
+
+
+_JOYSTICK_CAPSULE = f"""
+QPushButton#ls-joy-capsule {{
+    background-color: rgba(255,255,255,0.05);
+    color: {theme.TEXT_MUTED};
+    border: 1px solid {theme.BORDER};
+    border-radius: 12px;
+    font-family: "Brut Grotesque";
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 0;
+    min-height: 26px;
+}}
+QPushButton#ls-joy-capsule:hover {{
+    background-color: rgba(255,255,255,0.09);
+}}
+QPushButton#ls-joy-capsule:checked {{
+    background-color: {theme.PURPLE_BG};
+    color: {theme.PURPLE};
+    border: 1px solid {theme.PURPLE_BORDER};
+}}
+"""
+
+
+class _JoystickControls(QWidget):
+    """Analog joystick toggle(s) for the positioning pad."""
+
+    _AXIS_LABELS = "XYZ"
+
+    def __init__(self, stage: StageInstrument, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._stage = stage
+        self._updating = False
+        self._axis_buttons: list[QPushButton] = []
+        self._all_button: QPushButton | None = None
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(8)
+
+        header = QLabel("Joystick")
+        header.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; font-size: 12px; background: transparent;"
+        )
+        root.addWidget(header)
+
+        if stage.is_pi:
+            hint = QLabel(
+                "Enable the analog joystick per axis. Motion commands are rejected "
+                "while an axis is under joystick control."
+            )
+            hint.setWordWrap(True)
+            hint.setStyleSheet(
+                f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
+            )
+            root.addWidget(hint)
+
+            row = QWidget()
+            row.setStyleSheet("background: transparent;")
+            hbox = QHBoxLayout(row)
+            hbox.setContentsMargins(0, 0, 0, 0)
+            hbox.setSpacing(6)
+
+            for axis in range(stage.num_axis):
+                label = (
+                    self._AXIS_LABELS[axis]
+                    if axis < len(self._AXIS_LABELS)
+                    else str(axis + 1)
+                )
+                btn = QPushButton(label)
+                btn.setObjectName("ls-joy-capsule")
+                btn.setCheckable(True)
+                btn.setStyleSheet(_JOYSTICK_CAPSULE)
+                btn.setSizePolicy(
+                    QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+                )
+                btn.toggled.connect(
+                    lambda checked, ax=axis: self._on_axis_toggled(ax, checked)
+                )
+                self._axis_buttons.append(btn)
+                hbox.addWidget(btn)
+
+            all_btn = QPushButton("ALL")
+            all_btn.setObjectName("ls-joy-capsule")
+            all_btn.setCheckable(True)
+            all_btn.setStyleSheet(_JOYSTICK_CAPSULE)
+            all_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            all_btn.toggled.connect(self._on_all_toggled)
+            self._all_button = all_btn
+            hbox.addWidget(all_btn)
+            root.addWidget(row)
+            self._refresh_pi_state()
+        else:
+            self._toggle = QPushButton("Enable joystick")
+            self._toggle.setCheckable(True)
+            self._toggle.setStyleSheet(theme.GHOST_BTN)
+            self._toggle.setFixedHeight(theme.BTN_MIN_H)
+            try:
+                from pystages import Corvus
+
+                if isinstance(stage.stage, Corvus):
+                    self._toggle.setChecked(stage.stage.joystick_enabled)
+            except Exception:
+                pass
+            self._toggle.toggled.connect(self._on_corvus_toggled)
+            root.addWidget(self._toggle)
+
+    def _refresh_pi_state(self) -> None:
+        if not self._stage.is_pi:
+            return
+        try:
+            states = self._stage.pi_joystick_enabled
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Could not read PI joystick state: %s", exc
+            )
+            return
+        self._updating = True
+        try:
+            for axis, btn in enumerate(self._axis_buttons):
+                if axis < len(states):
+                    btn.setChecked(states[axis])
+            if self._all_button is not None and states:
+                self._all_button.setChecked(all(states))
+        finally:
+            self._updating = False
+
+    def _on_axis_toggled(self, axis: int, checked: bool) -> None:
+        if self._updating:
+            return
+        try:
+            self._stage.set_pi_joystick_axis(axis, checked)
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Failed to set PI joystick on axis %s: %s", axis, exc
+            )
+            self._refresh_pi_state()
+            return
+        self._updating = True
+        try:
+            if self._all_button is not None:
+                states = self._stage.pi_joystick_enabled
+                self._all_button.setChecked(all(states))
+        finally:
+            self._updating = False
+
+    def _on_all_toggled(self, checked: bool) -> None:
+        if self._updating:
+            return
+        try:
+            self._stage.pi_joystick_enabled = checked
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Failed to set PI joystick on all axes: %s", exc
+            )
+            self._refresh_pi_state()
+            return
+        self._refresh_pi_state()
+
+    def _on_corvus_toggled(self, checked: bool) -> None:
+        if self._updating:
+            return
+        try:
+            self._stage.enable_joystick(checked)
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Failed to toggle joystick: %s", exc
+            )
+            self._updating = True
+            self._toggle.setChecked(not checked)
+            self._updating = False
+
+
 class _ShutterSection(QWidget):
     """Shutter heading (with live status) + Open / Closed toggles."""
 
@@ -1283,6 +1533,118 @@ class _SafetyLimitsSection(QWidget):
         return "\n".join(lines) if lines else "No area defined yet."
 
 
+class _PIMotionSection(QWidget):
+    """Closed-loop VEL/ACC/DEC controls for PI/Mercury stages."""
+
+    _AXIS_LABELS = "XYZ"
+
+    def __init__(self, stage: StageInstrument, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._stage = stage
+        self._updating = False
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(PANEL_SPACING)
+
+        root.addWidget(theme.section_title("PI motion", "move-3d"))
+        hint = QLabel(
+            "Closed-loop velocity, acceleration and deceleration for each Mercury "
+            "controller axis (mm/s and mm/s²). Also applies under joystick control."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
+        )
+        root.addWidget(hint)
+
+        try:
+            velocity = stage.pi_velocity_mm_s
+            acceleration = stage.pi_acceleration_mm_s2
+            deceleration = stage.pi_deceleration_mm_s2
+            velocity_max = stage.pi_velocity_max_mm_s
+            acceleration_max = stage.pi_acceleration_max_mm_s2
+            deceleration_max = stage.pi_deceleration_max_mm_s2
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Could not read PI motion parameters: %s", exc
+            )
+            error = QLabel("Unable to read PI motion parameters from the controller.")
+            error.setWordWrap(True)
+            error.setStyleSheet(
+                f"color: {theme.ACCENT}; font-size: 11px; background: transparent;"
+            )
+            root.addWidget(error)
+            return
+
+        for axis in range(stage.num_axis):
+            axis_label = (
+                self._AXIS_LABELS[axis] if axis < len(self._AXIS_LABELS) else str(axis + 1)
+            )
+            title = QLabel(f"Axis {axis_label}")
+            title.setStyleSheet(
+                f"color: {theme.TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
+                " font-size: 12px; background: transparent;"
+            )
+            root.addWidget(title)
+
+            vel_max = max(0.001, velocity_max[axis])
+            acc_max = max(0.1, acceleration_max[axis])
+            dec_max = max(0.1, deceleration_max[axis])
+
+            vel_slider = _FloatSliderRow(
+                "VELOCITY",
+                0.0,
+                vel_max,
+                min(vel_max, velocity[axis]),
+                scale=1000,
+                suffix="\xa0mm/s",
+                decimals=3,
+                on_change=lambda value, ax=axis: self._on_velocity_changed(ax, value),
+            )
+            acc_slider = _FloatSliderRow(
+                "ACCELERATION",
+                0.0,
+                acc_max,
+                min(acc_max, acceleration[axis]),
+                scale=10,
+                suffix="\xa0mm/s²",
+                decimals=1,
+                on_change=lambda value, ax=axis: self._on_acceleration_changed(ax, value),
+            )
+            dec_slider = _FloatSliderRow(
+                "DECELERATION",
+                0.0,
+                dec_max,
+                min(dec_max, deceleration[axis]),
+                scale=10,
+                suffix="\xa0mm/s²",
+                decimals=1,
+                on_change=lambda value, ax=axis: self._on_deceleration_changed(ax, value),
+            )
+            root.addWidget(vel_slider)
+            root.addWidget(acc_slider)
+            root.addWidget(dec_slider)
+
+            if axis < stage.num_axis - 1:
+                root.addWidget(theme.separator())
+
+    def _on_velocity_changed(self, axis: int, value: float) -> None:
+        if self._updating:
+            return
+        self._stage.set_pi_axis_motion(axis, velocity_mm_s=float(value))
+
+    def _on_acceleration_changed(self, axis: int, value: float) -> None:
+        if self._updating:
+            return
+        self._stage.set_pi_axis_motion(axis, acceleration_mm_s2=float(value))
+
+    def _on_deceleration_changed(self, axis: int, value: float) -> None:
+        if self._updating:
+            return
+        self._stage.set_pi_axis_motion(axis, deceleration_mm_s2=float(value))
+
+
 class SettingsWorkspace(Workspace):
     """Setup workspace with sub-category panels."""
 
@@ -1369,6 +1731,17 @@ class SettingsWorkspace(Workspace):
 
     def build_content(self) -> QWidget | None:
         return None
+
+    def on_activated(self) -> None:
+        viewer = self._window.viewer
+        if viewer is not None and self._click_move_btn is not None:
+            self._on_viewer_mode_changed(int(viewer.mode))
+
+    def on_deactivated(self) -> None:
+        """Leave click-and-move mode when switching to another workspace tab."""
+        viewer = self._window.viewer
+        if viewer is not None and viewer.mode == Viewer.Mode.STAGE:
+            viewer.select_mode(Viewer.Mode.NONE)
 
     # ── Sub-category switching ────────────────────────────────────────────────
 
@@ -1557,9 +1930,9 @@ class SettingsWorkspace(Workspace):
             btn.setIcon(lucide.icon("move", 15, theme.TEXT))
             btn.setToolTip(
                 "Move the stage to a new position by clicking on the camera view. "
-                "Shortcut: M — cancel with Esc."
+                "Shortcut: M — click again or Esc to deselect."
             )
-            btn.toggled.connect(self._on_click_move_toggled)
+            btn.clicked.connect(self._on_click_move_clicked)
             viewer.mode_changed.connect(self._on_viewer_mode_changed)
             self._on_viewer_mode_changed(int(viewer.mode))
             layout.addWidget(btn)
@@ -1577,11 +1950,16 @@ class SettingsWorkspace(Workspace):
 
         if stage is not None:
             layout.addWidget(DpadWidget(stage))
+            if stage.supports_analog_joystick:
+                layout.addWidget(_JoystickControls(stage))
             stage.position_changed.connect(self._on_position_changed)
             self._on_position_changed(stage.position)
 
             layout.addWidget(theme.separator())
             layout.addWidget(_SafetyLimitsSection(self._window))
+            if stage.is_pi:
+                layout.addWidget(theme.separator())
+                layout.addWidget(_PIMotionSection(stage))
         else:
             layout.addWidget(self._placeholder("No stage configured"))
 
@@ -1797,14 +2175,11 @@ class SettingsWorkspace(Workspace):
         if self._coord_label is not None:
             self._coord_label.setText(_format_coords(list(position.data)))
 
-    def _on_click_move_toggled(self, checked: bool) -> None:
+    def _on_click_move_clicked(self) -> None:
         viewer = self._window.viewer
         if viewer is None:
             return
-        if checked:
-            viewer.select_mode(Viewer.Mode.STAGE)
-        else:
-            viewer.select_mode(Viewer.Mode.NONE)
+        viewer.select_mode(Viewer.Mode.STAGE, toggle=True)
 
     def _on_viewer_mode_changed(self, mode_id: int) -> None:
         btn = self._click_move_btn

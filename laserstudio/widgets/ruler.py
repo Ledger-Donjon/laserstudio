@@ -163,10 +163,16 @@ class Ruler(QGraphicsObject):
         label: str | None = None,
         graduation: float | None = None,
         graduation_count: float | None = None,
+        *,
+        ruler_id: int | None = None,
     ):
         super().__init__(parent)
-        self._id = Ruler.__id
-        Ruler.__id += 1
+        if ruler_id is not None:
+            self._id = ruler_id
+            Ruler.__id = max(Ruler.__id, ruler_id + 1)
+        else:
+            self._id = Ruler.__id
+            Ruler.__id += 1
 
         self.viewer = viewer
         self._p1 = QPointF(*p1) if isinstance(p1, tuple) else QPointF(p1)
