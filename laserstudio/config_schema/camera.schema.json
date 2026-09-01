@@ -49,6 +49,17 @@
       "description": "If there is a optical magnifier, specify the zooming factor of the objective.",
       "suffix": "x"
     },
+    "objectives": {
+      "type": "array",
+      "minItems": 1,
+      "default": [1, 5, 10, 20, 50],
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0.0,
+        "suffix": "x"
+      },
+      "description": "Magnifications available on the optical column. Used to populate the objective selector in the UI. If omitted, a camera-type default list is used."
+    },
     "invert_vertical": {
       "type": "boolean",
       "default": false,

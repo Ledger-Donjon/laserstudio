@@ -225,7 +225,6 @@ class StageInstrument(Instrument):
             if self.refresh_interval is None:
                 self.refresh_interval = 200
 
-
         elif device_type == "PI":
             logging.getLogger("laserstudio").info(
                 "Creating a PI/Mercury stage... "
@@ -234,6 +233,17 @@ class StageInstrument(Instrument):
             adresses = config.get("adresses", [1, 2, 3])
             logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
             self.stage = PI(dev=dev, addresses=adresses)
+            self._pi_joystick_velocity_mm_s = self._expand_per_axis_config(
+                config.get("joystick_velocity_mm_s",  [50.0, 50.0, 5.0]), len(adresses)
+            )
+            self._pi_joystick_acceleration_mm_s2 = self._expand_per_axis_config(
+                config.get("joystick_acceleration_mm_s2", [400.0, 400.0, 40.0]), len(adresses)
+            )
+            self._pi_joystick_deceleration_mm_s2 = self._expand_per_axis_config(
+                config.get("joystick_deceleration_mm_s2", [400.0, 400.0, 40.0]), len(adresses)
+            )
+            self._pi_saved_motion_params: tuple[list[float], list[float], list[float]] | None = None
+            self._apply_pi_motion_from_config(config, len(adresses))
         elif device_type == "SMC100":
             logging.getLogger("laserstudio").info(
                 "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
@@ -323,9 +333,7 @@ class StageInstrument(Instrument):
         # When enabled, a move whose target falls outside [min, max] on any
         # constrained axis is rejected. These are independent from any firmware
         # soft limits (e.g. GRBL $20).
-        self._soft_limits_enabled: bool = bool(
-            config.get("soft_limits_enabled", False)
-        )
+        self._soft_limits_enabled: bool = bool(config.get("soft_limits_enabled", False))
         self._soft_limits_min: list[float] | None = None
         self._soft_limits_max: list[float] | None = None
         soft_min = config.get("soft_limits_min")
@@ -344,7 +352,7 @@ class StageInstrument(Instrument):
 
     def _handle_cnc_error(self, error: CNCError, *, notify: bool = False) -> None:
         message = format_grbl_alarm_message(error)
-        alarm_key = (error.alarm_code, error.args[0] if error.args else "")
+        alarm_key = (error.status.substate, error.args[0] if error.args else "")
         if alarm_key != self._last_reported_alarm:
             self._last_reported_alarm = alarm_key
             logging.getLogger("laserstudio").warning(message)
@@ -362,9 +370,17 @@ class StageInstrument(Instrument):
             values += [0.0] * (self.num_axis - len(values))
         return values
 
-    def _set_soft_limits_raw(
-        self, minimum: list[float], maximum: list[float]
-    ) -> None:
+    @staticmethod
+    def _expand_per_axis_config(value: float | int | list[float], count: int) -> list[float]:
+        """Expand a scalar or list config value to one entry per axis."""
+        if isinstance(value, (int, float)):
+            return [float(value)] * count
+        values = [float(v) for v in value]
+        if len(values) < count:
+            values += [values[-1]] * (count - len(values))
+        return values[:count]
+
+    def _set_soft_limits_raw(self, minimum: list[float], maximum: list[float]) -> None:
         """Set the soft limits without emitting any signal (used at init)."""
         minimum = self._pad_axes([float(v) for v in minimum])
         maximum = self._pad_axes([float(v) for v in maximum])
@@ -433,9 +449,7 @@ class StageInstrument(Instrument):
         """True if a software limit box has been defined."""
         return self._soft_limits_min is not None and self._soft_limits_max is not None
 
-    def set_soft_limits(
-        self, minimum: list[float], maximum: list[float]
-    ) -> None:
+    def set_soft_limits(self, minimum: list[float], maximum: list[float]) -> None:
         """Define the software limit box (stage µm coordinates) and notify."""
         self._set_soft_limits_raw(minimum, maximum)
         self.soft_limits_changed.emit()
@@ -568,9 +582,7 @@ class StageInstrument(Instrument):
                 f"Warning: Bad response!: {repr(e)}"
             )
         except Exception as e:
-            logging.getLogger("laserstudio").error(
-                f"Error: {repr(e)}", exc_info=True
-            )
+            logging.getLogger("laserstudio").error(f"Error: {repr(e)}", exc_info=True)
         else:
             self.position_changed.emit(position)
         finally:
@@ -642,7 +654,9 @@ class StageInstrument(Instrument):
 
         within_limits, violated_axis = self._is_within_soft_limits(position)
         if not within_limits and violated_axis is not None:
-            axis_name = "XYZ"[violated_axis] if violated_axis < 3 else str(violated_axis)
+            axis_name = (
+                "XYZ"[violated_axis] if violated_axis < 3 else str(violated_axis)
+            )
             message = (
                 f"Move blocked by software limits: axis {axis_name} target "
                 f"{position[violated_axis]:.1f}\xa0µm is outside the allowed area."
@@ -729,6 +743,278 @@ class StageInstrument(Instrument):
             )
 
     @property
+    def is_pi(self) -> bool:
+        """True when the underlying stage is a PI/Mercury controller."""
+        return isinstance(self.stage, PI)
+
+    def _pi_stage(self) -> PI:
+        if not isinstance(self.stage, PI):
+            raise TypeError("PI motion parameters require a PI stage")
+        return self.stage
+
+    def _apply_pi_motion_from_config(self, config: dict[str, Any], count: int) -> None:
+        """Apply optional closed-loop VEL/ACC/DEC from config at startup."""
+        pi_stage = self._pi_stage()
+        if "velocity_mm_s" in config:
+            pi_stage.velocity = self._expand_per_axis_config(
+                config["velocity_mm_s"], count
+            )
+        if "acceleration_mm_s2" in config:
+            pi_stage.acceleration = self._expand_per_axis_config(
+                config["acceleration_mm_s2"], count
+            )
+        if "deceleration_mm_s2" in config:
+            pi_stage.deceleration = self._expand_per_axis_config(
+                config["deceleration_mm_s2"], count
+            )
+
+    @property
+    def pi_velocity_mm_s(self) -> list[float]:
+        """Closed-loop velocity (mm/s) for each PI controller axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.velocity)
+        finally:
+            self.mutex.unlock()
+
+    @pi_velocity_mm_s.setter
+    def pi_velocity_mm_s(self, value: float | list[float]) -> None:
+        pi_stage = self._pi_stage()
+        if isinstance(value, (int, float)):
+            values = [float(value)] * pi_stage.num_axis
+        else:
+            values = self._expand_per_axis_config(value, pi_stage.num_axis)
+        self.mutex.lock()
+        try:
+            pi_stage.velocity = values
+        finally:
+            self.mutex.unlock()
+
+    @property
+    def pi_velocity_max_mm_s(self) -> list[float]:
+        """Maximum settable closed-loop velocity (mm/s) per PI axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.velocity_max)
+        finally:
+            self.mutex.unlock()
+
+    @property
+    def pi_acceleration_max_mm_s2(self) -> list[float]:
+        """Maximum settable closed-loop acceleration (mm/s²) per PI axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.acceleration_max)
+        finally:
+            self.mutex.unlock()
+
+    @property
+    def pi_deceleration_max_mm_s2(self) -> list[float]:
+        """Maximum settable closed-loop deceleration (mm/s²) per PI axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.deceleration_max)
+        finally:
+            self.mutex.unlock()
+
+    @property
+    def pi_acceleration_mm_s2(self) -> list[float]:
+        """Closed-loop acceleration (mm/s²) for each PI controller axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.acceleration)
+        finally:
+            self.mutex.unlock()
+
+    @pi_acceleration_mm_s2.setter
+    def pi_acceleration_mm_s2(self, value: float | list[float]) -> None:
+        pi_stage = self._pi_stage()
+        if isinstance(value, (int, float)):
+            values = [float(value)] * pi_stage.num_axis
+        else:
+            values = self._expand_per_axis_config(value, pi_stage.num_axis)
+        self.mutex.lock()
+        try:
+            pi_stage.acceleration = values
+        finally:
+            self.mutex.unlock()
+
+    @property
+    def pi_deceleration_mm_s2(self) -> list[float]:
+        """Closed-loop deceleration (mm/s²) for each PI controller axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.deceleration)
+        finally:
+            self.mutex.unlock()
+
+    @pi_deceleration_mm_s2.setter
+    def pi_deceleration_mm_s2(self, value: float | list[float]) -> None:
+        pi_stage = self._pi_stage()
+        if isinstance(value, (int, float)):
+            values = [float(value)] * pi_stage.num_axis
+        else:
+            values = self._expand_per_axis_config(value, pi_stage.num_axis)
+        self.mutex.lock()
+        try:
+            pi_stage.deceleration = values
+        finally:
+            self.mutex.unlock()
+
+    def set_pi_axis_motion(
+        self,
+        axis: int,
+        *,
+        velocity_mm_s: float | None = None,
+        acceleration_mm_s2: float | None = None,
+        deceleration_mm_s2: float | None = None,
+    ) -> None:
+        """Update VEL/ACC/DEC for a single PI axis."""
+        if velocity_mm_s is not None:
+            values = self.pi_velocity_mm_s
+            values[axis] = float(velocity_mm_s)
+            self.pi_velocity_mm_s = values
+        if acceleration_mm_s2 is not None:
+            values = self.pi_acceleration_mm_s2
+            values[axis] = float(acceleration_mm_s2)
+            self.pi_acceleration_mm_s2 = values
+        if deceleration_mm_s2 is not None:
+            values = self.pi_deceleration_mm_s2
+            values[axis] = float(deceleration_mm_s2)
+            self.pi_deceleration_mm_s2 = values
+
+    @property
+    def supports_analog_joystick(self) -> bool:
+        """True when the stage exposes an analog joystick (PI or Corvus)."""
+        return isinstance(self.stage, (PI, Corvus))
+
+    @property
+    def pi_joystick_enabled(self) -> list[bool]:
+        """Joystick activation state for each PI controller axis."""
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            return list(pi_stage.joystick_enabled)
+        finally:
+            self.mutex.unlock()
+
+    @pi_joystick_enabled.setter
+    def pi_joystick_enabled(self, value: bool | list[bool]) -> None:
+        pi_stage = self._pi_stage()
+        self.mutex.lock()
+        try:
+            pi_stage.joystick_enabled = value
+        finally:
+            self.mutex.unlock()
+
+    def set_pi_joystick_axis(self, axis: int, enabled: bool) -> None:
+        """Enable or disable the analog joystick on a single PI axis."""
+        states = self.pi_joystick_enabled
+        states[axis] = enabled
+        self.pi_joystick_enabled = states
+
+    def enable_joystick(self, enabled: bool):
+        """
+        Enable the joystick for the stage.
+        """
+        if isinstance(self.stage, Corvus):
+            self.stage.joystick_enabled = enabled
+        elif isinstance(self.stage, PI):
+            if enabled:
+                self._enable_pi_joystick(True)
+            else:
+                self._enable_pi_joystick(False)
+
+    def _pi_query_axis_float(self, pi_stage: PI, address: int, command: str) -> float:
+        """Read a single-axis float parameter from a PI controller (e.g. VEL, ACC, DEC)."""
+        res = pi_stage.query(command, address, args=["1"])[0]
+        parts = res.split("=", 1)
+        if len(parts) != 2:
+            raise ProtocolError(
+                query=f"{address} {command}? 1",
+                response=res,
+                expected="2 parts in the response, separated by =",
+            )
+        return float(parts[1].strip())
+
+    def _enable_pi_joystick(self, enabled: bool) -> None:
+        """Enable or disable the analog joystick on PI/Mercury controllers.
+
+        Joystick velocity is proportional to the closed-loop VEL setting (see
+        C-863 manual §8.6). We lower VEL/ACC/DEC before activation to avoid
+        over-current protection when the stick is moved quickly, and restore
+        the previous values when the joystick is disabled.
+        """
+        log = logging.getLogger("laserstudio")
+        pi_stage = self.stage
+        assert isinstance(pi_stage, PI)
+        self.mutex.lock()
+        try:
+            
+            if enabled:
+                pi_stage.enable_joystick()
+                self._pi_saved_motion_params = (pi_stage.velocity, pi_stage.acceleration, pi_stage.deceleration)
+                for i, address in enumerate(pi_stage.addresses):
+                    log.info(
+                        f"PI address {address}: saved motion params "
+                        f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
+                        f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
+                        f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
+                    )
+            else:
+                pi_stage.disable_joystick()
+                if self._pi_saved_motion_params is not None:
+                    pi_stage.velocity = self._pi_saved_motion_params[0]
+                    pi_stage.acceleration = self._pi_saved_motion_params[1]
+                    pi_stage.deceleration = self._pi_saved_motion_params[2]
+
+                    for i, address in enumerate(pi_stage.addresses):
+                                log.info(
+                                    f"PI address {address}: restored motion params "
+                                    f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
+                                    f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
+                                    f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
+                            )
+                                
+            for i, address in enumerate(pi_stage.addresses):
+                res = pi_stage.query("JON", address, args=["1"])[0]
+                log.info(f"Joystick state on address {address}: {res}")
+                errors = pi_stage.error()
+                if errors:
+                    log.error(f"PI controller {address} errors after joystick toggle: {errors}")
+                else:
+                    log.info(f"PI controller {address}: no errors")
+        finally:
+            self.mutex.unlock()
+
+    def reboot(self):
+        """
+        Reboot the stage.
+        """
+        if isinstance(self.stage, PI):
+            # Send command RBT
+            for a in self.stage.addresses:
+                self.stage.send(a, "RBT")
+
+    def home(self, wait: bool = False):
+        """
+        Home the stage.
+        """
+        self.stage.home(wait=wait)
+        if isinstance(self.stage, PI):
+            errors = self.stage.error()
+            if errors:
+                logging.getLogger("laserstudio").error(f"Errors: {errors}")
+            else:
+                logging.getLogger("laserstudio").info("No errors")
+
+    @property
     def settings(self) -> Config:
         """
         Return a dict of settings for the stage.
@@ -743,6 +1029,10 @@ class StageInstrument(Instrument):
         if self._soft_limits_min is not None and self._soft_limits_max is not None:
             super_settings["soft_limits_min"] = list(self._soft_limits_min)
             super_settings["soft_limits_max"] = list(self._soft_limits_max)
+        if self.is_pi:
+            super_settings["velocity_mm_s"] = self.pi_velocity_mm_s
+            super_settings["acceleration_mm_s2"] = self.pi_acceleration_mm_s2
+            super_settings["deceleration_mm_s2"] = self.pi_deceleration_mm_s2
         logging.getLogger("laserstudio").debug(f"Stage settings: {super_settings}")
         return super_settings
 
@@ -775,3 +1065,10 @@ class StageInstrument(Instrument):
         if "soft_limits_enabled" in data:
             self._soft_limits_enabled = bool(data["soft_limits_enabled"])
         self.soft_limits_changed.emit()
+        if self.is_pi:
+            if "velocity_mm_s" in data:
+                self.pi_velocity_mm_s = cast(Any, data["velocity_mm_s"])
+            if "acceleration_mm_s2" in data:
+                self.pi_acceleration_mm_s2 = cast(Any, data["acceleration_mm_s2"])
+            if "deceleration_mm_s2" in data:
+                self.pi_deceleration_mm_s2 = cast(Any, data["deceleration_mm_s2"])

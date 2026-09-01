@@ -1,6 +1,7 @@
 import os
 import logging
-from typing import Literal, cast, Any
+from collections.abc import Sequence
+from typing import ClassVar, Literal, cast, Any
 import numpy
 from numpy.typing import NDArray
 import cv2
@@ -13,11 +14,27 @@ from .shutter import ShutterInstrument, TicShutterInstrument
 from ..utils.yaml_types import Config
 
 
+def parse_objectives(config: Config, default: Sequence[float]) -> list[float]:
+    """Read available objective magnifications from config, or return a copy of default."""
+    raw = config.get("objectives")
+    if not isinstance(raw, list):
+        return list(default)
+    values = [
+        float(x)
+        for x in raw
+        if isinstance(x, (int, float)) and float(x) > 0.0
+    ]
+    return values if values else list(default)
+
+
 class CameraInstrument(Instrument):
     """Class to regroup camera instrument operations"""
 
     # Signal emitted when a new image is created
     new_image = pyqtSignal(QImage)
+
+    # Magnifications offered in the UI when `objectives` is omitted from config.
+    DEFAULT_OBJECTIVES: ClassVar[tuple[float, ...]] = (1.0, 5.0, 10.0, 20.0, 50.0)
 
     def __init__(self, config: Config):
         """
@@ -93,6 +110,8 @@ class CameraInstrument(Instrument):
 
         # Objective
         self.objective = cast(float, config.get("objective", 1.0))
+        self.objectives = parse_objectives(config, self.DEFAULT_OBJECTIVES)
+        self.include_current_objective()
 
     def set_resolution(self, width: int, height: int) -> tuple[int, int]:
         """Update the image size in pixels and notify listeners."""
@@ -147,6 +166,11 @@ class CameraInstrument(Instrument):
             if self._last_frame_accumulator is not None
             else None
         )
+
+    def include_current_objective(self) -> None:
+        """Ensure the currently selected magnification appears in the available list."""
+        if not any(abs(mag - self.objective) < 1e-9 for mag in self.objectives):
+            self.objectives = [self.objective, *self.objectives]
 
     def select_objective(self, factor: float):
         """Select an objective with a magnifying factor.
@@ -590,6 +614,7 @@ class CameraInstrument(Instrument):
         settings["image_averaging"] = self.image_averaging
         settings["windowed_averaging"] = self.windowed_averaging
         settings["objective"] = self.objective
+        settings["objectives"] = list(self.objectives)
         settings["width"] = self.width
         settings["height"] = self.height
 

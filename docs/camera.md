@@ -47,6 +47,11 @@ Negative values can be given if you need to flip the image of the camera.
 In the case where the camera is mounted on an optical column, the `camera.objective` key in the
 {doc}`conf_file` can set which objective is used to magnify the image in the optical column.
 
+The list of magnifications offered in the objective selector is configured with
+`camera.objectives`. If this key is omitted, Laser Studio uses a default list that depends on
+the camera type (USB: 1×, 5×, 10×, 20×, 50×; NIT and Raptor: 5×, 10×, 20×, 50×).
+If the current `camera.objective` is not in that list, it is added automatically.
+
 ## Configuration file examples
 
 Here are some examples for defining the configuration of the Cameras in the configuration file.
@@ -62,6 +67,7 @@ camera:
   api_command: "images/camera"
   pixel_size_in_um: [15.115, 15.115]
   objective: 5
+  objectives: [5, 10, 20, 50]
 ```
 
 ### For a USB Camera

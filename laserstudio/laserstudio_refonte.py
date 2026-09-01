@@ -60,14 +60,18 @@ class LaserStudioRefonte(QMainWindow):
         self.setWindowTitle("Laser Studio · New UI")
         self.setMinimumSize(1200, 720)
 
+        # Viewer must exist before workspace panels are built (Settings wires it).
+        self._viewer_area = self._build_viewer_area()
+
         # The ordered set of workspaces shown as tabs.
         self._workspaces: list[Workspace] = [
             ConfigWorkspace(yaml_config, config_path, config_loaded, self),
             SettingsWorkspace(self),
             PhotoemissionWorkspace(),
-            ScanWorkspace(),
-            AnalyzeWorkspace(),
+            ScanWorkspace(self._viewer_area.viewer, self.instruments.scans),
+            AnalyzeWorkspace(self),
         ]
+        self._current_workspace = -1
 
         root = QWidget()
         root.setObjectName("ls-root")
@@ -87,9 +91,6 @@ class LaserStudioRefonte(QMainWindow):
         hbox = QHBoxLayout(content)
         hbox.setContentsMargins(0, 0, 0, 0)
         hbox.setSpacing(0)
-
-        # Viewer must exist before workspace panels are built (Settings wires it).
-        self._viewer_area = self._build_viewer_area()
 
         # Left column: one panel per workspace.
         self._sidebar = QStackedWidget()
@@ -137,6 +138,9 @@ class LaserStudioRefonte(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self).activated.connect(
             lambda: self.viewer.select_mode(Viewer.Mode.NONE)
         )
+        QShortcut(QKeySequence(Qt.Key.Key_L), self).activated.connect(
+            lambda: self.viewer.select_mode(Viewer.Mode.RULER)
+        )
 
     @property
     def viewer(self):
@@ -160,9 +164,7 @@ class LaserStudioRefonte(QMainWindow):
 
         ledger_logo = QLabel()
         ledger_logo.setPixmap(
-            lucide.svg_file_pixmap(
-                resource_path(":/icons/ledger-single-white.svg"), 18
-            )
+            lucide.svg_file_pixmap(resource_path(":/icons/ledger-single-white.svg"), 18)
         )
         ledger_logo.setFixedSize(18, 18)
         ledger_logo.setStyleSheet("background: transparent;")
@@ -228,7 +230,7 @@ class LaserStudioRefonte(QMainWindow):
     # ── Viewer area ───────────────────────────────────────────────────────────
 
     def _build_viewer_area(self) -> ViewerArea:
-        area = ViewerArea()
+        area = ViewerArea(instruments=self.instruments)
         instr = self.instruments
         if instr.stage is not None or instr.camera is not None:
             area.viewer.add_stage_sight(
@@ -275,8 +277,12 @@ class LaserStudioRefonte(QMainWindow):
     # ── Workspace switching ───────────────────────────────────────────────────
 
     def _select_workspace(self, index: int) -> None:
+        if self._current_workspace not in (index, -1):
+            self._workspaces[self._current_workspace].on_deactivated()
+        self._current_workspace = index
         self._sidebar.setCurrentIndex(index)
         ws = self._workspaces[index]
+        ws.on_activated()
         for j, btn in enumerate(self._tab_buttons):
             active = j == index
             btn.setChecked(active)

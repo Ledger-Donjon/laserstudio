@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QPointF, QRectF, QTimer, pyqtSignal, QEvent
 from PyQt6.QtGui import (
     QBrush,
     QColorConstants,
@@ -29,7 +29,6 @@ from typing import Any
 from shapely import Polygon
 import logging
 import json
-import numpy as np
 from .stagesight import (
     StageSight,
     StageInstrument,
@@ -38,14 +37,18 @@ from .stagesight import (
     LaserInstrument,
 )
 from .marker import IdMarker, Marker
+from .ruler import Ruler
 from .scangeometry import ScanGeometry
 from .softlimits import SoftLimitsItem, EDIT_HANDLE_ATTR
 from .maxdistance import MaxDistanceItem
 from ..instruments.stage import MoveFor, Vector
+from ..instruments.scans import ScansInstrument, default_zone_color
+from ..instruments.annotations import AnnotationsInstrument
 from ..utils.yaml_types import Config
 from ..utils.colors import LedgerColors
 from ..utils.background_align import BackgroundPin, compute_affine_transform
 from ..utils.util import yaml_to_qtransform, qtransform_to_yaml
+from .annotationsgeometry import AnnotationsGeometry
 
 
 class Viewer(QGraphicsView):
@@ -64,6 +67,7 @@ class Viewer(QGraphicsView):
         ZONE_POLY = auto()
         PIN = auto()
         OFFSET_ORIGIN = auto()
+        RULER = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -73,8 +77,24 @@ class Viewer(QGraphicsView):
     follow_stage_sight_changed = pyqtSignal(bool)
     # Background reference image state
     background_changed = pyqtSignal()
+    # Signal emitted when a ruler is added or removed
+    rulers_changed = pyqtSignal()
+    # Signal emitted when a marker is added, removed or updated in the model
+    markers_changed = pyqtSignal()
 
-    def __init__(self, parent: QWidget | None = None):
+    # A left click shorter than this distance (in pixels) does not create a
+    # ruler, so a misclick in RULER mode does not leave a zero-length item.
+    MIN_RULER_DRAG_PIXELS = 5.0
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        scans: ScansInstrument | None = None,
+        annotations: AnnotationsInstrument | None = None,
+    ):
+        """
+        :param parent: Parent widget.
+        """
         super().__init__(parent)
 
         # # Align objects to the center
@@ -109,11 +129,21 @@ class Viewer(QGraphicsView):
         self.stage_sight: StageSight | None = None
         self._follow_stage_sight = False
 
-        # Scanning geometry object and its representative item in the view.
-        # Also includes the scan path
-        self.scan_geometry = ScanGeometry()
+        # Scan Instrument for the management of scan zones
+        self.scans: ScansInstrument = (
+            scans if scans is not None else ScansInstrument({})
+        )
+        self.scan_geometry = ScanGeometry(self.scans)
         self.__scene.addItem(self.scan_geometry)
         self.scan_geometry.setZValue(3)
+
+        # Shared rulers and user markers (one model, one graphics layer per viewer).
+        self.annotations: AnnotationsInstrument = (
+            annotations if annotations is not None else AnnotationsInstrument({})
+        )
+        self.annotations_geometry = AnnotationsGeometry(self.annotations, self)
+        self.annotations.rulers_changed.connect(self.rulers_changed.emit)
+        self.annotations.markers_changed.connect(self.markers_changed.emit)
 
         # Permits to activate tools
         self.setInteractive(True)
@@ -141,13 +171,8 @@ class Viewer(QGraphicsView):
             self.__scene.addItem(m)
             m.hide()
 
-        # Markers
-        self.__markers: set[IdMarker] = set()
-        self.__markers_by_label_by_color: dict[str | None, dict[str, set[IdMarker]]] = {
-            None: {}
-        }
-
-        self.default_marker_size = 20.0
+        # Ruler being drawn by the user, if any
+        self._ruler_in_progress: Ruler | None = None
 
         # To prevent warning, due to QTBUG-103935 (https://bugreports.qt.io/browse/QTBUG-103935)
         if (vp := self.viewport()) is not None:
@@ -222,17 +247,39 @@ class Viewer(QGraphicsView):
 
     @property
     def markers(self) -> list[IdMarker]:
-        return list(self.__markers)
+        return self.annotations_geometry.markers
 
     @property
     def markers_by_label_by_color(self) -> dict[str | None, dict[str, set[IdMarker]]]:
-        return self.__markers_by_label_by_color
+        return self.annotations_geometry.markers_by_label_by_color
+
+    @property
+    def default_marker_size(self) -> float:
+        return self.annotations.default_marker_size
+
+    @default_marker_size.setter
+    def default_marker_size(self, value: float) -> None:
+        self.annotations.default_marker_size = float(value)
+
+    @property
+    def default_ruler_color(self) -> QColor:
+        return self.annotations.default_ruler_color
+
+    @default_ruler_color.setter
+    def default_ruler_color(self, value: QColor) -> None:
+        self.annotations.default_ruler_color = value
+
+    @property
+    def default_ruler_graduation(self) -> float | None:
+        return self.annotations.default_ruler_graduation
+
+    @default_ruler_graduation.setter
+    def default_ruler_graduation(self, value: float | None) -> None:
+        self.annotations.default_ruler_graduation = value
 
     def marker_size(self, value: float):
-        self.default_marker_size = value
+        self.annotations_geometry.apply_marker_size(value)
         self.setUpdatesEnabled(False)
-        for m in self.markers:
-            m.size = value
         self.setUpdatesEnabled(True)
 
     @property
@@ -586,9 +633,7 @@ class Viewer(QGraphicsView):
         stage = self.stage_sight.stage if self.stage_sight is not None else None
         if stage is None:
             return
-        stage.set_soft_limits_xy(
-            rect.left(), rect.top(), rect.right(), rect.bottom()
-        )
+        stage.set_soft_limits_xy(rect.left(), rect.top(), rect.right(), rect.bottom())
 
     def _on_stage_sight_moved(self, scene_pos: QPointF) -> None:
         """Recenter the max-distance circle on the stage sight scene position."""
@@ -601,7 +646,7 @@ class Viewer(QGraphicsView):
         ``StageInstrument.position`` (which emits ``position_changed``).
         """
         stage = self.stage_sight.stage if self.stage_sight is not None else None
-        if stage is None:
+        if stage is None or self.stage_sight is None:
             return
         center = self.stage_sight.pos()
         self.max_distance_item.set_center(center.x(), center.y())
@@ -631,6 +676,11 @@ class Viewer(QGraphicsView):
 
     @mode.setter
     def mode(self, new_mode: Mode):
+        # Leaving the mode in the middle of a drag must not leave a half-drawn
+        # ruler behind.
+        if self._ruler_in_progress is not None and new_mode != Viewer.Mode.RULER:
+            self.remove_ruler(self._ruler_in_progress)
+            self._ruler_in_progress = None
         self.__mode = new_mode
         self.__update_drag_mode()
         self.__update_selection_color()
@@ -657,9 +707,9 @@ class Viewer(QGraphicsView):
         """
         result: Config = {}
 
-        if self.scan_geometry and self.stage_sight is not None:
-            """Get position of the next point from the scan geometry"""
-            next_point_tuple = self.scan_geometry.next_point()
+        if self.stage_sight is not None:
+            """Get position of the next point from the shared scan zones"""
+            next_point_tuple = self.scans.next_point()
 
             if next_point_tuple is not None:
                 next_point = list(next_point_tuple)
@@ -684,19 +734,29 @@ class Viewer(QGraphicsView):
                 Qt.KeyboardModifier.ShiftModifier
                 in QGuiApplication.queryKeyboardModifiers()
             )
-        color = ("red" if has_shift else "green") if is_valid else "orange"
-        self.setStyleSheet(f"QGraphicsView {{ selection-background-color: {color}; }}")
-        c = (
-            (QColorConstants.Red if has_shift else QColorConstants.Green)
-            if is_valid
-            else QColorConstants.DarkYellow
+        if not is_valid:
+            # Self-intersecting outline: neither adding nor removing would work.
+            base = QColor(QColorConstants.DarkYellow)
+        elif has_shift:
+            # Subtracting is an erase gesture, so it keeps its own red signal
+            # rather than borrowing the zone's color.
+            base = QColor(QColorConstants.Red)
+        else:
+            # Adding: draw in the color of the zone the shape will land in, so
+            # it is obvious which zone the gesture targets. With no zone yet,
+            # preview the color the about-to-be-created Zone 1 will get.
+            zone = self.scans.active_zone
+            base = QColor(zone.color) if zone is not None else default_zone_color(0)
+
+        self.setStyleSheet(
+            f"QGraphicsView {{ selection-background-color: {base.name()}; }}"
         )
-        pen = QPen(c)
-        if isinstance(c, QColor):
-            c.setAlpha(64)
+        pen = QPen(base)
         pen.setCosmetic(True)
+        fill = QColor(base)
+        fill.setAlpha(64)
         self.zone_poly_item.setPen(pen)
-        self.zone_poly_item.setBrush(QBrush(c))
+        self.zone_poly_item.setBrush(QBrush(fill))
 
     def __update_drag_mode(self):
         if self.mode == Viewer.Mode.ZONE:
@@ -802,11 +862,12 @@ class Viewer(QGraphicsView):
                     return
                 item = item.parentItem()
 
-        # We want to catch a right-click on a marker
+        # We want to catch a right-click on a marker or on a ruler, to let their
+        # own context menu open instead of starting a pan.
         if event.button() == Qt.MouseButton.RightButton:
             item = self.itemAt(event.pos())
             while item is not None:
-                if isinstance(item, Marker):
+                if isinstance(item, (Marker, Ruler)):
                     super().mousePressEvent(event)
                     return
                 item = item.parentItem()
@@ -850,6 +911,11 @@ class Viewer(QGraphicsView):
                     scene_pos.x(), scene_pos.y(), scene_pos.x(), scene_pos.y()
                 )
                 self.offset_origin_line.show()
+
+            elif self.mode == Viewer.Mode.RULER:
+                self._start_ruler(scene_pos)
+                event.accept()
+                return
 
         # The event is a press of the right button
         if event.button() == Qt.MouseButton.RightButton:
@@ -901,6 +967,9 @@ class Viewer(QGraphicsView):
             if self.max_distance_item.isVisible():
                 self.max_distance_item.update_cursor_proximity(scene_pos, threshold)
             self.scan_geometry.update_cursor_proximity(scene_pos, threshold)
+            for ruler in self.rulers:
+                if ruler is not self._ruler_in_progress:
+                    ruler.update_cursor_proximity(scene_pos, threshold)
 
             if self.mode == Viewer.Mode.ZONE_POLY and not self.zone_poly.isEmpty():
                 # Check if mouse button is pressed
@@ -927,6 +996,10 @@ class Viewer(QGraphicsView):
                 self.offset_origin_line.setLine(
                     p1.x(), p1.y(), scene_pos.x(), scene_pos.y()
                 )
+
+            elif self.mode == Viewer.Mode.RULER:
+                if (ruler := self._ruler_in_progress) is not None:
+                    ruler.set_endpoint(1, scene_pos)
 
         if self.mode in [
             Viewer.Mode.ZONE,
@@ -976,6 +1049,9 @@ class Viewer(QGraphicsView):
                     self.stage_sight.stage.offset_origin[i] += offset[i]
             self.offset_origin_line.hide()
 
+        elif self.mode == Viewer.Mode.RULER and is_left:
+            self._finish_ruler()
+
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
@@ -994,12 +1070,14 @@ class Viewer(QGraphicsView):
 
         return super().mouseDoubleClickEvent(event)
 
-    def leaveEvent(self, event: Any):
+    def leaveEvent(self, a0: QEvent | None):
         """Hide the edit handles when the cursor leaves the view."""
         self.soft_limits_item.update_cursor_proximity(None, 0.0)
         self.max_distance_item.update_cursor_proximity(None, 0.0)
         self.scan_geometry.update_cursor_proximity(None, 0.0)
-        super().leaveEvent(event)
+        for ruler in self.rulers:
+            ruler.update_cursor_proximity(None, 0.0)
+        super().leaveEvent(a0)
 
     def keyPressEvent(self, event: QKeyEvent | None):
         """
@@ -1068,9 +1146,7 @@ class Viewer(QGraphicsView):
 
         logging.getLogger("laserstudio").debug(f"Pins: {self.pins}")
         if len(self.pins) == 3:
-            bg_pins = [
-                BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins
-            ]
+            bg_pins = [BackgroundPin(image_px=p[1], stage_xy=p[0]) for p in self.pins]
             self.commit_background_alignment(bg_pins)
             self.mode = self.Mode.NONE
         else:
@@ -1175,7 +1251,7 @@ class Viewer(QGraphicsView):
 
     def add_marker(
         self,
-        position: None | tuple[float, float] = None,
+        position: None | tuple[float, float] | list[float] = None,
         color: QColor
         | Qt.GlobalColor
         | int
@@ -1183,6 +1259,8 @@ class Viewer(QGraphicsView):
         | LedgerColors = QColorConstants.Red,
         label: str | None = None,
         visible: bool = True,
+        *,
+        marker_id: int | None = None,
     ) -> IdMarker:
         """
         Add a marker at a specific position, or at current observed position.
@@ -1197,54 +1275,113 @@ class Viewer(QGraphicsView):
         if position is None:
             p = self.focused_element_position()
             position = p.x(), p.y()
+        elif isinstance(position, list):
+            position = (float(position[0]), float(position[1]))
 
-        marker = IdMarker(viewer=self, color=color, label=label, position=position)
-        marker.setVisible(visible)
-        marker.size = self.default_marker_size
-
-        # Adding to the model
-        self.__markers.add(marker)
-        if label not in self.__markers_by_label_by_color:
-            self.__markers_by_label_by_color[label] = {marker.color_name: set([marker])}
-        elif marker.color_name not in self.__markers_by_label_by_color[label]:
-            self.__markers_by_label_by_color[label][marker.color_name] = set([marker])
-        else:
-            self.__markers_by_label_by_color[label][marker.color_name].add(marker)
-
-        # Adding to the view
-        self.__scene.addItem(marker)
-
+        data = self.annotations.add_marker(
+            position,
+            color=color,
+            label=label,
+            visible=visible,
+            marker_id=marker_id,
+        )
+        marker = self.annotations_geometry.get_marker(data.id)
+        if marker is None:
+            raise RuntimeError(f"Marker #{data.id} was not created in the view.")
         return marker
 
     def clear_markers(self):
         """Removes all markers."""
-        for marker in self.__markers:
-            self.__scene.removeItem(marker)
-            marker.viewer = None
-        self.__markers.clear()
-        self.__markers_by_label_by_color.clear()
+        self.annotations.clear_markers()
 
     def remove_marker(self, marker: IdMarker):
         """Remove a specific marker from the scene."""
-        self.__scene.removeItem(marker)
-        self.__markers.remove(marker)
-        self.__markers_by_label_by_color[marker.label][marker.color_name].remove(marker)
-        if len(self.__markers_by_label_by_color[marker.label][marker.color_name]) == 0:
-            del self.__markers_by_label_by_color[marker.label][marker.color_name]
-        if len(self.__markers_by_label_by_color[marker.label]) == 0:
-            del self.__markers_by_label_by_color[marker.label]
-        logging.getLogger("laserstudio").debug(
-            f"Markers by label by color: {self.__markers_by_label_by_color}"
-        )
-        logging.getLogger("laserstudio").debug(f"Markers: {self.__markers}")
+        self.annotations.remove_marker(marker.id)
         logging.getLogger("laserstudio").info(f"Marker {marker} removed")
-        marker.viewer = None
+
+    # Rulers
+    @property
+    def rulers(self) -> list[Ruler]:
+        return self.annotations_geometry.rulers
+
+    def add_ruler(
+        self,
+        p1: tuple[float, float] | QPointF,
+        p2: tuple[float, float] | QPointF,
+        color: QColor
+        | Qt.GlobalColor
+        | int
+        | list[float]
+        | LedgerColors
+        | None = None,
+        label: str | None = None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool = True,
+    ) -> Ruler:
+        """
+        Add a ruler measuring the distance between two positions.
+
+        :param p1: The position of the first endpoint.
+        :param p2: The position of the second endpoint.
+        :param color: The color of the ruler. If None, the viewer's default is used.
+        :param label: The label of the ruler.
+        :param graduation: The graduation interval, in micrometers. If None, the
+            ruler is drawn without graduations.
+        :param graduation_count: The number of graduations wanted over the whole
+            ruler, as an alternative to *graduation*: the ruler keeps that count
+            and derives the interval from its length. Ignored when *graduation*
+            is given.
+        :param visible: If False, the ruler is created but not displayed.
+        :return: The added ruler.
+        """
+        if isinstance(p1, QPointF):
+            p1 = (p1.x(), p1.y())
+        if isinstance(p2, QPointF):
+            p2 = (p2.x(), p2.y())
+
+        data = self.annotations.add_ruler(
+            p1,
+            p2,
+            color=color,
+            label=label,
+            graduation=graduation,
+            graduation_count=graduation_count,
+            visible=visible,
+        )
+        ruler = self.annotations_geometry.get_ruler(data.id)
+        if ruler is None:
+            raise RuntimeError(f"Ruler #{data.id} was not created in the view.")
+        return ruler
+
+    def remove_ruler(self, ruler: Ruler):
+        """Remove a specific ruler from the scene."""
+        if ruler.id not in self.annotations.rulers:
+            return
+        self.annotations.remove_ruler(ruler.id)
+        logging.getLogger("laserstudio").info(f"Ruler {ruler} removed")
+
+    def clear_rulers(self):
+        """Remove all rulers."""
+        self.annotations.clear_rulers()
+
+    def _start_ruler(self, scene_pos: QPointF):
+        """Begin drawing a ruler; both endpoints start at the same position."""
+        self._ruler_in_progress = self.add_ruler(scene_pos, scene_pos)
+
+    def _finish_ruler(self):
+        """Commit the ruler being drawn, or discard it if it is too short."""
+        ruler = self._ruler_in_progress
+        if ruler is None:
+            return
+        self._ruler_in_progress = None
+        if ruler.length * self.zoom < self.MIN_RULER_DRAG_PIXELS:
+            self.remove_ruler(ruler)
 
     @property
     def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         data: dict[str, Any] = {}
-        data["marker_size"] = self.default_marker_size
 
         if self.background_picture_path is not None:
             data["background_picture_path"] = self.background_picture_path
@@ -1267,8 +1404,14 @@ class Viewer(QGraphicsView):
     @settings.setter
     def settings(self, data: dict[str, Any]):
         """Import settings from a dict."""
+        legacy_annotations: dict[str, Any] = {}
         if (marker_size := data.get("marker_size")) is not None:
-            self.marker_size(marker_size)
+            legacy_annotations["marker_size"] = marker_size
+        if (rulers := data.get("rulers")) is not None:
+            legacy_annotations["rulers"] = rulers
+        if legacy_annotations:
+            self.annotations.settings = legacy_annotations
+
         if (path := data.get("background_picture_path")) is not None:
             self.load_picture(path)
             if (opacity := data.get("background_picture_opacity")) is not None:
@@ -1297,7 +1440,7 @@ class Viewer(QGraphicsView):
         """Load markers from a file."""
         with open(file_path, "r") as f:
             try:
-                markers: list[dict[str, Any]] = json.load(f)
+                markers: list[dict[str, Any]] | dict[str, Any] = json.load(f)
             except json.JSONDecodeError:
                 QMessageBox.critical(
                     self,
@@ -1305,6 +1448,21 @@ class Viewer(QGraphicsView):
                     "The file contains invalid JSON.",
                 )
                 return
+        if isinstance(markers, dict):
+            payload = markers.get("markers")
+            if isinstance(payload, list):
+                markers = payload
+            else:
+                logging.getLogger("laserstudio").warning(
+                    "Marker file is a dict without a 'markers' list."
+                )
+                return
+        if not isinstance(markers, list):
+            logging.getLogger("laserstudio").warning(
+                f"Marker file has unexpected format: {type(markers)}"
+            )
+            return
+
         if interactive:
             # Ask for confirmation
             if not QMessageBox.information(
@@ -1318,16 +1476,42 @@ class Viewer(QGraphicsView):
         self.setUpdatesEnabled(False)
         try:
             for marker in markers:
-                color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
+                if not isinstance(marker, dict):
+                    continue
+                pos = marker.get("pos")
+                if not isinstance(pos, list) or len(pos) < 2:
+                    logging.getLogger("laserstudio").warning(
+                        f"Skipping marker with invalid position: {marker=}"
+                    )
+                    continue
+                raw_color = marker.get("color", [1.0, 0.0, 0.0, 1.0])
+                if not isinstance(raw_color, list) or len(raw_color) < 3:
+                    raw_color = [1.0, 0.0, 0.0, 1.0]
+                if len(raw_color) == 3:
+                    raw_color = [*raw_color, 1.0]
                 color = QColor(
-                    int(color[0] * 255),
-                    int(color[1] * 255),
-                    int(color[2] * 255),
-                    int(color[3] * 255),
+                    int(raw_color[0] * 255),
+                    int(raw_color[1] * 255),
+                    int(raw_color[2] * 255),
+                    int(raw_color[3] * 255),
                 )
-                label = marker.get("label", None)
+                label = marker.get("label")
                 visible = not marker.get("hidden", False)
-                self.add_marker(marker["pos"], color, label=label, visible=visible)
+                raw_id = marker.get("id")
+                marker_id = (
+                    int(raw_id)
+                    if isinstance(raw_id, int) and not isinstance(raw_id, bool)
+                    else None
+                )
+                if marker_id is not None and marker_id in self.annotations.markers:
+                    marker_id = None
+                self.add_marker(
+                    pos,
+                    color,
+                    label=label,
+                    visible=visible,
+                    marker_id=marker_id,
+                )
         finally:
             self.setUpdatesEnabled(True)
 

@@ -47,28 +47,46 @@ class LSAPI:
         params: dict[str, Any] | None = None,
         is_put: bool = False,
         is_delete: bool = False,
+        is_patch: bool = False,
     ) -> requests.Response:
         """
-        Sends to the session a HTTP GET, POST or PUT command according to the dict given in params.
+        Sends to the session a HTTP GET, POST, PUT, PATCH or DELETE command
+        according to the flags and the dict given in params.
+
+        An explicitly requested verb (``is_put``, ``is_patch`` or
+        ``is_delete``) always wins, even when ``params`` is None: a PUT or
+        PATCH with no payload is still sent as PUT/PATCH (with an empty
+        body), never silently downgraded to a GET. Only when none of these
+        flags is set does the presence of ``params`` decide between GET (no
+        params) and POST (params given).
 
         :param command: The REST command to be executed (eg, the path part of the URL)
         :param params: The payload to be sent in the body of the request, as a JSON
         :param is_put: To force to send a PUT command instead of a POST, when params is not None
         :param is_delete: To force to send a DELETE command
+        :param is_patch: To force to send a PATCH command instead of a POST, when params is not None
         :return: The response from the server.
+        :raises ValueError: If more than one of ``is_put``, ``is_patch`` and
+            ``is_delete`` is set.
         :raises LSAPIConnectionError: If the server cannot be reached.
         :raises LSAPIError: If the server returns an HTTP error. The concrete
             subclass matches the server-reported error ``code`` (e.g.
             :class:`~laserstudio.lsapi.errors.InstrumentNotFound`).
         """
+        if sum((is_put, is_patch, is_delete)) > 1:
+            raise ValueError(
+                "send(): at most one of is_put, is_patch, is_delete may be set"
+            )
         url = f"http://{self.host}:{self.port}/{command}"
         try:
             if is_delete:
                 response = self.session.delete(url, json=params)
-            elif params is None:
-                response = self.session.get(url)
             elif is_put:
                 response = self.session.put(url, json=params)
+            elif is_patch:
+                response = self.session.patch(url, json=params)
+            elif params is None:
+                response = self.session.get(url)
             else:
                 response = self.session.post(url, json=params)
         except requests.exceptions.RequestException as exc:
@@ -178,6 +196,85 @@ class LSAPI:
         params: dict[str, Any] = {"ids": ids}
         result: dict[str, Any] = self.send(
             "annotation/markers", params, is_delete=True
+        ).json()
+        return result
+
+    def rulers(self) -> list[dict[str, Any]]:
+        """
+        Get the list of rulers in the scene.
+
+        :return: A list of dictionaries, each containing the ruler's id, endpoints,
+            length, RGBA color and, when set, its label and graduation interval.
+        """
+        rulers: list[dict[str, Any]] = self.send("annotation/rulers").json()
+        return rulers
+
+    def ruler(
+        self,
+        segments: list[tuple[float, float, float, float]]
+        | tuple[float, float, float, float],
+        color: tuple[float, float, float]
+        | tuple[float, float, float, float]
+        | None = None,
+        label: str | None = None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Add ruler(s) measuring the distance between two positions.
+
+        :param segments: the ruler segment(s), each as a (x1, y1, x2, y2) tuple,
+            or a list of such tuples.
+        :param color: (red, green, blue) or (red, green, blue, alpha) tuple.
+            Each color channel is in [0, 1]. If None, the viewer's default is used.
+        :param label: the label of the ruler(s), as a string.
+        :param graduation: the graduation interval, in micrometers. If None or 0,
+            the ruler(s) are drawn without graduations.
+        :param graduation_count: the number of graduations wanted over the whole
+            ruler, as an alternative to `graduation`: each ruler keeps that count
+            and derives its interval from its own length. Giving both is an error.
+        :param visible: if False, the ruler(s) are created but not displayed.
+        :return: A dictionary describing the created ruler, or the list of created
+            rulers under the ``rulers`` key when several are given.
+        """
+        if isinstance(segments, tuple):
+            list_segments = [list(segments)]
+        else:
+            list_segments = [list(segment) for segment in segments]
+        for segment in list_segments:
+            assert len(segment) == 4
+
+        params: dict[str, Any] = {
+            "segments": list_segments,
+            "visible": visible,
+        }
+        if color is not None:
+            assert len(color) in (3, 4)
+            params["color"] = list(color)
+        if label is not None:
+            params["label"] = label
+        if graduation is not None:
+            params["graduation"] = graduation
+        if graduation_count is not None:
+            params["graduation_count"] = graduation_count
+        result: dict[str, Any] = self.send(
+            "annotation/add_rulers", params, is_put=True
+        ).json()
+        return result
+
+    def delete_rulers(self, ids: list[int] | None = None) -> dict[str, Any]:
+        """
+        Delete ruler(s) from the scene.
+
+        :param ids: The identifiers of the rulers to delete. If None (or an
+            empty list), all rulers are removed.
+        :return: A dictionary with the list of deleted ruler identifiers under
+            the ``deleted`` key.
+        """
+        params: dict[str, Any] = {"ids": ids}
+        result: dict[str, Any] = self.send(
+            "annotation/rulers", params, is_delete=True
         ).json()
         return result
 
@@ -348,7 +445,7 @@ class LSAPI:
         :raises InstrumentNotFound: If no instrument matches ``label``.
         """
         settings = self.send(
-            f"instruments/{label}/settings", settings, is_put=True
+            f"instruments/{label}/settings", settings, is_put=settings is not None
         ).json()
         return settings
 
@@ -378,19 +475,68 @@ class LSAPI:
         """
         return self.send(f"instruments/{label}/settings").json()["settings"]
 
-    def scangeometry(self) -> dict[str, Any]:
-        """Return the current scan geometry settings."""
-        result: dict[str, Any] = self.send("scangeometry").json()
+    def scan_zones(self) -> dict[str, Any]:
+        """Return the list of scan zones and the active zone identifier."""
+        result: dict[str, Any] = self.send("scangeometry/zones").json()
         return result
 
-    def set_scangeometry(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update and return the scan geometry settings."""
+    def add_scan_zone(
+        self,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a scan zone.
+
+        :param name: Zone name. Defaults to ``Zone <n>``.
+        :param color: ``#rrggbb`` color. Defaults to the next zone color.
+        :param enabled: Whether the zone is scanned. Defaults to True.
+        :param geometry: Serialized shape. Defaults to an empty zone.
+        :return: The new zone's identifier and settings.
+        """
+        payload: dict[str, Any] = {
+            "name": name,
+            "color": color,
+            "enabled": enabled,
+            "geometry": geometry,
+        }
+        result: dict[str, Any] = self.send("scangeometry/zones", payload).json()
+        return result
+
+    def update_scan_zone(
+        self,
+        zone_id: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update any subset of a scan zone's attributes.
+
+        :param zone_id: Identifier of the zone.
+        :return: The zone's identifier and updated settings.
+        :raises ScanZoneNotFound: If no zone exists with this identifier.
+        """
+        payload: dict[str, Any] = {
+            "name": name,
+            "color": color,
+            "enabled": enabled,
+            "geometry": geometry,
+        }
         result: dict[str, Any] = self.send(
-            "scangeometry", {"settings": settings}, is_put=True
+            f"scangeometry/zones/{zone_id}", payload, is_patch=True
         ).json()
         return result
 
-    def delete_scangeometry(self) -> dict[str, Any]:
-        """Clear the scan geometry (empty polygon) and return the new settings."""
-        result: dict[str, Any] = self.send("scangeometry", is_delete=True).json()
+    def delete_scan_zone(self, zone_id: int) -> dict[str, Any]:
+        """Delete a scan zone.
+
+        :param zone_id: Identifier of the zone.
+        :return: The remaining zones and the active zone identifier.
+        :raises ScanZoneNotFound: If no zone exists with this identifier.
+        """
+        result: dict[str, Any] = self.send(
+            f"scangeometry/zones/{zone_id}", is_delete=True
+        ).json()
         return result

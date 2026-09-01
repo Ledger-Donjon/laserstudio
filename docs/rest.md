@@ -35,6 +35,7 @@ error codes and HTTP statuses is:
 | `INVALID_PARAMETER` | `400 Bad Request` | A parameter is missing or invalid. |
 | `INSTRUMENT_NOT_FOUND` | `404 Not Found` | No instrument matches the given label. |
 | `MEMORY_POINT_NOT_FOUND` | `404 Not Found` | No memory point matches the given index. |
+| `SCAN_ZONE_NOT_FOUND` | `404 Not Found` | No scan zone matches the given index. |
 | `CONFLICT` | `409 Conflict` | The action cannot be performed in the current state (e.g. scanning not enabled). |
 | `NOT_IMPLEMENTED` | `501 Not Implemented` | The action is not implemented yet. |
 | `DEVICE_UNAVAILABLE` | `503 Service Unavailable` | A required device (camera, stage, focus helper...) is not available. |
@@ -103,7 +104,7 @@ The body of the request must be a JSON object.
 
 ## Annotation
 
-This group of endpoints permits to add markers to be shown on the viewer.
+This group of endpoints permits to add markers and rulers to be shown on the viewer.
 
 ### `/annotation/add_marker`
 
@@ -120,6 +121,39 @@ markers are removed. The response lists the deleted identifiers:
   "deleted": [1, 2, 3]
 }
 ```
+
+### `/annotation/add_ruler`
+
+A `PUT` adds one or several rulers, each measuring the distance between two viewer
+positions. Segments are given as `[x1, y1, x2, y2]`. The `color`, `label`,
+`graduation` (tick interval in µm) and `visible` fields are optional:
+
+```json
+{
+  "segments": [[0.0, 0.0, 300.0, 400.0]],
+  "color": [0.87, 1.0, 0.0, 1.0],
+  "label": "die pitch",
+  "graduation": 100.0
+}
+```
+
+`graduation_count` may be given instead of `graduation` to express the graduations as
+a number of divisions: each ruler keeps that count and derives its interval from its own
+length, so 10 graduations on a 150 µm ruler means an interval of 15 µm, and the count
+stays 10 if the ruler is later resized. It may be fractional (7.5 graduations over
+150 µm is a 20 µm interval) and must be strictly positive. The two forms are exclusive,
+and a ruler reports only the one it was given; giving both is an error.
+
+The response describes the created ruler, including its `id` and its `length`. When
+several segments are given, the created rulers are listed under the `rulers` key.
+
+### `/annotation/rulers`
+
+A `GET` returns the list of rulers currently in the scene.
+
+A `DELETE` removes rulers. With a `{"ids": [1, 2, 3]}` body, only the rulers with the
+given identifiers are removed; with no body (or `{"ids": null}`), all rulers are
+removed. The response lists the deleted identifiers.
 
 ### `/annotation/pixel_to_position`
 

@@ -1,4 +1,3 @@
-from typing import Any
 from PyQt6.QtCore import QObject, pyqtSignal, QVariant
 from ..utils.yaml_types import Config
 
@@ -7,9 +6,10 @@ class Instrument(QObject):
     # Signal emitted when the instrument has a parameter which changed in another way than UI interface
     parameter_changed = pyqtSignal(str, QVariant)
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: Config):
         super().__init__()
-        self.label: str | None = config.get("label")
+        label = config.get("label")
+        self.label: str | None = str(label) if label is not None else None
 
     @property
     def settings(self) -> Config:

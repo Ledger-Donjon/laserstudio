@@ -1,21 +1,24 @@
 from __future__ import annotations
+
 import logging
-import numpy
-from numpy.typing import NDArray
 import math
 from datetime import date
 from enum import Enum, IntFlag
-from serial.serialutil import SerialException
-from typing import NamedTuple, cast, Any
+from typing import Any, NamedTuple, cast
+
+import numpy
+from numpy.typing import NDArray
 from PyQt6.QtCore import pyqtSignal
+from serial.serialutil import SerialException
+
+from ..utils.yaml_types import Config
 from .camera_usb import CameraUSBInstrument
 from .list_serials import (
-    get_serial_device,
-    DeviceSearchError,
-    serial,
     ConnectionFailure,
+    DeviceSearchError,
+    get_serial_device,
+    serial,
 )
-from ..utils.yaml_types import Config
 
 
 class RaptorCameraGainTrigger(IntFlag):
@@ -90,7 +93,7 @@ class RaptorManufacturersData(NamedTuple):
     dac_cal_40_deg: int
 
     @staticmethod
-    def from_bytes(data: bytes) -> "RaptorManufacturersData":
+    def from_bytes(data: bytes) -> RaptorManufacturersData:
         """
         Get 18 bytes from cameras NVM.
         For 2 byte values 1st byte returned is the LSB.
@@ -163,6 +166,8 @@ class RaptorCommand(bytes, Enum):
 class CameraRaptorInstrument(CameraUSBInstrument):
     """Class to implement the Raptor cameras"""
 
+    DEFAULT_OBJECTIVES: ClassVar[tuple[float, ...]] = (5.0, 10.0, 20.0, 50.0)
+
     def _should_probe_resolutions(self) -> bool:
         return False
 
@@ -174,10 +179,10 @@ class CameraRaptorInstrument(CameraUSBInstrument):
             logging.getLogger("laserstudio").error(
                 "In configuration file, 'dev' is mandatory for type 'Raptor'"
             )
-            raise
+            raise ValueError("'dev' is mandatory for type 'Raptor'")
 
-        if not (isinstance(dev, dict) or isinstance(dev, str)):
-            raise ValueError(
+        if not (isinstance(dev, (dict, str))):
+            raise TypeError(
                 "In configuration file, 'dev' must be a string or a configuration object"
             )
 
@@ -185,7 +190,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
             dev = get_serial_device(dev)
         except DeviceSearchError as e:
             logging.getLogger("laserstudio").error(
-                f"Raptor camera is enabled but is not found: {str(e)}... Skipping."
+                f"Raptor camera is enabled but is not found: {e!s}... Skipping."
             )
             raise
         try:
@@ -228,7 +233,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.serial.write(whole_command)
 
         expected_bytes += 1  # Add ETX
-        ret = bytes()
+        ret = b""
         while len(ret) < expected_bytes:
             # print(f"READing {expected_bytes - len(ret)} bytes")
             ret += self.serial.read(expected_bytes - len(ret))
@@ -500,7 +505,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
         self.temperature_changed.emit(temperature)
         return temperature
 
-    def capture_image(self):
+    def capture_image(self) -> numpy.ndarray | None:
         ret, frame = self.vc.read()
         if not ret:
             return None
@@ -532,6 +537,7 @@ class CameraRaptorInstrument(CameraUSBInstrument):
     def settings(self) -> dict[str, Any]:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
+
         settings["gain_db"] = self.get_digital_gain_db()
         settings["exposure_time_ms"] = self.get_exposure_time_ms()
         settings["high_gain"] = self.get_high_gain_enabled()
@@ -544,6 +550,12 @@ class CameraRaptorInstrument(CameraUSBInstrument):
     @settings.setter
     def settings(self, data: dict[str, Any]):
         """Import and apply settings."""
+
+        # Discard width, height and supported_resolutions from settings
+        data.pop("width", None)
+        data.pop("height", None)
+        data.pop("supported_resolutions", None)
+
         # Call the parent class settings setter
         CameraUSBInstrument.settings.__set__(self, data)  # type: ignore[attr-defined]
 

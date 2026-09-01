@@ -112,6 +112,25 @@ class RestProxy(QObject):
     def handle_delete_markers(self, ids: list[int] | None) -> Config:
         return self.laser_studio.handle_delete_markers(ids)
 
+    def handle_add_rulers(
+        self,
+        segments: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
+        graduation: float | None,
+        graduation_count: float | None,
+        visible: bool | None,
+    ) -> Config:
+        return self.laser_studio.handle_add_rulers(
+            segments, color, label, graduation, graduation_count, visible
+        )
+
+    def handle_rulers(self) -> list[Config]:
+        return self.laser_studio.handle_rulers()
+
+    def handle_delete_rulers(self, ids: list[int] | None) -> Config:
+        return self.laser_studio.handle_delete_rulers(ids)
+
     def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
         return self.laser_studio.handle_pixel_to_position(pixels)
 
@@ -152,11 +171,32 @@ class RestProxy(QObject):
     ) -> Any:
         return self.laser_studio.handle_instrument_settings(label, conf)
 
-    def handle_scangeometry(self, settings: dict[str, Any] | None) -> Config:
-        return self.laser_studio.handle_scangeometry(settings)
+    def handle_scan_zones(self) -> Config:
+        return self.laser_studio.handle_scan_zones()
 
-    def handle_clear_scangeometry(self) -> Config:
-        return self.laser_studio.handle_clear_scangeometry()
+    def handle_add_scan_zone(
+        self,
+        name: str | None,
+        color: str | None,
+        enabled: bool | None,
+        geometry: dict[str, Any] | None,
+    ) -> Config:
+        return self.laser_studio.handle_add_scan_zone(name, color, enabled, geometry)
+
+    def handle_update_scan_zone(
+        self,
+        zone_id: int,
+        name: str | None,
+        color: str | None,
+        enabled: bool | None,
+        geometry: dict[str, Any] | None,
+    ) -> Config:
+        return self.laser_studio.handle_update_scan_zone(
+            zone_id, name, color, enabled, geometry
+        )
+
+    def handle_delete_scan_zone(self, zone_id: int) -> Config:
+        return self.laser_studio.handle_delete_scan_zone(zone_id)
 
 
 class RestThread(QThread):
@@ -306,6 +346,38 @@ class DeleteMarkerBody(BaseModel):
     )
 
 
+class RulerBody(BaseModel):
+    segments: list[list[float]] | None = Field(
+        default=None,
+        description="Ruler segments, each given as [x1, y1, x2, y2].",
+        examples=[[[0.0, 0.0, 100.0, 50.0]]],
+    )
+    color: list[float] | None = Field(default=None, examples=[[0.87, 1.0, 0.0, 1.0]])
+    label: str | None = None
+    graduation: float | None = Field(
+        default=None,
+        description="Graduation interval in µm. Omitted or 0 draws a plain line.",
+        examples=[10.0],
+    )
+    graduation_count: float | None = Field(
+        default=None,
+        description="Number of graduations over the whole ruler, as an alternative "
+        "to 'graduation': the ruler keeps that count and derives its interval from "
+        "its length. Giving both is an error.",
+        examples=[10.0],
+    )
+    visible: bool = True
+
+
+class DeleteRulerBody(BaseModel):
+    ids: list[int] | None = Field(
+        default=None,
+        description="Identifiers of the rulers to delete. "
+        "If omitted or null, all rulers are removed.",
+        examples=[[1, 2, 3]],
+    )
+
+
 class PixelToPositionBody(BaseModel):
     pixels: list[list[float]] = Field(
         description="Camera-image pixel coordinates ``[px, py]`` to convert, "
@@ -318,33 +390,57 @@ class InstrumentSettingsBody(BaseModel):
     settings: dict[str, Any]
 
 
-class ScanGeometryBody(BaseModel):
-    settings: dict[str, Any] = Field(
-        description="Scan geometry settings (``geometry`` and optional ``density``).",
+class ScanZoneBody(BaseModel):
+    """Fields of a scan zone. Every field is optional on both POST and PATCH.
+
+    On a PATCH, an omitted or ``null`` field is left unchanged, so a PATCH
+    with an empty body is a no-op; only the fields actually supplied are
+    applied.
+    """
+
+    name: str | None = Field(
+        default=None,
+        description="Zone name. Defaults to ``Zone <n>`` on creation.",
+        examples=["Corner pads"],
+    )
+    color: str | None = Field(
+        default=None,
+        description="Zone color as ``#rrggbb`` (``#rrggbbaa`` accepted). "
+        "Defaults to the next color of the zone palette on creation.",
+        examples=["#ff5300"],
+    )
+    enabled: bool | None = Field(
+        default=None,
+        description="Whether the zone contributes to point generation. "
+        "Defaults to true on creation.",
+        examples=[True],
+    )
+    geometry: dict[str, Any] | None = Field(
+        default=None,
+        description="Serialized shape (``polygon`` or ``multipolygon``). "
+        "Replaces the zone's shape, discarding its add/subtract history. "
+        "Omitting this field on a PATCH leaves the shape untouched; to "
+        "explicitly clear it instead, send "
+        '``{"geometrycollection": null}``.',
         examples=[
             {
-                "density": 100,
-                "geometry": {
-                    "polygon": {
-                        "exterior": [
-                            {"x": 0.0, "y": 0.0},
-                            {"x": 100.0, "y": 0.0},
-                            {"x": 100.0, "y": 100.0},
-                            {"x": 0.0, "y": 100.0},
-                            {"x": 0.0, "y": 0.0},
-                        ],
-                        "interiors": [],
-                    }
-                },
+                "polygon": {
+                    "exterior": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 100.0, "y": 0.0},
+                        {"x": 100.0, "y": 100.0},
+                        {"x": 0.0, "y": 100.0},
+                        {"x": 0.0, "y": 0.0},
+                    ],
+                    "interiors": [],
+                }
             }
         ],
     )
 
 
 class InstrumentInfo(BaseModel):
-    type: str = Field(
-        description="Instrument class name.", examples=["PDMInstrument"]
-    )
+    type: str = Field(description="Instrument class name.", examples=["PDMInstrument"])
     label: str | None = Field(description="Instrument label, if any.")
 
 
@@ -532,6 +628,37 @@ def delete_markers(body: DeleteMarkerBody | None = None):
     return RestServer.run("handle_delete_markers", ids)
 
 
+@annotation_router.put("/add_rulers", responses={400: _ERR})
+@annotation_router.put("/add_ruler", responses={400: _ERR})
+def add_rulers(body: RulerBody):
+    """Add one or several rulers and return their identifier(s) and length(s)."""
+    return RestServer.run(
+        "handle_add_rulers",
+        body.segments,
+        body.color,
+        body.label,
+        body.graduation,
+        body.graduation_count,
+        body.visible,
+    )
+
+
+@annotation_router.get("/rulers")
+def get_rulers():
+    """Return the list of rulers currently in the scene."""
+    return RestServer.run("handle_rulers")
+
+
+@annotation_router.delete("/rulers", responses={400: _ERR})
+def delete_rulers(body: DeleteRulerBody | None = None):
+    """Delete ruler(s) by id, or all rulers when no id is given.
+
+    Returns the list of deleted ruler identifiers under the ``deleted`` key.
+    """
+    ids = body.ids if body is not None else None
+    return RestServer.run("handle_delete_rulers", ids)
+
+
 @annotation_router.post("/pixel_to_position", responses={400: _ERR, 503: _ERR})
 def pixel_to_position(body: PixelToPositionBody):
     """Convert camera-image pixel coordinates to viewer coordinates.
@@ -549,7 +676,9 @@ instruments_router = APIRouter(prefix="/instruments", tags=["instruments"])
 
 
 @instruments_router.get("/", response_model=list[InstrumentInfo])
-@instruments_router.get("", response_model=list[InstrumentInfo], include_in_schema=False)
+@instruments_router.get(
+    "", response_model=list[InstrumentInfo], include_in_schema=False
+)
 def list_instruments():
     """List the available instruments (type and label)."""
     return RestServer.run("handle_list_instruments")
@@ -572,25 +701,41 @@ def put_instrument_settings(label: str, body: InstrumentSettingsBody):
 scangeometry_router = APIRouter(prefix="/scangeometry", tags=["scangeometry"])
 
 
-@scangeometry_router.get("")
-@scangeometry_router.get("/", include_in_schema=False)
-def get_scangeometry():
-    """Return the current scan geometry settings."""
-    return RestServer.run("handle_scangeometry", None)
+@scangeometry_router.get("/zones")
+def get_scan_zones():
+    """Return the list of scan zones and the active zone id."""
+    return RestServer.run("handle_scan_zones")
 
 
-@scangeometry_router.put("", responses={400: _ERR})
-@scangeometry_router.put("/", include_in_schema=False, responses={400: _ERR})
-def put_scangeometry(body: ScanGeometryBody):
-    """Update and return the scan geometry settings."""
-    return RestServer.run("handle_scangeometry", body.settings)
+@scangeometry_router.post("/zones", responses={400: _ERR})
+def post_scan_zone(body: ScanZoneBody):
+    """Create a scan zone and return its id and settings."""
+    return RestServer.run(
+        "handle_add_scan_zone", body.name, body.color, body.enabled, body.geometry
+    )
 
 
-@scangeometry_router.delete("")
-@scangeometry_router.delete("/", include_in_schema=False)
-def delete_scangeometry():
-    """Clear the scan geometry (empty polygon) and return the new settings."""
-    return RestServer.run("handle_clear_scangeometry")
+@scangeometry_router.patch("/zones/{zone_id}", responses={404: _ERR, 400: _ERR})
+def patch_scan_zone(zone_id: int, body: ScanZoneBody):
+    """Update a scan zone and return its id and settings.
+
+    Omitted or ``null`` fields are left unchanged; a PATCH with an empty
+    body is a no-op.
+    """
+    return RestServer.run(
+        "handle_update_scan_zone",
+        zone_id,
+        body.name,
+        body.color,
+        body.enabled,
+        body.geometry,
+    )
+
+
+@scangeometry_router.delete("/zones/{zone_id}", responses={404: _ERR})
+def delete_scan_zone(zone_id: int):
+    """Delete a scan zone and return the remaining zones."""
+    return RestServer.run("handle_delete_scan_zone", zone_id)
 
 
 for _router in (

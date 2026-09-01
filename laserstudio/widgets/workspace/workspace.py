@@ -9,15 +9,16 @@ shows the shared spatial viewer instead.
 Concrete workspaces live in their own modules next to this one
 (``configworkspace.py``, ``settingsworkspace.py``, …).
 """
+
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt
 from PyQt6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ..newui import theme
 
 
-class Workspace:
+class Workspace(QObject):
     """
     Base class for a Laser Studio workspace tab.
 
@@ -38,6 +39,16 @@ class Workspace:
     def build_content(self) -> QWidget | None:
         """Return the right-side content, or ``None`` to use the viewer."""
         return None
+
+    def on_activated(self) -> None:
+        """Called when this workspace's tab becomes the current one."""
+
+    def on_deactivated(self) -> None:
+        """Called when another workspace's tab is selected.
+
+        Workspaces that put the shared viewer in a specific mode use this to
+        leave that mode behind.
+        """
 
 
 def placeholder_panel(label: str) -> QWidget:

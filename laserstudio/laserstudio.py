@@ -39,6 +39,7 @@ from .widgets.toolbars import (
     CameraImageAdjustementDockWidget,
     MainToolBar,
     MarkersToolBar,
+    RulersToolBar,
     PDMDockWidget,
     LaserDriverDockWidget,
     CameraNITDockWidget,
@@ -47,14 +48,18 @@ from .widgets.toolbars import (
     LightDockWidget,
     FocusToolBar,
 )
+from .widgets import rulerapi
 from .restserver.server import RestProxy
 from .restserver.errors import (
     DeviceUnavailableError,
     InstrumentNotFoundError,
     InvalidParameterError,
     MemoryPointNotFoundError,
+    ScanZoneNotFoundError,
 )
+
 from .utils.yaml_types import Config
+from .instruments.scans import ScansInstrument
 
 
 class LaserStudio(QMainWindow):
@@ -86,7 +91,10 @@ class LaserStudio(QMainWindow):
         self.instruments = Instruments(config)
 
         # Creation of Viewer as the central widget
-        self.viewer = Viewer()
+        self.viewer = Viewer(
+            scans=self.instruments.scans,
+            annotations=self.instruments.annotations,
+        )
         self.setCentralWidget(self.viewer)
 
         # Add StageSight if there is a Stage instrument or a camera
@@ -136,6 +144,17 @@ class LaserStudio(QMainWindow):
         self.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, toolbar.markers_list_dockwidget
         )
+
+        # ToolBar: Rulers
+        rulers_toolbar = RulersToolBar(self.viewer)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, rulers_toolbar)
+        # Dock widget: Rulers list
+        self.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea,
+            rulers_toolbar.rulers_list_dockwidget,
+        )
+        # Shown on demand with the toolbar's "Show list" button.
+        rulers_toolbar.rulers_list_dockwidget.hide()
 
         # ToolBar: Stage positioning
         if self.instruments.stage is not None:
@@ -227,6 +246,9 @@ class LaserStudio(QMainWindow):
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.STAGE))
         shortcut = QShortcut(Qt.Key.Key_P, self)
         shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.PIN))
+        # "L" for length: "R" is already taken by the rectangular zone mode.
+        shortcut = QShortcut(Qt.Key.Key_L, self)
+        shortcut.activated.connect(lambda: self.viewer.select_mode(Viewer.Mode.RULER))
         if (stage := self.instruments.stage) is not None and stage.num_axis > 2:
             shortcut = QShortcut(Qt.Key.Key_PageUp, self)
             shortcut.activated.connect(
@@ -423,9 +445,7 @@ class LaserStudio(QMainWindow):
             for inst in self.instruments.all_instruments
         ]
 
-    def handle_instrument_settings(
-        self, label: str, settings: Config | None
-    ) -> Config:
+    def handle_instrument_settings(self, label: str, settings: Config | None) -> Config:
         """
         Handles the settings for a specific instrument identified by its label.
         This method retrieves an instrument by its label, updates its settings if
@@ -548,6 +568,34 @@ class LaserStudio(QMainWindow):
                 deleted.append(marker.id)
         return {"deleted": deleted}
 
+    def handle_rulers(self) -> list[Config]:
+        """Handle a Rulers API request to get the list of rulers."""
+        return rulerapi.rulers(self.viewer)
+
+    def handle_add_rulers(
+        self,
+        segments: list[list[float]] | None,
+        color: list[float] | None,
+        label: str | None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool | None = True,
+    ) -> Config:
+        """Add ruler(s) to the viewer. See :func:`rulerapi.add_rulers`."""
+        return rulerapi.add_rulers(
+            self.viewer,
+            segments,
+            color,
+            label,
+            graduation,
+            graduation_count,
+            visible,
+        )
+
+    def handle_delete_rulers(self, ids: list[int] | None = None) -> Config:
+        """Delete ruler(s) from the viewer. See :func:`rulerapi.delete_rulers`."""
+        return rulerapi.delete_rulers(self.viewer, ids)
+
     def handle_pixel_to_position(self, pixels: list[list[float]]) -> Config:
         """Convert camera-image pixel coordinates into viewer coordinates.
 
@@ -578,25 +626,109 @@ class LaserStudio(QMainWindow):
             positions.append([scene_point.x(), scene_point.y()])
         return {"positions": positions}
 
-    EMPTY_SCAN_GEOMETRY: Config = {
-        "geometry": {"polygon": {"exterior": [], "interiors": []}}
-    }
-
-    def handle_scangeometry(self, settings: Config | None = None) -> Config:
-        """Get or set the viewer scan geometry settings.
-
-        :param settings: If provided, apply these settings to the scan geometry.
-            If ``None``, return the current settings unchanged.
-        :return: The current scan geometry settings.
+    def __check_scans_parameters(
+        self,
+        zone_id: int | None = None,
+        color: str | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> None:
         """
-        if settings is not None:
-            self.viewer.scan_geometry.settings = settings
-        return self.viewer.scan_geometry.settings
+        :param zone_id: Identifier of the zone to update.
+        :param color: ``#rrggbb`` color.
+        :param geometry: Serialized shape.
+        :raises ScanZoneNotFoundError: if no zone has this id.
+        :raises InvalidParameterError: if ``geometry`` is not a valid geometry.
+        :raises InvalidParameterError: if ``color`` is not a valid color."""
+        if zone_id is not None:
+            zone = self.instruments.scans.zones.get(zone_id)
+            if zone is None:
+                raise ScanZoneNotFoundError(
+                    zone_id,
+                    details={"available": list(self.instruments.scans.zones.keys())},
+                )
+        if color is not None:
+            if not ScansInstrument.is_valid_scan_zone_color(color):
+                raise InvalidParameterError(
+                    f"Invalid scan zone color: {color!r}. Expected '#rrggbb' or "
+                    "'#rrggbbaa', or a name Qt understands.",
+                    details={"color": color},
+                )
+        if geometry is not None:
+            if not ScansInstrument.is_valid_scan_zone_geometry(geometry):
+                raise InvalidParameterError(
+                    "Invalid scan zone geometry: expected a serialized 'polygon' "
+                    "(with an 'exterior' list of {'x', 'y'} points and an "
+                    "optional 'interiors' list of such lists), 'multipolygon' "
+                    "(a list of such geometries) or 'geometrycollection'.",
+                    details={"geometry": geometry},
+                )
 
-    def handle_clear_scangeometry(self) -> Config:
-        """Clear the scan geometry by setting an empty polygon."""
-        self.viewer.scan_geometry.settings = self.EMPTY_SCAN_GEOMETRY
-        return self.viewer.scan_geometry.settings
+    def handle_scan_zones(self) -> Config:
+        """:return: The list of scan zones and the active zone identifier."""
+        zones = self.instruments.scans
+        return {
+            "zones": [zone.settings for zone in zones.zones.values()],
+            "active": zones.active_zone.id if zones.active_zone is not None else None,
+        }
+
+    def handle_add_scan_zone(
+        self,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> Config:
+        """Create a scan zone.
+
+        :param name: Zone name. Defaults to ``Zone <n>``.
+        :param color: ``#rrggbb`` color. Defaults to the next zone color.
+        :param enabled: Whether the zone is scanned. Defaults to True.
+        :param geometry: Serialized shape. Defaults to an empty zone.
+        :return: The new zone's id and settings.
+        :raises InvalidParameterError: if ``color`` or ``geometry`` is given
+            but unusable.
+        """
+        self.__check_scans_parameters(color=color, geometry=geometry)
+        zone = self.instruments.scans.add_zone(
+            name=name,
+            color=color,
+            enabled=True if enabled is None else enabled,
+            geometry=geometry,
+        )
+        return {"id": zone.id, "zone": zone.settings}
+
+    def handle_update_scan_zone(
+        self,
+        zone_id: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> Config:
+        """Update any subset of a scan zone's attributes.
+
+        :param zone_id: Stable id of the zone to update.
+        :return: The zone's id and updated settings.
+        :raises ScanZoneNotFoundError: if no zone has this id.
+        :raises InvalidParameterError: if ``color`` or ``geometry`` is given
+            but unusable.
+        """
+        self.__check_scans_parameters(zone_id=zone_id, color=color, geometry=geometry)
+        self.instruments.scans.update_zone_params(
+            zone_id, name=name, color=color, enabled=enabled, geometry=geometry
+        )
+        return {"id": zone_id, "zone": self.instruments.scans.zone(zone_id).settings}
+
+    def handle_delete_scan_zone(self, zone_id: int) -> Config:
+        """Delete a scan zone.
+
+        :param zone_id: Identifier of the zone to delete.
+        :return: The remaining zones and the active zone id.
+        :raises ScanZoneNotFoundError: if no zone has this id.
+        """
+        self.__check_scans_parameters(zone_id=zone_id)
+        self.instruments.scans.remove_zone(zone_id)
+        return self.handle_scan_zones()
 
     def handle_go_to_memory_point(self, index: int):
         """Perform a move operation on stage to go to a memory point.
@@ -650,6 +782,7 @@ class LaserStudio(QMainWindow):
             Viewer.Mode.ZONE_POLY: "Mode: Poly Zone",
             Viewer.Mode.PIN: "Mode: Pin (P)",
             Viewer.Mode.OFFSET_ORIGIN: "Mode: Offset",
+            Viewer.Mode.RULER: "Mode: Ruler (L)",
         }
         return labels.get(mode, f"Mode: {mode.name}")
 
@@ -664,7 +797,10 @@ class LaserStudio(QMainWindow):
             data["camera"] = self.instruments.camera.settings
 
         # Scanning geometry
-        data["scangeometry"] = self.viewer.scan_geometry.settings
+        data["scans"] = self.instruments.scans.settings
+
+        # Rulers and markers
+        data["annotations"] = self.instruments.annotations.settings
 
         # Lighting
         if self.instruments.light is not None:
@@ -725,11 +861,26 @@ class LaserStudio(QMainWindow):
         if (self.instruments.light is not None) and (lighting is not None):
             self.instruments.light.settings = lighting
 
-        # Scanning geometry
-        geometry = data.get("scangeometry")
-        logging.getLogger("laserstudio").debug(f"Scan Geometry settings: {geometry}...")
-        if geometry is not None:
-            self.viewer.scan_geometry.settings = geometry
+        # Scans geometry
+        scans = data.get("scans", data.get("scangeometry"))
+        logging.getLogger("laserstudio").debug(f"Scans settings: {scans}...")
+        if scans is not None:
+            self.instruments.scans.settings = scans
+
+        # Annotations (rulers, markers) — fall back to legacy viewer section.
+        annotations = data.get("annotations")
+        if annotations is not None:
+            self.instruments.annotations.settings = annotations
+        else:
+            viewer_legacy = data.get("viewer")
+            if isinstance(viewer_legacy, dict):
+                migrated: dict[str, Any] = {}
+                if "marker_size" in viewer_legacy:
+                    migrated["marker_size"] = viewer_legacy["marker_size"]
+                if "rulers" in viewer_legacy:
+                    migrated["rulers"] = viewer_legacy["rulers"]
+                if migrated:
+                    self.instruments.annotations.settings = migrated
 
         # Probes
         probes = data.get("probes", [])

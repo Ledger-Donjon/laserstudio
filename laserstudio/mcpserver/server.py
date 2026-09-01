@@ -14,7 +14,8 @@ explicit reason when something fails (unknown instrument, no camera, ...).
 from __future__ import annotations
 
 import io
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from mcp.server.fastmcp import FastMCP, Image
 
@@ -26,9 +27,13 @@ INSTRUCTIONS = """\
 Control a running Laser Studio instance.
 
 Use these tools to inspect and drive the setup: list instruments, read or update
-instrument settings, read or update scan geometry, read or move the stage, run
-scans (go_next), focus, manage markers, and capture camera images or
-screenshots.
+instrument settings (including the ``Scan Zones`` and ``Focus`` instruments),
+manage scan zones (create, rename, recolor, enable or disable, delete), read or
+move the stage, run scans (go_next), focus, manage markers and rulers, and capture camera
+images or screenshots.
+
+Scanning runs on the union of the *enabled* zones: disable a zone to exclude it
+from go_next without losing its shape.
 
 Tools fail with an explicit error message prefixed by a machine-readable code
 (e.g. INSTRUMENT_NOT_FOUND, DEVICE_UNAVAILABLE, INVALID_PARAMETER) when an
@@ -66,28 +71,72 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         return call(api.get_instrument_settings, label)
 
     @mcp.tool()
-    def set_instrument_settings(
-        label: str, settings: dict[str, Any]
-    ) -> dict[str, Any]:
+    def set_instrument_settings(label: str, settings: dict[str, Any]) -> dict[str, Any]:
         """Update the settings of the instrument identified by its label."""
         return call(api.set_instrument_settings, label, settings)
 
     # -- Scan geometry ------------------------------------------------------ #
 
     @mcp.tool()
-    def get_scangeometry() -> dict[str, Any]:
-        """Get the current scan geometry settings (polygons and density)."""
-        return call(api.scangeometry)
+    def get_scan_zones() -> dict[str, Any]:
+        """List the scan zones (name, color, enabled, shape) and which is active."""
+        return call(api.scan_zones)
 
     @mcp.tool()
-    def set_scangeometry(settings: dict[str, Any]) -> dict[str, Any]:
-        """Update the scan geometry settings (polygons and optional density)."""
-        return call(api.set_scangeometry, settings)
+    def add_scan_zone(
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a scan zone.
+
+        Defaults: name "Zone <n>", the next color of the zone palette,
+        enabled, and an empty shape. `color` is "#rrggbb".
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see an
+        existing zone's geometry as a template.
+        """
+        return call(api.add_scan_zone, name, color, enabled, geometry)
 
     @mcp.tool()
-    def delete_scangeometry() -> dict[str, Any]:
-        """Clear the scan geometry by setting an empty polygon."""
-        return call(api.delete_scangeometry)
+    def update_scan_zone(
+        index: int,
+        name: str | None = None,
+        color: str | None = None,
+        enabled: bool | None = None,
+        geometry: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Rename, recolor, enable/disable or reshape the scan zone at `index`.
+
+        `index` is the stable zone id from the `id` field reported by
+        get_scan_zones — not a list position. It does not change when other
+        zones are deleted. Only the given fields change. Disabling a zone
+        excludes it from point generation without deleting it.
+
+        `geometry` shapes: polygon
+        `{"polygon": {"exterior": [{"x":0.0,"y":0.0}, ...], "interiors": [[{"x":..,"y":..}, ...], ...]}}`;
+        multipolygon `{"multipolygon": [{"polygon": {...}}, ...]}` (a list of
+        geometry dicts, not a "polygons" key); empty shape
+        `{"geometrycollection": null}`. Call get_scan_zones first to see the
+        zone's current geometry as a template.
+        """
+        return call(api.update_scan_zone, index, name, color, enabled, geometry)
+
+    @mcp.tool()
+    def delete_scan_zone(index: int) -> dict[str, Any]:
+        """Delete the scan zone identified by `index` (the `id` field from
+        get_scan_zones) and return the remaining zones.
+
+        Zone ids are stable: deleting a zone does not renumber the remaining
+        ones, so you can safely pass multiple ids collected from a single
+        get_scan_zones call without re-listing between deletes.
+        """
+        return call(api.delete_scan_zone, index)
 
     # -- Motion ------------------------------------------------------------- #
 
@@ -167,6 +216,54 @@ def build_server(host: str = "localhost", port: int | None = None) -> FastMCP:
         :return: A dict with the list of deleted identifiers under ``deleted``.
         """
         return call(api.delete_markers, ids)
+
+    @mcp.tool()
+    def list_rulers() -> list[dict[str, Any]]:
+        """List the rulers (distance measurements) currently in the viewer."""
+        return call(api.rulers)
+
+    @mcp.tool()
+    def add_ruler(
+        segment: list[float],
+        color: list[float] | None = None,
+        label: str | None = None,
+        graduation: float | None = None,
+        graduation_count: float | None = None,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        """Add a ruler measuring the distance between two viewer positions.
+
+        :param segment: ``[x1, y1, x2, y2]`` viewer coordinates of the two ends.
+        :param color: ``[r, g, b]`` or ``[r, g, b, a]`` channels in ``[0, 1]``.
+        :param label: Optional label for the ruler.
+        :param graduation: Graduation interval in µm. If omitted or 0, the ruler
+            is drawn as a plain line.
+        :param graduation_count: Number of graduations over the whole ruler, as an
+            alternative to ``graduation``: the ruler keeps that count and derives
+            its interval from its length (10 graduations on a 150 µm ruler means a
+            15 µm interval, and the count stays 10 if the ruler is resized).
+        :param visible: If False, the ruler is created but not displayed.
+        """
+        rgba = tuple(color) if color is not None else None
+        return call(
+            api.ruler,
+            segments=(segment[0], segment[1], segment[2], segment[3]),
+            color=rgba,  # type: ignore[arg-type]
+            label=label,
+            graduation=graduation,
+            graduation_count=graduation_count,
+            visible=visible,
+        )
+
+    @mcp.tool()
+    def delete_rulers(ids: list[int] | None = None) -> dict[str, Any]:
+        """Delete rulers from the viewer.
+
+        :param ids: Identifiers of the rulers to delete (as returned by
+            ``list_rulers`` / ``add_ruler``). If omitted, all rulers are removed.
+        :return: A dict with the list of deleted identifiers under ``deleted``.
+        """
+        return call(api.delete_rulers, ids)
 
     @mcp.tool()
     def pixel_to_position(pixels: list[list[float]]) -> list[list[float]]:
