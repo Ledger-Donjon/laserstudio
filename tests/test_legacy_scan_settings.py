@@ -1,6 +1,6 @@
 """Backwards compatibility of scan settings written by pre-zones Laser Studio.
 
-Before scan zones existed, ``ScanGeometry.settings`` produced
+Before scan zones existed, the scan model's ``settings`` produced
 ``{"density": int, "geometry": <serialised shapely>}`` — a single, unnamed
 geometry. Those files are sitting in users' working directories, and scripts
 still ``PUT`` that same shape at ``/scangeometry``. Loading one must reproduce
@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import pytest
 
-from laserstudio.utils.scanzones import ScanZones, yaml_to_shapely
+from laserstudio.instruments.scans import ScansInstrument
+from laserstudio.utils.scanzones import yaml_to_shapely
 
 
 def _ring(points: list[tuple[float, float]]) -> list[dict[str, float]]:
@@ -77,7 +78,7 @@ LEGACY_PAYLOADS: dict[str, tuple[dict, float]] = {
 @pytest.mark.parametrize("name", sorted(LEGACY_PAYLOADS))
 def test_legacy_payload_loads_with_the_same_geometry(name: str):
     payload, expected_area = LEGACY_PAYLOADS[name]
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.settings = payload
 
     assert zones.flattened.area == pytest.approx(expected_area)
@@ -88,25 +89,27 @@ def test_legacy_payload_loads_with_the_same_geometry(name: str):
 @pytest.mark.parametrize("name", sorted(LEGACY_PAYLOADS))
 def test_legacy_payload_becomes_one_enabled_zone(name: str):
     payload, _ = LEGACY_PAYLOADS[name]
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.settings = payload
 
     assert len(zones.zones) == 1
-    assert zones.zones[0].name == "Zone 1"
-    assert zones.zones[0].enabled is True
-    assert zones.active_index == 0
+    zone = zones.zone(1)
+    assert zone.name == "Zone 1"
+    assert zone.enabled is True
+    # The restored zone is what the next drawing gesture must target.
+    assert zones.active_zone is zone
 
 
 def test_legacy_payload_still_generates_points():
     payload, _ = LEGACY_PAYLOADS["single_rect"]
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.settings = payload
     assert zones.next_point() is not None
 
 
 def test_a_bare_geometry_dict_without_the_wrapper_is_accepted():
     """Some callers PUT the serialised geometry itself, with no outer key."""
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.settings = _rect(0, 0, 100, 100)
     assert zones.flattened.area == pytest.approx(10000.0)
     assert len(zones.zones) == 1
@@ -119,7 +122,7 @@ def test_new_settings_stay_readable_by_an_older_version():
     so it must find the union of the *enabled* zones there — otherwise a
     downgrade, or a colleague on an older build, would scan the wrong area.
     """
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.add_zone(name="A", geometry=yaml_to_shapely(_rect(0, 0, 100, 100)))
     zones.add_zone(name="B", geometry=yaml_to_shapely(_rect(300, 0, 100, 100)))
     zones.add_zone(
@@ -135,10 +138,10 @@ def test_new_settings_stay_readable_by_an_older_version():
 
 def test_a_legacy_payload_replaces_existing_zones_rather_than_merging():
     """Loading an old file is a full restore, as it always was."""
-    zones = ScanZones()
+    zones = ScansInstrument({})
     zones.add_zone(name="Stale", geometry=yaml_to_shapely(_rect(0, 0, 500, 500)))
     payload, expected_area = LEGACY_PAYLOADS["single_rect"]
     zones.settings = payload
 
-    assert [z.name for z in zones.zones] == ["Zone 1"]
+    assert [z.name for z in zones.zones.values()] == ["Zone 1"]
     assert zones.flattened.area == pytest.approx(expected_area)

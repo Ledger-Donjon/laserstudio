@@ -20,7 +20,9 @@ from PyQt6.QtGui import QColor, QColorConstants
 from PyQt6.QtWidgets import QApplication, QGraphicsScene
 from shapely.geometry import Polygon
 
-from laserstudio.utils.scanzones import ScanZones, default_zone_color
+from laserstudio.instruments.scans import ScansInstrument
+from laserstudio.instruments.scans import ScansInstrument
+from laserstudio.utils.scanzones import default_zone_color
 from laserstudio.widgets.scangeometry import ScanGeometry
 from laserstudio.widgets.viewer import Viewer
 
@@ -48,7 +50,7 @@ def scene_and_view(qapp):
     view added to it) down with it and turning later access into a
     "wrapped C/C++ object has been deleted" crash.
     """
-    zones = ScanZones()
+    zones = ScansInstrument({})
     scene = QGraphicsScene()
     view = ScanGeometry(zones)
     scene.addItem(view)
@@ -69,18 +71,17 @@ class TestRenderingRules:
         self, scene_and_view
     ):
         zones, _scene, view = scene_and_view
-        zones.add_zone(geometry=_square())  # zone 0, active by default
-        zones.add_zone(geometry=_square(x=20.0), enabled=False)  # zone 1
+        drawn = zones.add_zone(geometry=_square())
+        zones.add_zone(geometry=_square(x=20.0), enabled=False)
         items = view._ScanGeometry__scan_geometry_items.childItems()
         assert len(items) == 1
-        # Only zone 0's 4 vertices get handles; zone 1 contributes none.
-        assert len(view._ScanGeometry__vertex_handles) == 4
-        assert all(h.zone_index == 0 for h in view._ScanGeometry__vertex_handles)
+        # Only the enabled zone's 4 vertices get handles.
+        assert len(view._ScanGeometry__handles) == 4
+        assert all(h.zone_id == drawn.id for h in view._ScanGeometry__handles)
 
     def test_disabled_active_zone_is_dashed_with_no_brush(self, scene_and_view):
         zones, _scene, view = scene_and_view
-        zones.add_zone(geometry=_square(), enabled=False)
-        zones.active_index = 0
+        zones.active_zone = zones.add_zone(geometry=_square(), enabled=False)
         items = view._ScanGeometry__scan_geometry_items.childItems()
         assert len(items) == 1
         item = items[0]
@@ -89,8 +90,8 @@ class TestRenderingRules:
 
     def test_active_zone_outline_is_thicker_than_non_active(self, scene_and_view):
         zones, _scene, view = scene_and_view
-        zones.add_zone(geometry=_square())  # zone 0, active (default index 0)
-        zones.add_zone(geometry=_square(x=20.0))  # zone 1, enabled, not active
+        zones.active_zone = zones.add_zone(geometry=_square())
+        zones.add_zone(geometry=_square(x=20.0))  # enabled, not active
         items = view._ScanGeometry__scan_geometry_items.childItems()
         assert len(items) == 2
         widths = sorted(item.pen().width() for item in items)
@@ -100,26 +101,24 @@ class TestRenderingRules:
 class TestDragCycle:
     def test_full_drag_moves_vertex_and_leaves_ops_add_only(self, scene_and_view):
         zones, _scene, view = scene_and_view
-        zones.add_zone(geometry=_square())
+        zone = zones.add_zone(geometry=_square())
         # GEOS's union (run when the zone's cached ``geometry`` is computed)
         # is free to reorder or reverse the ring, so a vertex's index among
         # the handles is not the same as its index in the input list. Locate
         # the handle by its actual on-screen position instead of assuming
         # which index corresponds to the (0, 0) corner.
         handle = next(
-            h
-            for h in view._ScanGeometry__vertex_handles
-            if h.pos() == QPointF(0.0, 0.0)
+            h for h in view._ScanGeometry__handles if h.pos() == QPointF(0.0, 0.0)
         )
         view._begin_handle_move(handle)
         view._handle_move(handle, QPointF(-5.0, -5.0))
         view._end_handle_move()
-        moved_poly = zones.zones[0].polygons[0]
+        moved_poly = zone.polygons[0]
         coords = list(moved_poly.exterior.coords)[:-1]
         assert any(c == pytest.approx((-5.0, -5.0)) for c in coords)
         assert not any(c == pytest.approx((0.0, 0.0)) for c in coords)
-        assert zones.zones[0].geometry.area != pytest.approx(100.0)
-        assert all(is_add for _, is_add in zones.zones[0].ops)
+        assert zone.geometry.area != pytest.approx(100.0)
+        assert all(is_add for _, is_add in zone.ops)
 
 
 class TestRebuildHandlesRegression:
@@ -128,50 +127,44 @@ class TestRebuildHandlesRegression:
         old handles are already attached to the scene must not lose them."""
         zones, _scene, view = scene_and_view
         zones.add_zone(geometry=_square())
-        assert len(view._ScanGeometry__vertex_handles) == 4
+        assert len(view._ScanGeometry__handles) == 4
         view._ScanGeometry__rebuild_handles()
-        assert len(view._ScanGeometry__vertex_handles) == 4
+        assert len(view._ScanGeometry__handles) == 4
         view._ScanGeometry__rebuild_handles()
-        assert len(view._ScanGeometry__vertex_handles) == 4
+        assert len(view._ScanGeometry__handles) == 4
 
 
 class TestFix1ZoneIdentityDuringDrag:
-    def test_removing_a_preceding_zone_mid_drag_commits_to_correct_zone(
+    def test_removing_another_zone_mid_drag_commits_to_correct_zone(
         self, scene_and_view
     ):
         zones, _scene, view = scene_and_view
-        zones.add_zone(name="A", geometry=_square())
-        zones.add_zone(name="B", geometry=_square(x=20.0))
-        zones.add_zone(name="C", geometry=_square(x=40.0))
-        handle = next(
-            h for h in view._ScanGeometry__vertex_handles if h.zone_index == 1
-        )  # a vertex of B
+        a = zones.add_zone(name="A", geometry=_square())
+        b = zones.add_zone(name="B", geometry=_square(x=20.0))
+        c = zones.add_zone(name="C", geometry=_square(x=40.0))
+        handle = next(h for h in view._ScanGeometry__handles if h.zone_id == b.id)
         view._begin_handle_move(handle)
-        zones.remove_zone(0)  # remove A; B is now index 0, C is now index 1
+        zones.remove_zone(a)  # B and C keep their ids
         view._handle_move(handle, QPointF(-100.0, -100.0))
         view._end_handle_move()
 
-        assert zones.zones[0].name == "B"
-        assert zones.zones[0].geometry.area != pytest.approx(100.0)
-        assert zones.zones[1].name == "C"
-        assert zones.zones[1].geometry.area == pytest.approx(100.0)
+        assert zones.zone(b.id).geometry.area != pytest.approx(100.0)
+        assert zones.zone(c.id).geometry.area == pytest.approx(100.0)
 
     def test_removing_the_edited_zone_mid_drag_keeps_others_rendered(
         self, scene_and_view
     ):
         zones, _scene, view = scene_and_view
         zones.add_zone(name="A", geometry=_square())
-        zones.add_zone(name="B", geometry=_square(x=20.0))
+        b = zones.add_zone(name="B", geometry=_square(x=20.0))
         zones.add_zone(name="C", geometry=_square(x=40.0))
-        handle = next(
-            h for h in view._ScanGeometry__vertex_handles if h.zone_index == 1
-        )  # a vertex of B
+        handle = next(h for h in view._ScanGeometry__handles if h.zone_id == b.id)
         view._begin_handle_move(handle)
-        zones.remove_zone(1)  # remove B itself, the zone being edited
+        zones.remove_zone(b)  # remove B itself, the zone being edited
         view._handle_move(handle, QPointF(-100.0, -100.0))
         view._end_handle_move()
 
-        assert [z.name for z in zones.zones] == ["A", "C"]
+        assert [z.name for z in zones.zones.values()] == ["A", "C"]
         items = view._ScanGeometry__scan_geometry_items.childItems()
         assert len(items) > 0
 
@@ -179,18 +172,16 @@ class TestFix1ZoneIdentityDuringDrag:
 class TestFix2InvalidDragPreservesShape:
     def test_self_intersecting_drag_leaves_geometry_unchanged(self, scene_and_view):
         zones, _scene, view = scene_and_view
-        zones.add_zone(geometry=_square())
-        before_area = zones.zones[0].geometry.area
-        handle = next(
-            h for h in view._ScanGeometry__vertex_handles if h.handle_index == 0
-        )
+        zone = zones.add_zone(geometry=_square())
+        before_area = zone.geometry.area
+        handle = next(h for h in view._ScanGeometry__handles if h.handle_index == 0)
         view._begin_handle_move(handle)
         # Drag the (0, 0) corner far past the opposite edge: self-intersecting.
         view._handle_move(handle, QPointF(100.0, 100.0))
         view._end_handle_move()
 
-        assert zones.zones[0].geometry.area == pytest.approx(before_area)
-        assert len(zones.zones[0].polygons) > 0
+        assert zone.geometry.area == pytest.approx(before_area)
+        assert len(zone.polygons) > 0
 
 
 class TestCursorProximity:
@@ -198,15 +189,15 @@ class TestCursorProximity:
         zones, _scene, view = scene_and_view
         zones.add_zone(geometry=_square())
         view.update_cursor_proximity(QPointF(0.0, 0.0), 2.0)
-        visible = [h for h in view._ScanGeometry__vertex_handles if h.isVisible()]
+        visible = [h for h in view._ScanGeometry__handles if h.isVisible()]
         assert len(visible) == 1
         view.update_cursor_proximity(None, 0.0)
-        assert all(not h.isVisible() for h in view._ScanGeometry__vertex_handles)
+        assert all(not h.isVisible() for h in view._ScanGeometry__handles)
 
     def test_no_op_while_handles_dragging(self, scene_and_view):
         zones, _scene, view = scene_and_view
         zones.add_zone(geometry=_square())
-        handle = view._ScanGeometry__vertex_handles[0]
+        handle = view._ScanGeometry__handles[0]
         handle.setVisible(True)
         view._begin_handle_move(handle)  # sets __handles_dragging True
         view.update_cursor_proximity(None, 0.0)
@@ -215,7 +206,7 @@ class TestCursorProximity:
 
 
 class TestSharedModelMultipleViews:
-    """Two ``ScanGeometry`` views over one ``ScanZones`` model.
+    """Two ``ScanGeometry`` views over one ``ScansInstrument`` model.
 
     Task 7/8 let two windows share a single model; these pin the contract
     that both views actually redraw when the shared model changes, rather
@@ -229,7 +220,7 @@ class TestSharedModelMultipleViews:
         # ``scene_and_view`` fixture's docstring above): an unreferenced
         # ``QGraphicsScene`` can be garbage-collected on the C++ side, taking
         # its items down with it.
-        zones = ScanZones()
+        zones = ScansInstrument({})
         scene_a = QGraphicsScene()
         view_a = ScanGeometry(zones)
         scene_a.addItem(view_a)
@@ -248,12 +239,12 @@ class TestSharedModelMultipleViews:
 
     def test_disabling_a_non_active_zone_removes_it_from_both_views(self, two_views):
         zones, view_a, view_b, _scene_a, _scene_b = two_views
-        zones.add_zone(geometry=_square())  # zone 0, active by default
-        zones.add_zone(geometry=_square(x=20.0))  # zone 1, not active
+        zones.active_zone = zones.add_zone(geometry=_square())
+        other = zones.add_zone(geometry=_square(x=20.0))  # not active
         assert len(view_a._ScanGeometry__scan_geometry_items.childItems()) == 2
         assert len(view_b._ScanGeometry__scan_geometry_items.childItems()) == 2
 
-        zones.update_zone(1, enabled=False)
+        zones.update_zone_params(other.id, enabled=False)
 
         items_a = view_a._ScanGeometry__scan_geometry_items.childItems()
         items_b = view_b._ScanGeometry__scan_geometry_items.childItems()
@@ -261,22 +252,22 @@ class TestSharedModelMultipleViews:
         assert len(items_b) == 1
 
 
-class TestViewerScanZonesConstructorContract:
-    """``Viewer``'s ``scan_zones`` parameter: private by default, shared when
-    an existing model is passed. Building a ``Viewer`` needs a
-    ``QApplication``, provided by the module-scoped ``qapp`` fixture."""
+class TestViewerScansConstructorContract:
+    """``Viewer``'s ``scans`` parameter: private by default, shared when an
+    existing model is passed. Building a ``Viewer`` needs a ``QApplication``,
+    provided by the module-scoped ``qapp`` fixture."""
 
     def test_two_viewers_with_no_model_get_distinct_models(self, qapp):
         viewer_a = Viewer()
         viewer_b = Viewer()
-        assert viewer_a.scan_zones is not viewer_b.scan_zones
+        assert viewer_a.scans is not viewer_b.scans
 
     def test_two_viewers_given_the_same_model_share_it(self, qapp):
-        shared = ScanZones()
-        viewer_a = Viewer(scan_zones=shared)
-        viewer_b = Viewer(scan_zones=shared)
-        assert viewer_a.scan_zones is shared
-        assert viewer_b.scan_zones is shared
+        shared = ScansInstrument({})
+        viewer_a = Viewer(scans=shared)
+        viewer_b = Viewer(scans=shared)
+        assert viewer_a.scans is shared
+        assert viewer_b.scans is shared
 
 
 class TestDrawingPreviewColor:
@@ -290,31 +281,31 @@ class TestDrawingPreviewColor:
         return viewer.zone_poly_item.pen().color()
 
     def test_add_uses_the_active_zones_color(self, qapp):
-        zones = ScanZones()
-        zones.add_zone(name="A", color="#ff5300")
-        zones.add_zone(name="B", color="#00c8ff")
-        viewer = Viewer(scan_zones=zones)
+        zones = ScansInstrument({})
+        a = zones.add_zone(name="A", color="#ff5300")
+        b = zones.add_zone(name="B", color="#00c8ff")
+        viewer = Viewer(scans=zones)
 
-        zones.active_index = 0
+        zones.active_zone = a
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=True)
         assert self._preview(viewer) == QColor("#ff5300")
 
-        zones.active_index = 1
+        zones.active_zone = b
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=True)
         assert self._preview(viewer) == QColor("#00c8ff")
 
     def test_fill_is_translucent_but_outline_is_not(self, qapp):
-        zones = ScanZones()
-        zones.add_zone(name="A", color="#ff5300")
-        viewer = Viewer(scan_zones=zones)
+        zones = ScansInstrument({})
+        zones.active_zone = zones.add_zone(name="A", color="#ff5300")
+        viewer = Viewer(scans=zones)
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=True)
         assert self._preview(viewer).alpha() == 255
         assert viewer.zone_poly_item.brush().color().alpha() == 64
 
     def test_subtract_stays_red_and_invalid_stays_a_warning(self, qapp):
-        zones = ScanZones()
-        zones.add_zone(name="A", color="#ff5300")
-        viewer = Viewer(scan_zones=zones)
+        zones = ScansInstrument({})
+        zones.active_zone = zones.add_zone(name="A", color="#ff5300")
+        viewer = Viewer(scans=zones)
 
         viewer._Viewer__update_selection_color(has_shift=True, is_valid=True)
         assert self._preview(viewer) == QColor(QColorConstants.Red)
@@ -323,8 +314,9 @@ class TestDrawingPreviewColor:
         assert self._preview(viewer) != QColor("#ff5300")
 
     def test_with_no_zones_previews_the_color_zone_1_will_get(self, qapp):
-        zones = ScanZones()
-        viewer = Viewer(scan_zones=zones)
+        zones = ScansInstrument({})
+        viewer = Viewer(scans=zones)
         viewer._Viewer__update_selection_color(has_shift=False, is_valid=True)
         # Drawing here creates Zone 1, so the preview shows its future color.
-        assert self._preview(viewer) == default_zone_color(0)
+        assert self._preview(viewer) == default_zone_color(1)
+        assert self._preview(viewer) == zones.add_zone().color

@@ -7,12 +7,11 @@ button, etc. ``QMenu.exec`` (used by the color-swatch picker) blocks, so
 ``_pick_color`` itself is never invoked here — ``_set_color`` (the part that
 actually touches the model) is tested directly instead.
 
-A full ``LaserStudioRefonte`` needs a real ``Instruments`` instance (i.e. a
-loaded config), which is heavier and noisier than this test needs. Instead we
-use a tiny stand-in exposing ``.viewer.scan_zones`` plus a stub viewer that
-records ``select_mode``/``go_next`` calls — enough surface for
-``ScanWorkspace`` to work against, matching how ``LaserStudioRefonte.viewer``
-is used (``self._window.viewer.scan_zones`` / ``.select_mode`` / ``.go_next``).
+``ScanWorkspace`` takes the viewer and the shared scan model directly, so no
+``LaserStudioRefonte`` (and no loaded configuration) is needed here. A real
+``Viewer`` is heavier than this needs, so a tiny ``QObject`` stand-in exposes
+exactly the surface the panel touches — ``mode``, the ``mode_changed`` signal,
+``select_mode`` and ``go_next`` — and records the calls it receives.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PyQt6 import sip
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
@@ -35,11 +34,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from laserstudio.instruments.scans import ScansInstrument
 from laserstudio.utils.colors import MARKERS_COLORS
-from laserstudio.utils.scanzones import ScanZones
 from laserstudio.widgets.viewer import Viewer
 from laserstudio.widgets.workspace.schemaform import ToggleSwitch
-from laserstudio.widgets.workspace.scanworkspace import ScanWorkspace
+from laserstudio.widgets.workspace.scanworkspace import ScanWorkspace, _ZoneRow
 
 
 @pytest.fixture(scope="module")
@@ -51,11 +50,17 @@ def qapp():
     return app
 
 
-class _StubViewer:
-    """Records calls instead of touching a real Qt graphics viewer/stage."""
+class _StubViewer(QObject):
+    """Records calls instead of touching a real Qt graphics viewer/stage.
 
-    def __init__(self, scan_zones: ScanZones) -> None:
-        self.scan_zones = scan_zones
+    A ``QObject`` because the panel connects to ``mode_changed``.
+    """
+
+    mode_changed = pyqtSignal(int)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.mode = Viewer.Mode.NONE
         self.select_mode_calls: list[tuple[object, bool]] = []
         self.go_next_calls = 0
 
@@ -66,26 +71,19 @@ class _StubViewer:
         self.go_next_calls += 1
 
 
-class _StubWindow:
-    """Minimal stand-in for LaserStudioRefonte: only `.viewer` is used."""
-
-    def __init__(self, scan_zones: ScanZones) -> None:
-        self.viewer = _StubViewer(scan_zones)
+@pytest.fixture
+def zones(qapp) -> ScansInstrument:
+    return ScansInstrument({})
 
 
 @pytest.fixture
-def zones(qapp) -> ScanZones:
-    return ScanZones()
+def viewer(qapp) -> _StubViewer:
+    return _StubViewer()
 
 
 @pytest.fixture
-def window(qapp, zones) -> _StubWindow:
-    return _StubWindow(zones)
-
-
-@pytest.fixture
-def workspace(qapp, window) -> ScanWorkspace:
-    ws = ScanWorkspace(window)
+def workspace(qapp, viewer, zones) -> ScanWorkspace:
+    ws = ScanWorkspace(viewer, zones)
     # The returned QScrollArea is a top-level (unparented) widget: nothing
     # else in Qt owns it, so it must be kept alive here or PyQt garbage
     # collects the underlying C++ object (and everything parented under it,
@@ -137,21 +135,21 @@ def _button_labelled(panel, label: str) -> QPushButton:
     return matches[0]
 
 
-# ── 1. No model attached ─────────────────────────────────────────────────────
+# ── 1. Empty model ───────────────────────────────────────────────────────────
 
 
-def test_build_panel_without_model_does_not_crash(qapp):
-    ws = ScanWorkspace(None)
+def test_build_panel_with_an_empty_model_shows_the_placeholder(qapp, viewer):
+    ws = ScanWorkspace(viewer, ScansInstrument({}))
     panel = ws.build_panel()
     assert panel is not None
-    assert ws.zones is None
     # Empty-state label path: one placeholder label, no zone rows.
     rows = _rows(ws)
     assert len(rows) == 1
-    assert isinstance(rows[0], type(rows[0]))  # just: it exists, no crash
+    assert isinstance(rows[0], QLabel)
+    assert not isinstance(rows[0], _ZoneRow)
 
 
-# ── 2. Row count tracks the model; changed signal rebuilds rows ─────────────
+# ── 2. Row count tracks the model; zone_changed rebuilds rows ──────────────
 
 
 def test_rows_track_model_via_changed_signal(workspace, zones):
@@ -172,45 +170,45 @@ def test_add_zone_button_creates_and_activates(workspace, zones):
     assert len(zones.zones) == 0
     workspace._on_add_zone()
     assert len(zones.zones) == 1
-    assert zones.active_index == 0
+    assert zones.active_zone is zones.zone(1)
 
     workspace._on_add_zone()
     assert len(zones.zones) == 2
-    assert zones.active_index == 1  # newest zone becomes active
+    assert zones.active_zone is zones.zone(2)  # newest zone becomes active
 
 
 # ── 4. Renaming via a row's QLineEdit ───────────────────────────────────────
 
 
 def test_rename_via_row_line_edit_updates_model(workspace, zones):
-    zones.add_zone(name="Alpha")
+    zone = zones.add_zone(name="Alpha")
     row = _rows(workspace)[0]
     _swatch, name_edit, _toggle, _delete = _row_controls(row)
 
     name_edit.setText("Renamed")
     name_edit.editingFinished.emit()
 
-    assert zones.zone(0).name == "Renamed"
+    assert zone.name == "Renamed"
 
 
 def test_rename_does_not_fire_while_syncing(workspace, zones):
-    zones.add_zone(name="Alpha")
+    zone = zones.add_zone(name="Alpha")
     # Simulate being mid-rebuild: _on_rename must be a no-op in that state.
     workspace._syncing = True
     try:
-        workspace._on_rename(0, "Should not apply")
+        workspace._on_rename(zone, "Should not apply")
     finally:
         workspace._syncing = False
-    assert zones.zone(0).name == "Alpha"
+    assert zone.name == "Alpha"
 
 
 # ── 5. Toggling a row's ToggleSwitch only affects that zone ─────────────────
 
 
 def test_toggle_disables_only_that_zone(workspace, zones):
-    zones.add_zone(name="A")
-    zones.add_zone(name="B")
-    zones.add_zone(name="C")
+    a = zones.add_zone(name="A")
+    b = zones.add_zone(name="B")
+    c = zones.add_zone(name="C")
     rows = _rows(workspace)
     assert len(rows) == 3
 
@@ -218,19 +216,19 @@ def test_toggle_disables_only_that_zone(workspace, zones):
     assert toggle_b.isChecked() is True
     toggle_b.setChecked(False)  # what a click on the toggle does
 
-    assert zones.zone(0).enabled is True
-    assert zones.zone(1).enabled is False
-    assert zones.zone(2).enabled is True
+    assert a.enabled is True
+    assert b.enabled is False
+    assert c.enabled is True
 
 
 def test_toggle_does_not_fire_while_syncing(workspace, zones):
-    zones.add_zone(name="A")
+    zone = zones.add_zone(name="A")
     workspace._syncing = True
     try:
-        workspace._on_toggle(0, False)
+        workspace._on_toggle(zone, False)
     finally:
         workspace._syncing = False
-    assert zones.zone(0).enabled is True
+    assert zone.enabled is True
 
 
 # ── 6. Deleting via a row's trash button — the stale-index risk ────────────
@@ -243,13 +241,13 @@ def test_delete_middle_of_three_removes_the_right_zone(workspace, zones):
     rows = _rows(workspace)
     assert len(rows) == 3
 
-    # Delete the middle row (index 1, "Beta"). Row callbacks capture their
-    # index at construction time; if the callback fired on a stale index
-    # captured before some earlier rebuild, this would delete the wrong zone.
+    # Delete the middle row ("Beta"). Row callbacks capture the zone they
+    # were built for; if one fired on a stale target captured before some
+    # earlier rebuild, this would delete the wrong zone.
     _swatch, _name, _toggle, delete_btn = _row_controls(rows[1])
     delete_btn.clicked.emit()
 
-    remaining = [z.name for z in zones.zones]
+    remaining = [z.name for z in zones.zones.values()]
     assert remaining == ["Alpha", "Gamma"]
 
     # And the rebuilt rows reflect the surviving zones, in order.
@@ -272,18 +270,18 @@ def test_delete_each_row_in_turn_removes_correct_zone(workspace, zones):
         rows = _rows(workspace)
         _s, _n, _t, delete_btn = _row_controls(rows[0])
         delete_btn.clicked.emit()
-        assert [z.name for z in zones.zones] == expected_survivors
+        assert [z.name for z in zones.zones.values()] == expected_survivors
 
 
 # ── Color swatch: _set_color directly (never _pick_color — QMenu.exec blocks) ──
 
 
 def test_set_color_updates_the_right_zone(workspace, zones):
-    zones.add_zone(name="A")
-    zones.add_zone(name="B")
-    workspace._set_color(1, QColor("#123456"))
-    assert zones.zone(0).color != QColor("#123456")
-    assert zones.zone(1).color == QColor("#123456")
+    a = zones.add_zone(name="A")
+    b = zones.add_zone(name="B")
+    workspace._set_color(b, QColor("#123456"))
+    assert a.color != QColor("#123456")
+    assert b.color == QColor("#123456")
 
 
 # ── 7. Clicking a row activates that zone ───────────────────────────────────
@@ -291,18 +289,19 @@ def test_set_color_updates_the_right_zone(workspace, zones):
 
 def test_clicking_a_row_activates_it(workspace, zones):
     zones.add_zone(name="A")
-    zones.add_zone(name="B")
-    zones.add_zone(name="C")
-    assert zones.active_index == 0  # ScanZones.add_zone leaves it untouched
+    b = zones.add_zone(name="B")
+    c = zones.add_zone(name="C")
+    # Adding zones through the model leaves the active one untouched.
+    assert zones.active_zone is None
 
-    workspace._on_activate(2)
-    assert zones.active_index == 2
+    workspace._on_activate(c)
+    assert zones.active_zone is c
 
-    # Directly exercise the monkeypatched mousePressEvent too, which is what
-    # actually runs when the user clicks a row.
+    # Exercise the row's mousePressEvent too, which is what actually runs
+    # when the user clicks a row.
     rows = _rows(workspace)
     rows[1].mousePressEvent(None)
-    assert zones.active_index == 1
+    assert zones.active_zone is b
 
 
 # ── 8. Density / point size / path color write to the model ───────────────
@@ -332,7 +331,7 @@ def test_path_color_combo_sets_model(workspace, zones):
 # ── 9. Draw-mode buttons and Go-to-next-point ───────────────────────────────
 
 
-def test_draw_mode_buttons_call_select_mode(workspace, window):
+def test_draw_mode_buttons_call_select_mode(workspace, viewer):
     """Each button built by ``_draw_section`` must call ``viewer.select_mode``
     with *its own* mode — not just any of the three. Clicking straight
     through ``workspace._select_mode(...)`` would only prove that method
@@ -348,20 +347,20 @@ def test_draw_mode_buttons_call_select_mode(workspace, window):
         ("Polygon", Viewer.Mode.ZONE_POLY),
     ]
     for label, mode in expected:
-        window.viewer.select_mode_calls.clear()
+        viewer.select_mode_calls.clear()
         button = _button_labelled(panel, label)
         button.click()
         # toggle=True is what lets re-clicking an already-active mode button
         # return the viewer to Mode.NONE.
-        assert window.viewer.select_mode_calls == [(mode, True)], (
+        assert viewer.select_mode_calls == [(mode, True)], (
             f"button {label!r} did not call select_mode({mode!r}, toggle=True)"
         )
 
 
-def test_go_next_button_calls_viewer_go_next(workspace, window):
+def test_go_next_button_calls_viewer_go_next(workspace, viewer):
     button = _button_labelled(workspace._test_panel, "Go to next point")
     button.click()
-    assert window.viewer.go_next_calls == 1
+    assert viewer.go_next_calls == 1
 
 
 # ── Fix 1: the `zones.changed`/`path_changed` connections must not outlive
@@ -387,16 +386,16 @@ def test_dropping_panel_then_mutating_model_does_not_crash(qapp):
     unambiguous, and there is no clean way to "expect" a SIGABRT from
     within the same process that would suffer it.
     """
-    zones = ScanZones()
-    window = _StubWindow(zones)
-    ws = ScanWorkspace(window)
+    zones = ScansInstrument({})
+    viewer = _StubViewer()
+    ws = ScanWorkspace(viewer, zones)
     panel = ws.build_panel()
 
     # Discard every reference the test holds; only whatever ScanWorkspace's
     # own internals still keep should determine what stays alive.
     del panel
     del ws
-    del window
+    del viewer
     gc.collect()
     gc.collect()
 
@@ -408,11 +407,11 @@ def test_dropping_panel_then_mutating_model_does_not_crash(qapp):
     zones.path_color = QColor("red")
 
 
-def test_build_panel_twice_does_not_double_connect(qapp, zones, window):
+def test_build_panel_twice_does_not_double_connect(qapp, zones, viewer):
     """Calling build_panel() again on the same instance (a future rebuild
     path) must not leave two live connections to the model — that would
     rebuild the rows (or push into the scan controls) twice per change."""
-    ws = ScanWorkspace(window)
+    ws = ScanWorkspace(viewer, zones)
     first_panel = ws.build_panel()
     second_panel = ws.build_panel()
     assert second_panel is not first_panel
@@ -429,7 +428,7 @@ def test_build_panel_twice_does_not_double_connect(qapp, zones, window):
     assert rebuild_count[0] == 1  # not 2
 
 
-def test_control_handlers_are_safe_after_the_panel_is_destroyed(qapp, zones, window):
+def test_control_handlers_are_safe_after_the_panel_is_destroyed(qapp, zones, viewer):
     """The scan-control handlers must be no-ops once their widgets are gone.
 
     ``_on_density``/``_on_point_size``/``_on_path_color`` used to read
@@ -439,7 +438,7 @@ def test_control_handlers_are_safe_after_the_panel_is_destroyed(qapp, zones, win
     deleted`` — reproduced in review. Deleting the panel's C++ side while
     keeping the ``ScanWorkspace`` alive is exactly that state.
     """
-    ws = ScanWorkspace(window)
+    ws = ScanWorkspace(viewer, zones)
     panel = ws.build_panel()
     before = (zones.density, zones.point_diameter, zones.path_color.name())
 
@@ -501,7 +500,7 @@ def test_scan_controls_sync_leaves_combo_alone_for_unlisted_color(workspace, zon
 
 
 def test_typing_a_rename_survives_an_unrelated_model_change(workspace, zones):
-    zones.add_zone(name="Alpha")
+    alpha = zones.add_zone(name="Alpha")
     zones.add_zone(name="Beta")
 
     # hasFocus() only reflects reality once the widget is actually shown.
@@ -521,9 +520,9 @@ def test_typing_a_rename_survives_an_unrelated_model_change(workspace, zones):
     # toolbar, a drag committing a geometry) must not discard it.
     zones.add_zone(name="Gamma")
 
-    assert zones.zone(0).name == "Alpha (typing)"
+    assert alpha.name == "Alpha (typing)"
 
-    # The rows were rebuilt (a new QLineEdit exists for zone 0), but focus
+    # The rows were rebuilt (a new QLineEdit exists for Alpha), but focus
     # and the typed text must have been carried over to it.
     QApplication.processEvents()
     rows = _rows(workspace)
@@ -537,41 +536,39 @@ def test_pending_rename_ignored_once_committed(workspace, zones):
     """Once a rename is committed (editingFinished fires normally), a later
     unrelated model change must not re-commit or otherwise touch it again —
     _pending_rename must only see text that differs from the model."""
-    zones.add_zone(name="Alpha")
+    alpha = zones.add_zone(name="Alpha")
     row = _rows(workspace)[0]
     _swatch, name_edit, _toggle, _delete = _row_controls(row)
 
     name_edit.setText("Renamed")
     name_edit.editingFinished.emit()
-    assert zones.zone(0).name == "Renamed"
+    assert alpha.name == "Renamed"
 
     # A later unrelated change must not do anything odd with the (now
     # unfocused, already-committed) row.
     zones.add_zone(name="Beta")
-    assert [z.name for z in zones.zones] == ["Renamed", "Beta"]
+    assert [z.name for z in zones.zones.values()] == ["Renamed", "Beta"]
 
 
 # ── Active-zone selection must be obvious in the list ──────────────────────
 
 
-def _active_chip(row) -> QLabel | None:
-    """The 'ACTIVE' marker label on a row, if it has one."""
-    labels = [w for w in row.findChildren(QLabel) if w.text() == "ACTIVE"]
-    return labels[0] if labels else None
+def _is_marked_active(row) -> bool:
+    """Whether a row carries the active-zone marking."""
+    return row.property("active") == "true"
 
 
 def test_active_row_is_visually_distinct(workspace, zones):
-    """Only the active row carries the ACTIVE marker, and its stylesheet
-    picks up that zone's own color as an accent — so which zone a drawing
-    gesture will land in is readable at a glance, not inferred from a
-    one-pixel border."""
-    zones.add_zone(name="A", color="#ff5300")
+    """Only the active row is marked, and its stylesheet picks up that zone's
+    own color as an accent — so which zone a drawing gesture will land in is
+    readable at a glance, not inferred from a one-pixel border."""
+    a = zones.add_zone(name="A", color="#ff5300")
     zones.add_zone(name="B", color="#00c8ff")
-    zones.active_index = 0
+    zones.active_zone = a
 
     first, second = _rows(workspace)
-    assert _active_chip(first) is not None
-    assert _active_chip(second) is None
+    assert _is_marked_active(first)
+    assert not _is_marked_active(second)
     # The accent uses the active zone's color, not a generic highlight.
     assert "#ff5300" in first.styleSheet()
     assert "#00c8ff" not in second.styleSheet()
@@ -580,20 +577,19 @@ def test_active_row_is_visually_distinct(workspace, zones):
 
 def test_the_marker_follows_the_active_zone(workspace, zones):
     zones.add_zone(name="A", color="#ff5300")
-    zones.add_zone(name="B", color="#00c8ff")
+    b = zones.add_zone(name="B", color="#00c8ff")
 
-    zones.active_index = 1
+    zones.active_zone = b
     first, second = _rows(workspace)
-    assert _active_chip(first) is None
-    assert _active_chip(second) is not None
+    assert not _is_marked_active(first)
+    assert _is_marked_active(second)
     assert "#00c8ff" in second.styleSheet()
 
 
 def test_exactly_one_row_is_ever_marked_active(workspace, zones):
-    for name in ("A", "B", "C"):
-        zones.add_zone(name=name)
-    for index in range(3):
-        zones.active_index = index
-        marked = [r for r in _rows(workspace) if _active_chip(r) is not None]
+    added = [zones.add_zone(name=name) for name in ("A", "B", "C")]
+    for zone in added:
+        zones.active_zone = zone
+        marked = [r for r in _rows(workspace) if _is_marked_active(r)]
         assert len(marked) == 1
-        assert marked[0].zone is zones.zone(index)
+        assert marked[0].zone is zone
