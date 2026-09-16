@@ -11,7 +11,7 @@ def test_line_vertical():
     Test the line vertical function.
     """
     # Create a QApplication instance
-    app = QApplication([])
+    _app = QApplication.instance() or QApplication([])
 
     # Create a QLineSeries object
     series = QLineSeries()
@@ -46,13 +46,11 @@ def test_line_vertical():
     # Set the chart view title
     chart_view.setWindowTitle("Test Line Vertical")
 
-    # Show the chart view
+    # Show the chart view and render it once, which exercises drawForeground()
     chart_view.show()
-    # Execute the application
-    app.exec()
+    assert not chart_view.grab().isNull()
 
     # Clean up
     chart_view.deleteLater()
     chart.deleteLater()
     series.deleteLater()
-    app.quit()

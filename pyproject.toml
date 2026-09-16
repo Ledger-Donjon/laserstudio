@@ -76,6 +76,12 @@ build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Integration tests talk to a Laser Studio instance listening on port 4444, so
+# they are excluded by default. Run them with: pytest -m integration
+addopts = "-m 'not integration'"
+markers = [
+    "integration: requires a running Laser Studio instance (slow, hits the REST API)",
+]
 
 [tool.mypy]
 python_version = "3.10"

@@ -3,6 +3,8 @@ import numpy
 import pytest
 from typing import cast
 
+pytestmark = pytest.mark.integration
+
 
 def test_go_next():
     api = LSAPI()

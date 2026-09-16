@@ -1,5 +1,8 @@
 from laserstudio.lsapi import LSAPI
 from random import random
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_add_marker():
