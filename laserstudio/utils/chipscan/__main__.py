@@ -2,7 +2,7 @@ from .chipscan import ChipScan
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QLocale
 import sys
-from ..colors import LedgerPalette, LedgerStyle, ledger_stylesheet
+from ..colors import apply_ledger_theme
 import yaml
 
 
@@ -11,9 +11,7 @@ def main():
 
     app.setApplicationName("Chip Scan")
     app.setApplicationDisplayName("Chip Scan")
-    app.setStyle(LedgerStyle)
-    app.setPalette(LedgerPalette)
-    app.setStyleSheet(ledger_stylesheet())
+    apply_ledger_theme(app)
 
     QLocale.setDefault(QLocale.c())
     with open("config.yaml") as stream:

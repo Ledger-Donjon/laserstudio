@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Sequence
 from PyQt6.QtGui import QColor, QPalette, QIcon, QPainter, QColorConstants
 from PyQt6.QtWidgets import (
+    QApplication,
     QStyleFactory,
     QProxyStyle,
     QStyle,
@@ -269,7 +270,16 @@ def ledger_stylesheet() -> str:
     accent = LedgerColors.SafetyOrange.value
     accent_border = LedgerColors.SafetyOrangeLight.value
 
+    tooltip_bg = LedgerPalette.color(QPalette.ColorRole.ToolTipBase)
+    tooltip_text = LedgerPalette.color(QPalette.ColorRole.ToolTipText)
+
     return f"""
+QToolTip {{
+    color: {tooltip_text.name()};
+    background-color: {tooltip_bg.name()};
+    border: 1px solid {border.name()};
+    padding: 3px 5px;
+}}
 QToolBar {{
     border: 1px solid {border.name()};
     border-radius: 4px;
@@ -370,6 +380,20 @@ QSlider::handle:hover {{
     background: {accent.name()};
 }}
 """.strip()
+
+
+def apply_ledger_theme(app: QApplication) -> None:
+    """Apply the Ledger style, palette and stylesheet to the application."""
+    # A fresh instance every time: setStyle() takes ownership and deletes the
+    # style previously set, which would leave a shared one dangling.
+    app.setStyle(LedgerProxyStyle())
+    app.setPalette(LedgerPalette)
+    # Desktop themes provide their own palette for tooltips, which overrides the
+    # application one. Widgets of the new UI set a background on themselves, and
+    # a tooltip is a child of the widget it documents, so it picks that dark
+    # background up while keeping the desktop's black text.
+    app.setPalette(LedgerPalette, "QTipLabel")
+    app.setStyleSheet(ledger_stylesheet())
 
 
 """

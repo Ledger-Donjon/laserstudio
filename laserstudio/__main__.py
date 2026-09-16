@@ -15,7 +15,7 @@ from .config_generator import ConfigGenerator, ConfigGeneratorWizard
 from .laserstudio import LaserStudio
 from .laserstudio_refonte import LaserStudioRefonte
 from .utils.util import resource_path
-from .utils.colors import LedgerPalette, LedgerStyle, ledger_stylesheet
+from .utils.colors import apply_ledger_theme
 from .instruments.list_serials import list_devices
 from .utils.yaml_types import Config
 
@@ -60,9 +60,7 @@ def main() -> int:
     for _font_file in sorted(_fonts_dir.glob("*.otf")):
         QFontDatabase.addApplicationFont(str(_font_file))
 
-    app.setStyle(LedgerStyle)
-    app.setPalette(LedgerPalette)
-    app.setStyleSheet(ledger_stylesheet())
+    apply_ledger_theme(app)
 
     QLocale.setDefault(QLocale.c())
 

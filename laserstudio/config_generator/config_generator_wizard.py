@@ -18,7 +18,7 @@ try:
     from .ref_resolve import set_base_url
     from .config_generator import ConfigGenerator, validate, ValidationError
     from .config_generator_widgets import SchemaWidget
-    from ..utils.colors import LedgerPalette, LedgerStyle
+    from ..utils.colors import apply_ledger_theme
 except ImportError:
     from laserstudio.config_generator.ref_resolve import set_base_url
     from laserstudio.config_generator.config_generator import (
@@ -27,7 +27,7 @@ except ImportError:
         ValidationError,
     )
     from laserstudio.config_generator.config_generator_widgets import SchemaWidget
-    from laserstudio.utils.colors import LedgerPalette, LedgerStyle
+    from laserstudio.utils.colors import apply_ledger_theme
 from ..utils.util import save_configuration_file
 
 
@@ -157,8 +157,7 @@ def main():
     assert type(SCHEMA) is dict
 
     app = QApplication(sys.argv)
-    app.setStyle(LedgerStyle)
-    app.setPalette(LedgerPalette)
+    apply_ledger_theme(app)
     wizard = ConfigGeneratorWizard(config_generator.schema)
     wizard.show()
     sys.exit(app.exec())
