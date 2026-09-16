@@ -1,10 +1,13 @@
-from random import uniform
-from PyQt6.QtCore import QVariant
 import logging
+from random import uniform
+
+from PyQt6.QtCore import QVariant
+
+from ..utils.yaml_types import Config
+from .lmscontroller import LMSControllerInstrument
 from .probe import ProbeInstrument
 from .shutter import ShutterInstrument
-from .lmscontroller import LMSControllerInstrument
-from ..utils.yaml_types import Config
+from .stage_m3fs import M3FSStageInstrument
 
 
 class LaserInstrument(ProbeInstrument):
@@ -32,7 +35,24 @@ class LaserInstrument(ProbeInstrument):
                     )
             except Exception as e:
                 logging.getLogger("laserstudio").warning(
-                    f"Shutter is enabled but device could not be created: {str(e)}... Skipping."
+                    f"Shutter is enabled but device could not be created: {e!s}... Skipping."
+                )
+
+        # Optispot
+        self.optispot: M3FSStageInstrument | None = None
+        optispot = config.get("optispot")
+        if isinstance(optispot, dict) and optispot.get("enable", True):
+            try:
+                device_type = optispot.get("type")
+                if device_type == "M3FS":
+                    self.optispot = M3FSStageInstrument(optispot)
+                else:
+                    logging.getLogger("laserstudio").error(
+                        f"Unsupported Optispot type {device_type}. Skipping device."
+                    )
+            except Exception as e:
+                logging.getLogger("laserstudio").warning(
+                    f"Optispot is enabled but device could not be created: {e!s}... Skipping."
                 )
 
     @property

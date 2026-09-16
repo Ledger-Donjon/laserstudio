@@ -16,6 +16,7 @@ from ...instruments.pdm import PDMInstrument, SyncSource, DelayLineType, Interlo
 from ...utils.util import resource_path, colored_image
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
 from ..coloredbutton import ColoredPushButton
+from ..optispotcontrol import OptispotControl
 
 
 class PDMDockWidget(QDockWidget):
@@ -149,6 +150,12 @@ class PDMDockWidget(QDockWidget):
             w.setIconSize(QSize(24, 24))
             w.toggled.connect(self.open_shutter)
             grid.addWidget(w, row, 1)
+            row += 1
+
+        # Laser optispot
+        if self.laser.optispot is not None:
+            grid.addWidget(QLabel("Optispot:"), row, 0)
+            grid.addWidget(OptispotControl(self.laser.optispot), row, 1)
             row += 1
 
         grid.addWidget(QLabel("Refresh interval:"), row, 0)

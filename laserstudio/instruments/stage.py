@@ -7,6 +7,7 @@ from typing import Any, SupportsIndex, cast, overload
 
 from PyQt6.QtCore import QMutex, Qt, QTimer, pyqtSignal
 from pystages import (
+    M3FS,
     PI,
     SMC100,
     Autofocus,
@@ -200,18 +201,18 @@ class StageInstrument(Instrument):
         dev = config.get("dev")
         if dev == "":
             dev = None
-        if device_type in ["Corvus", "CNC", "SMC100"] and dev is None:
+        if device_type in ["Corvus", "CNC", "SMC100", "M3FS"] and dev is None:
             logging.getLogger("laserstudio").error(
                 f"In configuration file, 'stage.dev' is mandatory for type {device_type}"
             )
             raise
 
-        if device_type in ["Corvus", "CNC", "SMC100", "PI"] and dev is not None:
+        if device_type in ["Corvus", "CNC", "SMC100", "PI", "M3FS"] and dev is not None:
             try:
                 dev = get_serial_device(dev)
             except DeviceSearchError as e:
                 logging.getLogger("laserstudio").error(
-                    f"Stage is enabled but device is not found: {str(e)}...  Skipping."
+                    f"Stage is enabled but device is not found: {e!s}...  Skipping."
                 )
                 raise
 
@@ -260,9 +261,14 @@ class StageInstrument(Instrument):
                 raise
             if self.refresh_interval is None:
                 self.refresh_interval = 2000
+        elif device_type == "M3FS":
+            logging.getLogger("laserstudio").info(
+                f"Connecting to {device_type} {dev}... "
+            )
+            self.stage = M3FS(dev)
         else:
             logging.getLogger("laserstudio").error(
-                f"Unknown stage type {device_type}. Skipping device."
+                f"Unsupported stage type {device_type}. Skipping device."
             )
             raise
 
@@ -481,11 +487,13 @@ class StageInstrument(Instrument):
         return Vector(*[float(v) for v in self.stage.position.data])
 
     def _apply_position_transforms(self, position: Vector) -> Vector:
-        x = position.x
-        y = position.y
-
-        position.x = x - self.shear[0] * y
-        position.y = y - self.shear[1] * x
+        # Shear couples X and Y, so it needs both axes: on a single-axis stage
+        # Y reads as NaN and would contaminate X.
+        if len(position) > 1:
+            x = position.x
+            y = position.y
+            position.x = x - self.shear[0] * y
+            position.y = y - self.shear[1] * x
 
         factors = self.unit_factors
         if isinstance(factors, float) or isinstance(factors, int):
@@ -666,12 +674,12 @@ class StageInstrument(Instrument):
         )
 
         # Apply shearing transformation
-        x = result[0]
-        y = result[1]
-
-        result[0] = x + self.shear[0] * y
-        result[1] = y + self.shear[1] * x
-        logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
+        if len(result) > 1 and len(self.shear) > 1:
+            x = result[0]
+            y = result[1]
+            result[0] = x + self.shear[0] * y
+            result[1] = y + self.shear[1] * x
+            logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
 
         self._release_joystick_for_move()
 

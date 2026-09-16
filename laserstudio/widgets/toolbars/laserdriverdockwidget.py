@@ -3,8 +3,9 @@ try:
 except Exception:
     LaserDriverPanel = None
 from ...instruments.laserdriver import LaserDriverInstrument
+from ..optispotcontrol import OptispotControl
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDockWidget
+from PyQt6.QtWidgets import QDockWidget, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 
 class LaserDriverDockWidget(QDockWidget):
@@ -34,4 +35,20 @@ class LaserDriverDockWidget(QDockWidget):
         panel.refresh_interval_edit.setMinimum(1000)
         panel.refresh_interval_edit.setMaximum(5000)
         panel.refresh_interval_edit.setValue(2000)
-        self.setWidget(panel)
+
+        if self.laser.optispot is None:
+            self.setWidget(panel)
+            return
+
+        # The driver's own panel knows nothing about the optispot, so the
+        # control goes below it, in a container holding both.
+        container = QWidget()
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
+        container.setLayout(vbox)
+        vbox.addWidget(panel)
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("Optispot:"))
+        hbox.addWidget(OptispotControl(self.laser.optispot))
+        vbox.addLayout(hbox)
+        self.setWidget(container)
