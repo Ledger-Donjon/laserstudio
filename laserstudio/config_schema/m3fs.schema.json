@@ -1,13 +1,13 @@
 {
-  "$id": "ticshutter.schema.json",
+  "$id": "m3fs.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "TIC Shutter",
+  "title": "M3FS",
   "type": "object",
   "allOf": [
     {
       "properties": {
         "type": {
-          "const": "TIC"
+          "const": "M3FS"
         }
       }
     },
@@ -15,5 +15,5 @@
       "$ref": "instrument.schema.json"
     }
   ],
-  "description": "A shutter from https://github.com/Ledger-Donjon/shutter-controller."
+  "description": "A one-axis stage, mostly used for laser's spot focusing (ALPhANOV Optispot feature)."
 }

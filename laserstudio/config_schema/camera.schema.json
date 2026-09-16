@@ -32,7 +32,10 @@
     },
     "pixel_size_in_um": {
       "type": "array",
-      "default": [1, 1],
+      "default": [
+        1,
+        1
+      ],
       "minItems": 1,
       "maxItems": 2,
       "items": {
@@ -52,7 +55,13 @@
     "objectives": {
       "type": "array",
       "minItems": 1,
-      "default": [1, 5, 10, 20, 50],
+      "default": [
+        1,
+        5,
+        10,
+        20,
+        50
+      ],
       "items": {
         "type": "number",
         "exclusiveMinimum": 0.0,
@@ -71,7 +80,11 @@
       "description": "If true, the image will be flipped horizontally. This is useful for some cameras that have a different orientation."
     },
     "shutter": {
-      "allOf": [{ "$ref": "ticshutter.schema.json" }]
+      "allOf": [
+        {
+          "$ref": "ticshutter.schema.json"
+        }
+      ]
     }
   },
   "oneOf": [
@@ -153,5 +166,7 @@
       ]
     }
   ],
-  "required": ["type"]
+  "required": [
+    "type"
+  ]
 }

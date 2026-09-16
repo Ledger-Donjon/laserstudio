@@ -6,7 +6,10 @@
     "host": {
       "type": "string",
       "description": "IP or hostname REST device.",
-      "examples": ["localhost", "127.0.0.1"],
+      "examples": [
+        "localhost",
+        "127.0.0.1"
+      ],
       "default": "localhost"
     },
     "port": {
@@ -21,8 +24,13 @@
       "type": "string",
       "description": "Default API command.",
       "default": "",
-      "examples": ["/images/camera", "/motion"]
+      "examples": [
+        "/images/camera",
+        "/motion"
+      ]
     }
   },
-  "required": ["api_command"]
+  "required": [
+    "api_command"
+  ]
 }

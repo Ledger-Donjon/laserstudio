@@ -8,7 +8,10 @@
       "type": "string",
       "description": "Address on which the REST API must serve. Setting 0.0.0.0 for instance will make the server accessible from any network interface.",
       "default": "localhost",
-      "examples": ["localhost", "0.0.0.0"]
+      "examples": [
+        "localhost",
+        "0.0.0.0"
+      ]
     },
     "port": {
       "type": "integer",

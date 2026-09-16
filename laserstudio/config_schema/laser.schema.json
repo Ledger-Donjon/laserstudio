@@ -30,7 +30,9 @@
           "maximum": 4
         }
       },
-      "required": ["num"]
+      "required": [
+        "num"
+      ]
     },
     {
       "title": "DonjonLaser",
@@ -73,7 +75,9 @@
           }
         },
         {
-          "required": ["motor"]
+          "required": [
+            "motor"
+          ]
         }
       ]
     }
@@ -83,5 +87,7 @@
       "$ref": "probe.schema.json"
     }
   ],
-  "required": ["type"]
+  "required": [
+    "type"
+  ]
 }

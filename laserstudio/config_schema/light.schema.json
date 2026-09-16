@@ -27,11 +27,15 @@
           "$ref": "lmscontroller.schema.json"
         },
         {
-          "required": ["motor"]
+          "required": [
+            "motor"
+          ]
         }
       ]
     }
   ],
   "description": "Lighting instrument.",
-  "required": ["type"]
+  "required": [
+    "type"
+  ]
 }

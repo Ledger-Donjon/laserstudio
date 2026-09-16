@@ -11,11 +11,19 @@
   "description": "Autofocus helper (requires both a camera and a stage).",
   "properties": {
     "coarse": {
-      "allOf": [{ "$ref": "focussearch.schema.json" }],
+      "allOf": [
+        {
+          "$ref": "focussearch.schema.json"
+        }
+      ],
       "description": "Coarse focus-search settings (wide span, fewer steps)."
     },
     "fine": {
-      "allOf": [{ "$ref": "focussearch.schema.json" }],
+      "allOf": [
+        {
+          "$ref": "focussearch.schema.json"
+        }
+      ],
       "description": "Fine focus-search settings (narrow span, more steps)."
     }
   }

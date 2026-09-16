@@ -65,3 +65,9 @@ lasers:
       motor: 2
       type: LMSController
       label: LMS Laser
+    optispot:
+      label: M3FS Optispot
+      type: M3FS
+      enable: true
+      dev:
+        sn: 29241

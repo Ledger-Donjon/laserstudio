@@ -5,7 +5,13 @@
     "label": {
       "type": "string",
       "description": "The instrument's personalized label.",
-      "examples": ["Camera", "Stage", "Laser 1", "Laser 2", "Probe"]
+      "examples": [
+        "Camera",
+        "Stage",
+        "Laser 1",
+        "Laser 2",
+        "Probe"
+      ]
     },
     "enable": {
       "type": "boolean",

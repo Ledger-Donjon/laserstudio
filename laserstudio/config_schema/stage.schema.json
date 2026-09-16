@@ -79,7 +79,10 @@
       "type": "array",
       "minItems": 2,
       "maxItems": 2,
-      "default": [0.0, 0.0],
+      "default": [
+        0.0,
+        0.0
+      ],
       "items": {
         "type": "number"
       }
@@ -132,7 +135,10 @@
           "items": {
             "type": "integer"
           },
-          "default": [1, 2]
+          "default": [
+            1,
+            2
+          ]
         }
       }
     },
@@ -150,7 +156,11 @@
           "items": {
             "type": "integer"
           },
-          "default": [1, 2, 3]
+          "default": [
+            1,
+            2,
+            3
+          ]
         },
         "joystick_velocity_mm_s": {
           "description": "Closed-loop velocity (mm/s) applied on each PI controller before enabling the analog joystick. Joystick speed is a fraction of this value (see PI C-863 manual). Lower values reduce overspeed and over-current trips.",
@@ -285,7 +295,9 @@
           "description": "Number of axes of the dummy stage."
         }
       },
-      "required": ["num_axis"]
+      "required": [
+        "num_axis"
+      ]
     },
     {
       "title": "REST",
@@ -302,5 +314,7 @@
       ]
     }
   ],
-  "required": ["type"]
+  "required": [
+    "type"
+  ]
 }
