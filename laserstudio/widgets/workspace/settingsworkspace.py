@@ -1790,6 +1790,7 @@ class SettingsWorkspace(Workspace):
     ]
 
     def __init__(self, window: Any) -> None:
+        super().__init__()
         self._window = window
         self._coord_label: QLabel | None = None
         self._pixel_size_lbl: QLineEdit | None = None

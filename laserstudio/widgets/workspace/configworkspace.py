@@ -272,6 +272,7 @@ class ConfigWorkspace(Workspace):
         config_loaded: bool,
         window: QWidget,
     ) -> None:
+        super().__init__()
         self._config_path = config_path
         self._config_loaded = config_loaded
         self._window = window  # parent for dialogs
