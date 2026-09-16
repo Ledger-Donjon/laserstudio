@@ -223,6 +223,14 @@ class Viewer(QGraphicsView):
         """Defer fit until after the current layout pass (viewport has real size)."""
         QTimer.singleShot(0, self._fit_view_if_auto)
 
+    def set_auto_fit(self, enabled: bool) -> None:
+        """Stop (or resume) the automatic refit done on show and resize.
+
+        Any explicit framing coming from the user — wheel zoom, zoom buttons —
+        must turn it off, otherwise the next resize discards their framing.
+        """
+        self._auto_fit_view = enabled
+
     def fit_view(self) -> None:
         """Frame the stage sight, or the full scene when a reference image exists."""
         if self.stage_sight is None:
@@ -315,6 +323,27 @@ class Viewer(QGraphicsView):
         else:
             all_elements_rect = self.__scene.itemsBoundingRect()
         self._apply_camera_fit(all_elements_rect)
+
+    def _visible_items_rect(self) -> QRectF:
+        """Bounding rect of the items actually drawn.
+
+        ``QGraphicsScene.itemsBoundingRect`` also covers hidden items — the
+        guardrail circle alone spans tens of millimetres — so framing it would
+        leave the user staring at empty scene.
+        """
+        rect = QRectF()
+        for item in self.__scene.items():
+            if item.isVisible():
+                rect = rect.united(item.sceneBoundingRect())
+        return rect
+
+    def reset_camera_to_visible_items(self):
+        """Resets the camera to frame every element currently drawn."""
+        rect = self._visible_items_rect()
+        if rect.isNull():
+            self.reset_camera()
+            return
+        self._apply_camera_fit(rect)
 
     def _stage_sight_fit_rect(self) -> QRectF | None:
         """Declared camera field of view in scene coordinates (µm)."""

@@ -141,6 +141,9 @@ class LaserStudioRefonte(QMainWindow):
         QShortcut(QKeySequence(Qt.Key.Key_L), self).activated.connect(
             lambda: self.viewer.select_mode(Viewer.Mode.RULER)
         )
+        QShortcut(QKeySequence(Qt.Key.Key_C), self).activated.connect(
+            self._viewer_area.controls.toggle_follow
+        )
 
     @property
     def viewer(self):

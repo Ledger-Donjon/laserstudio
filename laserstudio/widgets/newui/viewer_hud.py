@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
+from typing import TYPE_CHECKING
+
+from PyQt6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent, QShowEvent
-from PyQt6.QtWidgets import QLabel, QWidget
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from laserstudio.instruments.instruments import Instruments
 
-from . import theme
+from . import lucide, theme
+
+if TYPE_CHECKING:
+    from ..viewer import Viewer
 
 # Shared HUD decoration tokens — used by the viewer overlay and workspace backdrops.
 GRID_STEP = 34
@@ -19,6 +24,32 @@ BRACKET_LEN = 16
 LABEL_INSET = INSET + 4
 LABEL_FONT_SIZE = 10
 HUD_LABEL_SS = f"color: {theme.TEXT_MUTED}; background: transparent;"
+
+HUD_BTN_SIZE = 28
+HUD_BTN_ICON_SIZE = 16
+HUD_BTN_SS = f"""
+QPushButton {{
+    background: rgba(10,10,10,0.55);
+    border: 1px solid {theme.BORDER};
+    border-radius: 6px;
+    color: {theme.TEXT_MUTED};
+}}
+QPushButton:hover {{
+    background: rgba(255,255,255,0.10);
+    border: 1px solid {theme.BORDER_HOVER};
+    color: {theme.TEXT};
+}}
+QPushButton:checked {{
+    background: {theme.PURPLE_BG};
+    border: 1px solid {theme.PURPLE_BORDER};
+    color: {theme.PURPLE};
+}}
+QPushButton:disabled {{
+    background: rgba(255,255,255,0.02);
+    border: 1px solid {theme.BORDER_SUBTLE};
+    color: {theme.TEXT_DIM};
+}}
+"""
 
 _SCALE_COLOR = QColor(theme.TEXT_MUTED)
 _TARGET_BAR_PX = 46.0
@@ -93,6 +124,10 @@ class ViewerHud(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setStyleSheet("background: transparent;")
 
+        # Clickable HUD controls live in a sibling widget (see ViewerHudControls),
+        # but follow this overlay's visibility.
+        self.controls: ViewerHudControls | None = None
+
         self._workspace = "CONFIG"
         self._coords = (0.0, 0.0)
         self._scale_um = 100.0
@@ -106,6 +141,11 @@ class ViewerHud(QWidget):
         self._scale_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self._refresh_labels()
+
+    def setVisible(self, visible: bool) -> None:  # noqa: N802 (Qt override)
+        super().setVisible(visible)
+        if self.controls is not None:
+            self.controls.setVisible(visible)
 
     def set_workspace(self, name: str) -> None:
         self._workspace = name.upper()
@@ -169,6 +209,114 @@ class ViewerHud(QWidget):
         painter.end()
 
 
+class ViewerHudControls(QWidget):
+    """
+    Clickable HUD controls drawn over the viewer.
+
+    Kept out of :class:`ViewerHud`: that overlay is transparent for mouse
+    events, an attribute Qt also applies to child widgets.
+    """
+
+    def __init__(self, viewer: "Viewer", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent;")
+        self._viewer = viewer
+
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(6)
+
+        self._follow_btn = self._add_button(
+            icon_name="locate-fixed",
+            tooltip="Keep the view centered on the focused item (C)",
+            checkable=True,
+        )
+        self._follow_btn.toggled.connect(self._on_follow_toggled)
+
+        self._add_separator()
+
+        self._add_button(
+            icon_name="zoom-out", tooltip="Zoom out (×0.5)"
+        ).clicked.connect(lambda: self._apply_zoom(0.5))
+        self._add_button(
+            text="1:1", tooltip="Reset zoom to 1 µm per pixel"
+        ).clicked.connect(self._reset_zoom)
+        self._add_button(
+            icon_name="zoom-in", tooltip="Zoom in (×2)"
+        ).clicked.connect(lambda: self._apply_zoom(2.0))
+        self._add_button(
+            icon_name="maximize", tooltip="Fit every element in the view"
+        ).clicked.connect(self._fit_all)
+
+        viewer.follow_stage_sight_changed.connect(self._follow_btn.setChecked)
+        self.sync()
+
+    def _add_button(
+        self,
+        *,
+        tooltip: str,
+        icon_name: str | None = None,
+        text: str = "",
+        checkable: bool = False,
+    ) -> QPushButton:
+        btn = QPushButton(text, self)
+        btn.setCheckable(checkable)
+        btn.setFixedSize(HUD_BTN_SIZE, HUD_BTN_SIZE)
+        btn.setIconSize(QSize(HUD_BTN_ICON_SIZE, HUD_BTN_ICON_SIZE))
+        btn.setStyleSheet(HUD_BTN_SS)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setToolTip(tooltip)
+        if icon_name is not None:
+            btn.setIcon(lucide.icon(icon_name, HUD_BTN_ICON_SIZE, theme.TEXT_MUTED))
+        else:
+            btn.setFont(theme.mono_font(LABEL_FONT_SIZE))
+        self._layout.addWidget(btn)
+        return btn
+
+    def _add_separator(self) -> None:
+        line = QFrame(self)
+        line.setFixedSize(1, 16)
+        line.setStyleSheet(f"background: {theme.BORDER};")
+        self._layout.addWidget(line, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def _apply_zoom(self, factor: float) -> None:
+        self._viewer.set_auto_fit(False)
+        self._viewer.zoom = self._viewer.zoom * factor
+
+    def _reset_zoom(self) -> None:
+        self._viewer.set_auto_fit(False)
+        del self._viewer.zoom
+
+    def _fit_all(self) -> None:
+        self._viewer.set_auto_fit(False)
+        self._viewer.reset_camera_to_visible_items()
+
+    def sync(self) -> None:
+        """Align the controls with the viewer — call once a stage sight exists."""
+        self._follow_btn.setEnabled(self._viewer.stage_sight is not None)
+        self._follow_btn.setChecked(self._viewer.follow_stage_sight)
+        self._refresh_follow_icon()
+
+    def toggle_follow(self) -> None:
+        """Flip the centering mode (bound to the viewer shortcut)."""
+        if self._follow_btn.isEnabled():
+            self._follow_btn.toggle()
+
+    def _on_follow_toggled(self, checked: bool) -> None:
+        self._viewer.follow_stage_sight = checked
+        self._refresh_follow_icon()
+
+    def _refresh_follow_icon(self) -> None:
+        btn = self._follow_btn
+        if not btn.isEnabled():
+            color = theme.TEXT_DIM
+        elif btn.isChecked():
+            color = theme.PURPLE
+        else:
+            color = theme.TEXT_MUTED
+        btn.setIcon(lucide.icon("locate-fixed", HUD_BTN_ICON_SIZE, color))
+
+
 class ViewerArea(QWidget):
     """Viewer widget with a HUD overlay on top."""
 
@@ -196,6 +344,8 @@ class ViewerArea(QWidget):
             annotations=annotations,
         )
         self.hud = ViewerHud(self)
+        self.controls = ViewerHudControls(self.viewer, self)
+        self.hud.controls = self.controls
         self._distortion_overlay = None
 
         vp = self.viewer.viewport()
@@ -214,18 +364,34 @@ class ViewerArea(QWidget):
         super().resizeEvent(a0)
         self.viewer.setGeometry(self.rect())
         self.hud.setGeometry(self.rect())
+        self._reposition_controls()
         if self._distortion_overlay is not None:
             self._distortion_overlay.setGeometry(self.rect())
             if self._distortion_overlay.isVisible():
                 self._distortion_overlay.raise_()
             else:
-                self.hud.raise_()
+                self._raise_hud()
         else:
-            self.hud.raise_()
+            self._raise_hud()
         QTimer.singleShot(0, self.update_scale_from_viewer)
+
+    def _raise_hud(self) -> None:
+        self.hud.raise_()
+        self.controls.raise_()
+
+    def _reposition_controls(self) -> None:
+        """Park the HUD controls in the bottom-left corner, inside the brackets."""
+        self.controls.adjustSize()
+        self.controls.move(
+            LABEL_INSET,
+            max(0, self.height() - LABEL_INSET - self.controls.height()),
+        )
 
     def showEvent(self, a0: QShowEvent | None) -> None:
         super().showEvent(a0)
+        # The stage sight is added after construction, so the follow control
+        # only learns whether it can be enabled here.
+        self.controls.sync()
         self.fit_view()
 
     def show_distortion_overlay(self):
