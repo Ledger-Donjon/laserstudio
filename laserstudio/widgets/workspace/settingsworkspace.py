@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt
 from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QApplication,
@@ -31,6 +31,7 @@ from ...instruments.camera import CameraInstrument
 from ...instruments.camera_usb import CameraUSBInstrument
 from ...instruments.shutter import ShutterInstrument
 from ...instruments.stage import StageInstrument, Vector
+from ...instruments.stage_pi import PIStageInstrument
 from ..keyboardbox import Direction, arrow_key_direction, direction_axis
 from ..newui import lucide, theme
 from ..return_line_edit import ReturnDoubleSpinBox, ReturnSpinBox
@@ -544,6 +545,8 @@ class _JoystickControls(QWidget):
     def __init__(self, stage: StageInstrument, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._stage = stage
+        # Per-axis control is a PI feature; other stages get a single toggle.
+        self._pi = stage if isinstance(stage, PIStageInstrument) else None
         self._updating = False
         self._axis_buttons: list[QPushButton] = []
         self._all_button: QPushButton | None = None
@@ -558,7 +561,7 @@ class _JoystickControls(QWidget):
         )
         root.addWidget(header)
 
-        if stage.is_pi:
+        if self._pi is not None:
             hint = QLabel(
                 "Enable the analog joystick per axis. Motion commands are rejected "
                 "while an axis is under joystick control."
@@ -620,10 +623,11 @@ class _JoystickControls(QWidget):
             root.addWidget(self._toggle)
 
     def _refresh_pi_state(self) -> None:
-        if not self._stage.is_pi:
+        pi = self._pi
+        if pi is None:
             return
         try:
-            states = self._stage.pi_joystick_enabled
+            states = pi.pi_joystick_enabled
         except Exception as exc:
             logging.getLogger("laserstudio").warning(
                 "Could not read PI joystick state: %s", exc
@@ -640,10 +644,11 @@ class _JoystickControls(QWidget):
             self._updating = False
 
     def _on_axis_toggled(self, axis: int, checked: bool) -> None:
-        if self._updating:
+        pi = self._pi
+        if self._updating or pi is None:
             return
         try:
-            self._stage.set_pi_joystick_axis(axis, checked)
+            pi.set_pi_joystick_axis(axis, checked)
         except Exception as exc:
             logging.getLogger("laserstudio").warning(
                 "Failed to set PI joystick on axis %s: %s", axis, exc
@@ -653,16 +658,17 @@ class _JoystickControls(QWidget):
         self._updating = True
         try:
             if self._all_button is not None:
-                states = self._stage.pi_joystick_enabled
+                states = pi.pi_joystick_enabled
                 self._all_button.setChecked(all(states))
         finally:
             self._updating = False
 
     def _on_all_toggled(self, checked: bool) -> None:
-        if self._updating:
+        pi = self._pi
+        if self._updating or pi is None:
             return
         try:
-            self._stage.pi_joystick_enabled = checked
+            pi.pi_joystick_enabled = checked
         except Exception as exc:
             logging.getLogger("laserstudio").warning(
                 "Failed to set PI joystick on all axes: %s", exc
@@ -1341,7 +1347,7 @@ class DpadWidget(QWidget):
             "background: transparent;"
             + (
                 f" border: 1px solid {theme.PURPLE}; border-radius: 6px;"
-                if checked
+                if active
                 else ""
             )
         )
@@ -1552,7 +1558,7 @@ class _PIMotionSection(QWidget):
 
     _AXIS_LABELS = "XYZ"
 
-    def __init__(self, stage: StageInstrument, parent: QWidget | None = None) -> None:
+    def __init__(self, stage: PIStageInstrument, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._stage = stage
         self._updating = False
@@ -1971,7 +1977,7 @@ class SettingsWorkspace(Workspace):
 
             layout.addWidget(theme.separator())
             layout.addWidget(_SafetyLimitsSection(self._window))
-            if stage.is_pi:
+            if isinstance(stage, PIStageInstrument):
                 layout.addWidget(theme.separator())
                 layout.addWidget(_PIMotionSection(stage))
         else:

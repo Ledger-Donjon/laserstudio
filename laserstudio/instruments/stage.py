@@ -1,47 +1,52 @@
 from __future__ import annotations
+
 import logging
 import math
-from typing import cast, Any, SupportsIndex, overload
 from enum import Enum, auto
-from PyQt6.QtCore import QTimer, pyqtSignal, Qt, QMutex
-from pystages.exceptions import ProtocolError
+from typing import Any, SupportsIndex, cast, overload
+
+from PyQt6.QtCore import QMutex, Qt, QTimer, pyqtSignal
 from pystages import (
-    Corvus,
-    CNCRouter,
-    CNCError,
-    Stage,
-    Vector as PystagesVector,
+    PI,
+    SMC100,
     Autofocus,
+    CNCError,
+    CNCRouter,
+    Corvus,
+    Stage,
     Tic,
     TicDirection,
-    SMC100,
-    PI,
 )
-from ..utils.grbl_alarms import format_grbl_alarm_message
-from .stage_rest import StageRest
-from .stage_dummy import StageDummy
-from .list_serials import get_serial_device, DeviceSearchError
-from .instrument import Instrument
+from pystages import (
+    Vector as PystagesVector,
+)
+from pystages.exceptions import ProtocolError
+
 from ..utils.yaml_types import Config
+from .instrument import Instrument
+from .list_serials import DeviceSearchError, get_serial_device
+from .stage_dummy import StageDummy
+from .stage_rest import StageRest
 
 __all__ = [
-    "StageInstrument",
-    "MoveFor",
+    "PI",
+    "SMC100",
     "Autofocus",
+    "CNCRouter",
+    "Corvus",
+    "DeviceSearchError",
+    "Instrument",
+    "MoveFor",
+    "ProtocolError",
+    "Stage",
+    "StageDummy",
+    "StageInstrument",
+    "StageRest",
     "Tic",
     "TicDirection",
     "Vector",
-    "ProtocolError",
-    "Corvus",
-    "CNCRouter",
-    "SMC100",
-    "PI",
-    "Stage",
-    "StageRest",
-    "StageDummy",
+    "create_stage_instrument",
     "get_serial_device",
-    "DeviceSearchError",
-    "Instrument",
 ]
 
 
@@ -161,7 +166,6 @@ class StageInstrument(Instrument):
 
     # Signal emitted when a new position is fetched
     position_changed = pyqtSignal(Vector)
-    grbl_alarm = pyqtSignal(str)
     # Signal emitted when the "Max move distance" guardrail (value or enabled
     # state) changes.
     guardrail_changed = pyqtSignal()
@@ -233,17 +237,6 @@ class StageInstrument(Instrument):
             adresses = config.get("adresses", [1, 2, 3])
             logging.getLogger("laserstudio").info(f"Connecting to {adresses}... ")
             self.stage = PI(dev=dev, addresses=adresses)
-            self._pi_joystick_velocity_mm_s = self._expand_per_axis_config(
-                config.get("joystick_velocity_mm_s",  [50.0, 50.0, 5.0]), len(adresses)
-            )
-            self._pi_joystick_acceleration_mm_s2 = self._expand_per_axis_config(
-                config.get("joystick_acceleration_mm_s2", [400.0, 400.0, 40.0]), len(adresses)
-            )
-            self._pi_joystick_deceleration_mm_s2 = self._expand_per_axis_config(
-                config.get("joystick_deceleration_mm_s2", [400.0, 400.0, 40.0]), len(adresses)
-            )
-            self._pi_saved_motion_params: tuple[list[float], list[float], list[float]] | None = None
-            self._apply_pi_motion_from_config(config, len(adresses))
         elif device_type == "SMC100":
             logging.getLogger("laserstudio").info(
                 "Creating a SMC100 stage... " + f"Connecting to {device_type} {dev}... "
@@ -343,25 +336,12 @@ class StageInstrument(Instrument):
                 cast(list[float], soft_min), cast(list[float], soft_max)
             )
 
-        # Indicate
+        # Stores the initial type of 'move for' operation
         self.move_for = MoveFor(MoveFor.Type.CAMERA_CENTER)
 
     def set_log_level(self, level: int) -> None:
         if hasattr(self.stage, "logger"):
             self.stage.logger.setLevel(level)
-
-    def _handle_cnc_error(self, error: CNCError, *, notify: bool = False) -> None:
-        message = format_grbl_alarm_message(error)
-        alarm_key = (error.status.substate, error.args[0] if error.args else "")
-        if alarm_key != self._last_reported_alarm:
-            self._last_reported_alarm = alarm_key
-            logging.getLogger("laserstudio").warning(message)
-            if notify:
-                self.grbl_alarm.emit(message)
-
-    def clear_grbl_alarm_state(self) -> None:
-        """Clear the GRBL alarm state so position polling can resume after unlock."""
-        self._last_reported_alarm = None
 
     def _pad_axes(self, values: list[float]) -> list[float]:
         """Pad/truncate a list of values to match the number of axes."""
@@ -369,16 +349,6 @@ class StageInstrument(Instrument):
         if len(values) < self.num_axis:
             values += [0.0] * (self.num_axis - len(values))
         return values
-
-    @staticmethod
-    def _expand_per_axis_config(value: float | int | list[float], count: int) -> list[float]:
-        """Expand a scalar or list config value to one entry per axis."""
-        if isinstance(value, (int, float)):
-            return [float(value)] * count
-        values = [float(v) for v in value]
-        if len(values) < count:
-            values += [values[-1]] * (count - len(values))
-        return values[:count]
 
     def _set_soft_limits_raw(self, minimum: list[float], maximum: list[float]) -> None:
         """Set the soft limits without emitting any signal (used at init)."""
@@ -550,6 +520,18 @@ class StageInstrument(Instrument):
         """
         self.move_to(value, wait=False)
 
+    def _handle_cnc_error(self, error: CNCError, *, notify: bool = False) -> None:
+        """Report a GRBL error raised while talking to the device.
+
+        Only :class:`CNCRouterStageInstrument` can really answer this — it
+        overrides the hook to raise the alarm. Any other stage reaching here
+        means a device raised a CNCError it has no business raising.
+        """
+        logging.getLogger("laserstudio").error(
+            f"CNCError: {repr(error)} raised by non-CNCRouter stage ???",
+            exc_info=True,
+        )
+
     def __autorefresh_stage(self):
         """Called regularly to get stage position, and emits a pyQtSignal
         This method is not public, it is called by a QTimer to refresh the stage position regularly."""
@@ -576,7 +558,7 @@ class StageInstrument(Instrument):
             self._last_reported_alarm = None
             logging.getLogger("laserstudio").debug(f"Position refreshed: {position}")
         except CNCError as e:
-            self._handle_cnc_error(e)
+            self._handle_cnc_error(e, notify=True)
         except ProtocolError as e:
             logging.getLogger("laserstudio").warning(
                 f"Warning: Bad response!: {repr(e)}"
@@ -731,193 +713,17 @@ class StageInstrument(Instrument):
         here the device will get the current position as the origin,
         this will be then permanent accross all projects.
         """
-        if isinstance(self.stage, Corvus):
-            self.stage.set_origin()
-        elif isinstance(self.stage, CNCRouter):
-            self.stage.set_origin()
-        elif isinstance(self.stage, PI):
+        if isinstance(self.stage, (Corvus, PI, CNCRouter)):
             self.stage.set_origin()
         else:
-            logging.getLogger("laserstudio").error(
+            raise TypeError(
                 f"Stage of type {type(self.stage)} does not support setting device's origin. Skipping operation."
             )
 
     @property
-    def is_pi(self) -> bool:
-        """True when the underlying stage is a PI/Mercury controller."""
-        return isinstance(self.stage, PI)
-
-    def _pi_stage(self) -> PI:
-        if not isinstance(self.stage, PI):
-            raise TypeError("PI motion parameters require a PI stage")
-        return self.stage
-
-    def _apply_pi_motion_from_config(self, config: dict[str, Any], count: int) -> None:
-        """Apply optional closed-loop VEL/ACC/DEC from config at startup."""
-        pi_stage = self._pi_stage()
-        if "velocity_mm_s" in config:
-            pi_stage.velocity = self._expand_per_axis_config(
-                config["velocity_mm_s"], count
-            )
-        if "acceleration_mm_s2" in config:
-            pi_stage.acceleration = self._expand_per_axis_config(
-                config["acceleration_mm_s2"], count
-            )
-        if "deceleration_mm_s2" in config:
-            pi_stage.deceleration = self._expand_per_axis_config(
-                config["deceleration_mm_s2"], count
-            )
-
-    @property
-    def pi_velocity_mm_s(self) -> list[float]:
-        """Closed-loop velocity (mm/s) for each PI controller axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.velocity)
-        finally:
-            self.mutex.unlock()
-
-    @pi_velocity_mm_s.setter
-    def pi_velocity_mm_s(self, value: float | list[float]) -> None:
-        pi_stage = self._pi_stage()
-        if isinstance(value, (int, float)):
-            values = [float(value)] * pi_stage.num_axis
-        else:
-            values = self._expand_per_axis_config(value, pi_stage.num_axis)
-        self.mutex.lock()
-        try:
-            pi_stage.velocity = values
-        finally:
-            self.mutex.unlock()
-
-    @property
-    def pi_velocity_max_mm_s(self) -> list[float]:
-        """Maximum settable closed-loop velocity (mm/s) per PI axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.velocity_max)
-        finally:
-            self.mutex.unlock()
-
-    @property
-    def pi_acceleration_max_mm_s2(self) -> list[float]:
-        """Maximum settable closed-loop acceleration (mm/s²) per PI axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.acceleration_max)
-        finally:
-            self.mutex.unlock()
-
-    @property
-    def pi_deceleration_max_mm_s2(self) -> list[float]:
-        """Maximum settable closed-loop deceleration (mm/s²) per PI axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.deceleration_max)
-        finally:
-            self.mutex.unlock()
-
-    @property
-    def pi_acceleration_mm_s2(self) -> list[float]:
-        """Closed-loop acceleration (mm/s²) for each PI controller axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.acceleration)
-        finally:
-            self.mutex.unlock()
-
-    @pi_acceleration_mm_s2.setter
-    def pi_acceleration_mm_s2(self, value: float | list[float]) -> None:
-        pi_stage = self._pi_stage()
-        if isinstance(value, (int, float)):
-            values = [float(value)] * pi_stage.num_axis
-        else:
-            values = self._expand_per_axis_config(value, pi_stage.num_axis)
-        self.mutex.lock()
-        try:
-            pi_stage.acceleration = values
-        finally:
-            self.mutex.unlock()
-
-    @property
-    def pi_deceleration_mm_s2(self) -> list[float]:
-        """Closed-loop deceleration (mm/s²) for each PI controller axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.deceleration)
-        finally:
-            self.mutex.unlock()
-
-    @pi_deceleration_mm_s2.setter
-    def pi_deceleration_mm_s2(self, value: float | list[float]) -> None:
-        pi_stage = self._pi_stage()
-        if isinstance(value, (int, float)):
-            values = [float(value)] * pi_stage.num_axis
-        else:
-            values = self._expand_per_axis_config(value, pi_stage.num_axis)
-        self.mutex.lock()
-        try:
-            pi_stage.deceleration = values
-        finally:
-            self.mutex.unlock()
-
-    def set_pi_axis_motion(
-        self,
-        axis: int,
-        *,
-        velocity_mm_s: float | None = None,
-        acceleration_mm_s2: float | None = None,
-        deceleration_mm_s2: float | None = None,
-    ) -> None:
-        """Update VEL/ACC/DEC for a single PI axis."""
-        if velocity_mm_s is not None:
-            values = self.pi_velocity_mm_s
-            values[axis] = float(velocity_mm_s)
-            self.pi_velocity_mm_s = values
-        if acceleration_mm_s2 is not None:
-            values = self.pi_acceleration_mm_s2
-            values[axis] = float(acceleration_mm_s2)
-            self.pi_acceleration_mm_s2 = values
-        if deceleration_mm_s2 is not None:
-            values = self.pi_deceleration_mm_s2
-            values[axis] = float(deceleration_mm_s2)
-            self.pi_deceleration_mm_s2 = values
-
-    @property
     def supports_analog_joystick(self) -> bool:
-        """True when the stage exposes an analog joystick (PI or Corvus)."""
-        return isinstance(self.stage, (PI, Corvus))
-
-    @property
-    def pi_joystick_enabled(self) -> list[bool]:
-        """Joystick activation state for each PI controller axis."""
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            return list(pi_stage.joystick_enabled)
-        finally:
-            self.mutex.unlock()
-
-    @pi_joystick_enabled.setter
-    def pi_joystick_enabled(self, value: bool | list[bool]) -> None:
-        pi_stage = self._pi_stage()
-        self.mutex.lock()
-        try:
-            pi_stage.joystick_enabled = value
-        finally:
-            self.mutex.unlock()
-
-    def set_pi_joystick_axis(self, axis: int, enabled: bool) -> None:
-        """Enable or disable the analog joystick on a single PI axis."""
-        states = self.pi_joystick_enabled
-        states[axis] = enabled
-        self.pi_joystick_enabled = states
+        """True when the stage exposes an analog joystick."""
+        return isinstance(self.stage, Corvus)
 
     def enable_joystick(self, enabled: bool):
         """
@@ -925,94 +731,12 @@ class StageInstrument(Instrument):
         """
         if isinstance(self.stage, Corvus):
             self.stage.joystick_enabled = enabled
-        elif isinstance(self.stage, PI):
-            if enabled:
-                self._enable_pi_joystick(True)
-            else:
-                self._enable_pi_joystick(False)
-
-    def _pi_query_axis_float(self, pi_stage: PI, address: int, command: str) -> float:
-        """Read a single-axis float parameter from a PI controller (e.g. VEL, ACC, DEC)."""
-        res = pi_stage.query(command, address, args=["1"])[0]
-        parts = res.split("=", 1)
-        if len(parts) != 2:
-            raise ProtocolError(
-                query=f"{address} {command}? 1",
-                response=res,
-                expected="2 parts in the response, separated by =",
-            )
-        return float(parts[1].strip())
-
-    def _enable_pi_joystick(self, enabled: bool) -> None:
-        """Enable or disable the analog joystick on PI/Mercury controllers.
-
-        Joystick velocity is proportional to the closed-loop VEL setting (see
-        C-863 manual §8.6). We lower VEL/ACC/DEC before activation to avoid
-        over-current protection when the stick is moved quickly, and restore
-        the previous values when the joystick is disabled.
-        """
-        log = logging.getLogger("laserstudio")
-        pi_stage = self.stage
-        assert isinstance(pi_stage, PI)
-        self.mutex.lock()
-        try:
-            
-            if enabled:
-                pi_stage.enable_joystick()
-                self._pi_saved_motion_params = (pi_stage.velocity, pi_stage.acceleration, pi_stage.deceleration)
-                for i, address in enumerate(pi_stage.addresses):
-                    log.info(
-                        f"PI address {address}: saved motion params "
-                        f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
-                        f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
-                        f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
-                    )
-            else:
-                pi_stage.disable_joystick()
-                if self._pi_saved_motion_params is not None:
-                    pi_stage.velocity = self._pi_saved_motion_params[0]
-                    pi_stage.acceleration = self._pi_saved_motion_params[1]
-                    pi_stage.deceleration = self._pi_saved_motion_params[2]
-
-                    for i, address in enumerate(pi_stage.addresses):
-                                log.info(
-                                    f"PI address {address}: restored motion params "
-                                    f"VEL={self._pi_saved_motion_params[0][i]} mm/s, "
-                                    f"ACC={self._pi_saved_motion_params[1][i]} mm/s², "
-                                    f"DEC={self._pi_saved_motion_params[2][i]} mm/s²"
-                            )
-                                
-            for i, address in enumerate(pi_stage.addresses):
-                res = pi_stage.query("JON", address, args=["1"])[0]
-                log.info(f"Joystick state on address {address}: {res}")
-                errors = pi_stage.error()
-                if errors:
-                    log.error(f"PI controller {address} errors after joystick toggle: {errors}")
-                else:
-                    log.info(f"PI controller {address}: no errors")
-        finally:
-            self.mutex.unlock()
-
-    def reboot(self):
-        """
-        Reboot the stage.
-        """
-        if isinstance(self.stage, PI):
-            # Send command RBT
-            for a in self.stage.addresses:
-                self.stage.send(a, "RBT")
 
     def home(self, wait: bool = False):
         """
         Home the stage.
         """
         self.stage.home(wait=wait)
-        if isinstance(self.stage, PI):
-            errors = self.stage.error()
-            if errors:
-                logging.getLogger("laserstudio").error(f"Errors: {errors}")
-            else:
-                logging.getLogger("laserstudio").info("No errors")
 
     @property
     def settings(self) -> Config:
@@ -1029,10 +753,6 @@ class StageInstrument(Instrument):
         if self._soft_limits_min is not None and self._soft_limits_max is not None:
             super_settings["soft_limits_min"] = list(self._soft_limits_min)
             super_settings["soft_limits_max"] = list(self._soft_limits_max)
-        if self.is_pi:
-            super_settings["velocity_mm_s"] = self.pi_velocity_mm_s
-            super_settings["acceleration_mm_s2"] = self.pi_acceleration_mm_s2
-            super_settings["deceleration_mm_s2"] = self.pi_deceleration_mm_s2
         logging.getLogger("laserstudio").debug(f"Stage settings: {super_settings}")
         return super_settings
 
@@ -1065,10 +785,24 @@ class StageInstrument(Instrument):
         if "soft_limits_enabled" in data:
             self._soft_limits_enabled = bool(data["soft_limits_enabled"])
         self.soft_limits_changed.emit()
-        if self.is_pi:
-            if "velocity_mm_s" in data:
-                self.pi_velocity_mm_s = cast(Any, data["velocity_mm_s"])
-            if "acceleration_mm_s2" in data:
-                self.pi_acceleration_mm_s2 = cast(Any, data["acceleration_mm_s2"])
-            if "deceleration_mm_s2" in data:
-                self.pi_deceleration_mm_s2 = cast(Any, data["deceleration_mm_s2"])
+
+
+def create_stage_instrument(config: dict[str, Any]) -> StageInstrument:
+    """Build the :class:`StageInstrument` subclass matching the configured type.
+
+    Device-specific behaviour (PI reboot, GRBL alarms, …) lives in subclasses,
+    so the type declared in the configuration decides which one to build. The
+    imports are deferred because those modules import this one.
+
+    :param config: The ``stage`` section of the YAML configuration.
+    """
+    device_type = config.get("type")
+    if device_type == "PI":
+        from .stage_pi import PIStageInstrument
+
+        return PIStageInstrument(config)
+    if device_type == "CNC":
+        from .stage_cnc import CNCRouterStageInstrument
+
+        return CNCRouterStageInstrument(config)
+    return StageInstrument(config)

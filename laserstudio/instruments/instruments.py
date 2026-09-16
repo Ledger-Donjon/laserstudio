@@ -22,7 +22,7 @@ from .lmscontroller import LMSControllerInstrument
 from .pdm import PDMInstrument
 from .probe import ProbeInstrument
 from .scans import ScansInstrument
-from .stage import StageInstrument
+from .stage import StageInstrument, create_stage_instrument
 
 
 class Instruments:
@@ -42,7 +42,7 @@ class Instruments:
                 )
             else:
                 try:
-                    self.stage = StageInstrument(stage_config)
+                    self.stage = create_stage_instrument(stage_config)
                 except DeviceSearchError as e:
                     logging.getLogger("laserstudio").warning(
                         f"Stage is enabled but device {e!s} is not found... Skipping."

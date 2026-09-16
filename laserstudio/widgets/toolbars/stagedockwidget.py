@@ -27,7 +27,6 @@ from pystages.grbl import GRBLSetting
 from ...instruments.joysticks import JoystickInstrument
 from ...instruments.joysticksHID import HIDGAMEPAD, JoystickHIDInstrument
 from ...instruments.stage import (
-    PI,
     SMC100,
     CNCRouter,
     Corvus,
@@ -35,6 +34,8 @@ from ...instruments.stage import (
     StageInstrument,
     Vector,
 )
+from ...instruments.stage_cnc import CNCRouterStageInstrument
+from ...instruments.stage_pi import PIStageInstrument
 from ...utils.util import create_color_qicon
 from ..coloredbutton import ColoredPushButton
 from ..keyboardbox import Direction, KeyboardBox
@@ -242,7 +243,7 @@ class StageDockWidget(QDockWidget):
         self._updating_limit_ui = False
         self._limit_violation_box: QMessageBox | None = None
 
-        if isinstance(self.stage.stage, CNCRouter):
+        if isinstance(self.stage, CNCRouterStageInstrument):
             _connect_queued(self.stage.grbl_alarm, self.show_grbl_alarm)
 
         _connect_queued(
@@ -379,16 +380,16 @@ class StageDockWidget(QDockWidget):
             w.clicked.connect(stage.enable_joystick)
             grid.addWidget(w, 3, 1)
 
-        elif isinstance(stage := self.stage.stage, PI):
+        elif isinstance(pi_stage := self.stage, PIStageInstrument):
             w = QPushButton(self)
             w.setCheckable(True)
             w.setText("Enable Joystick")
-            w.toggled.connect(self.stage.enable_joystick)
+            w.toggled.connect(pi_stage.enable_joystick)
             grid.addWidget(w, 3, 0)
 
             w = QPushButton(self)
             w.setText("Reboot")
-            w.clicked.connect(self.stage.reboot)
+            w.clicked.connect(pi_stage.reboot)
             grid.addWidget(w, 3, 1)
 
         # Software limit area (LaserStudio-side, editable in the viewer)
@@ -753,7 +754,8 @@ class StageDockWidget(QDockWidget):
         self, operation: str, title: str, ok: bool, error_msg: str
     ):
         if ok and operation in ("unlock", "reset"):
-            self.stage.clear_grbl_alarm_state()
+            if isinstance(self.stage, CNCRouterStageInstrument):
+                self.stage.clear_grbl_alarm_state()
         elif not ok and error_msg:
             QMessageBox.warning(self, title, error_msg)
 
