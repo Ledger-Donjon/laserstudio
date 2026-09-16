@@ -50,7 +50,7 @@ class LightInstrument(Instrument):
         """
         Instrument.settings.__set__(self, data)
         if "light" in data:
-            self.intensity = data["light"]
+            self.light = bool(data["light"])
             self.parameter_changed.emit("light", data["light"])
 
         if "intensity" in data:
