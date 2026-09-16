@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
@@ -126,6 +127,7 @@ class LaserStudioRefonte(QMainWindow):
         vbox.addWidget(self._status_bar)
 
         self._wire_position_updates()
+        self._wire_laser_updates()
         self._init_status_bar()
         self._install_shortcuts()
         self._select_workspace(0)
@@ -249,7 +251,7 @@ class LaserStudioRefonte(QMainWindow):
     def _init_status_bar(self) -> None:
         stage = self.instruments.stage
         self._status_bar.set_connected(stage is not None)
-        self._status_bar.set_laser_armed(self.laser_armed)
+        self._refresh_laser_armed()
 
         camera = self.instruments.camera
         if self.yaml_config:
@@ -272,6 +274,26 @@ class LaserStudioRefonte(QMainWindow):
 
     def _update_position_display(self, coords: list[float]) -> None:
         self._status_bar.set_position(coords)
+
+    def _wire_laser_updates(self) -> None:
+        for laser in self.instruments.lasers:
+            laser.parameter_changed.connect(self._on_laser_parameter_changed)
+
+    def _on_laser_parameter_changed(self, parameter: str, _value) -> None:
+        if parameter == "on_off":
+            self._refresh_laser_armed()
+
+    def _refresh_laser_armed(self) -> None:
+        """The bar reads ARMED as soon as one laser is on."""
+        armed = False
+        for laser in self.instruments.lasers:
+            try:
+                armed = armed or bool(laser.on_off)
+            except Exception as exc:
+                logging.getLogger("laserstudio").warning(
+                    "Could not read the state of laser %s: %s", laser.label, exc
+                )
+        self.set_laser_armed(armed)
 
     def set_laser_armed(self, armed: bool) -> None:
         self.laser_armed = armed
