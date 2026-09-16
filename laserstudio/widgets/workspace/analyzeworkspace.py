@@ -28,7 +28,7 @@ from .workspace import Workspace
 PANEL_SPACING = 12
 
 _RULER_BTN = f"""
-QPushButton#ls-ruler-btn {{
+QPushButton#ls-ruler-btn, QPushButton#ls-marker-btn {{
     background-color: rgba(255,255,255,0.05);
     color: {theme.TEXT};
     border: 1px solid {theme.BORDER};
@@ -38,10 +38,10 @@ QPushButton#ls-ruler-btn {{
     padding: 6px 12px;
     text-align: left;
 }}
-QPushButton#ls-ruler-btn:hover {{
+QPushButton#ls-ruler-btn:hover, QPushButton#ls-marker-btn:hover {{
     background-color: rgba(255,255,255,0.09);
 }}
-QPushButton#ls-ruler-btn:checked {{
+QPushButton#ls-ruler-btn:checked, QPushButton#ls-marker-btn:checked {{
     background-color: {theme.PURPLE_BG};
     color: {theme.PURPLE};
     border: 1px solid {theme.PURPLE_BORDER};
@@ -98,9 +98,12 @@ class AnalyzeWorkspace(Workspace):
     icon = "activity"
 
     def __init__(self, window: Any) -> None:
+        super().__init__()
         self._window = window
         self._ruler_btn: QPushButton | None = None
         self._color_btn: QPushButton | None = None
+        self._marker_btn: QPushButton | None = None
+        self._marker_color_btn: QPushButton | None = None
 
     def build_panel(self) -> QWidget:
         scroll = theme.setup_scroll_area(QScrollArea())
@@ -180,6 +183,39 @@ class AnalyzeWorkspace(Workspace):
 
         layout.addWidget(theme.section_title("Markers", "crosshair"))
 
+        self._marker_btn = marker_btn = QPushButton("Marker")
+        marker_btn.setObjectName("ls-marker-btn")
+        marker_btn.setCheckable(True)
+        marker_btn.setStyleSheet(_RULER_BTN)
+        marker_btn.setFixedHeight(theme.BTN_MIN_H)
+        marker_btn.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        marker_btn.setToolTip(
+            "Add markers by clicking in the viewer. "
+            "Click again or press Esc to deselect."
+        )
+        marker_btn.clicked.connect(self._on_marker_clicked)
+        layout.addWidget(marker_btn)
+
+        self._marker_color_btn = marker_color_btn = QPushButton()
+        marker_color_btn.setStyleSheet(theme.GHOST_BTN)
+        marker_color_btn.setToolTip("Color for new markers")
+        marker_color_menu = QMenu(marker_color_btn)
+        for color, name in MARKERS_COLORS:
+
+            def on_marker_color_pick(
+                _checked: bool = False, *, c: QColor | Qt.GlobalColor | int = color
+            ) -> None:
+                self._set_marker_color(c)
+
+            marker_color_menu.addAction(
+                create_color_qicon(color), name, on_marker_color_pick
+            )
+        marker_color_btn.setMenu(marker_color_menu)
+        layout.addWidget(_field_row("Color", marker_color_btn))
+        self._set_marker_color(viewer.default_marker_color)
+
         markers_list = MarkersView(viewer)
         markers_list.setStyleSheet(_LIST_SS)
         markers_list.setMinimumHeight(160)
@@ -207,11 +243,11 @@ class AnalyzeWorkspace(Workspace):
             self._on_viewer_mode_changed(int(viewer.mode))
 
     def on_deactivated(self) -> None:
-        """Leave ruler mode when switching to another workspace tab."""
+        """Leave annotation-creation mode when switching workspace tab."""
         viewer: Viewer | None = self._window.viewer
         if viewer is None:
             return
-        if viewer.mode == Viewer.Mode.RULER:
+        if viewer.mode in (Viewer.Mode.RULER, Viewer.Mode.MARKER):
             viewer.select_mode(Viewer.Mode.NONE)
         self._on_viewer_mode_changed(int(viewer.mode))
 
@@ -221,13 +257,23 @@ class AnalyzeWorkspace(Workspace):
             return
         viewer.select_mode(Viewer.Mode.RULER, toggle=True)
 
-    def _on_viewer_mode_changed(self, mode_id: int) -> None:
-        btn = self._ruler_btn
-        if btn is None:
+    def _on_marker_clicked(self) -> None:
+        viewer: Viewer | None = self._window.viewer
+        if viewer is None:
             return
-        btn.blockSignals(True)
-        btn.setChecked(mode_id == int(Viewer.Mode.RULER))
-        btn.blockSignals(False)
+        viewer.select_mode(Viewer.Mode.MARKER, toggle=True)
+
+    def _on_viewer_mode_changed(self, mode_id: int) -> None:
+        buttons = (
+            (self._ruler_btn, Viewer.Mode.RULER),
+            (self._marker_btn, Viewer.Mode.MARKER),
+        )
+        for btn, mode in buttons:
+            if btn is None:
+                continue
+            btn.blockSignals(True)
+            btn.setChecked(mode_id == int(mode))
+            btn.blockSignals(False)
 
     def _set_color(self, color: QColor | Qt.GlobalColor | int | LedgerColors) -> None:
         viewer: Viewer | None = self._window.viewer
@@ -242,3 +288,14 @@ class AnalyzeWorkspace(Workspace):
         viewer: Viewer | None = self._window.viewer
         if viewer is not None:
             viewer.default_ruler_graduation = value if value > 0 else None
+
+    def _set_marker_color(
+        self, color: QColor | Qt.GlobalColor | int | LedgerColors
+    ) -> None:
+        viewer: Viewer | None = self._window.viewer
+        if isinstance(color, LedgerColors):
+            color = color.value
+        if viewer is not None:
+            viewer.default_marker_color = QColor(color)
+        if self._marker_color_btn is not None:
+            self._marker_color_btn.setIcon(create_color_qicon(color))

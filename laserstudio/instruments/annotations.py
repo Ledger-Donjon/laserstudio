@@ -158,6 +158,7 @@ class AnnotationsInstrument(Instrument):
         self._ruler_id_seq = 1
         self._marker_id_seq = 1
         self._default_marker_size = 20.0
+        self._default_marker_color = QColor(QColorConstants.Red)
         self._default_ruler_color = QColor(LedgerColors.Grellow.value)
         self._default_ruler_graduation: float | None = None
 
@@ -171,6 +172,14 @@ class AnnotationsInstrument(Instrument):
     def default_marker_size(self, value: float) -> None:
         self._default_marker_size = float(value)
         self.markers_changed.emit(-1)
+
+    @property
+    def default_marker_color(self) -> QColor:
+        return QColor(self._default_marker_color)
+
+    @default_marker_color.setter
+    def default_marker_color(self, value: QColor) -> None:
+        self._default_marker_color = QColor(value)
 
     @property
     def default_ruler_color(self) -> QColor:
@@ -278,12 +287,15 @@ class AnnotationsInstrument(Instrument):
         | Qt.GlobalColor
         | int
         | list[float]
-        | LedgerColors = QColorConstants.Red,
+        | LedgerColors
+        | None = None,
         label: str | None = None,
         visible: bool = True,
         *,
         marker_id: int | None = None,
     ) -> MarkerAnnotation:
+        if color is None:
+            color = self._default_marker_color
         mid = marker_id if marker_id is not None else self._allocate_marker_id()
         if mid in self.markers:
             raise ValueError(f"Marker with id {mid} already exists.")
@@ -324,6 +336,7 @@ class AnnotationsInstrument(Instrument):
     def settings(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "marker_size": self.default_marker_size,
+            "default_marker_color": _color_to_list(self.default_marker_color),
             "default_ruler_color": _color_to_list(self.default_ruler_color),
             "default_ruler_graduation": self.default_ruler_graduation,
         }
@@ -340,6 +353,10 @@ class AnnotationsInstrument(Instrument):
         marker_size = data.get("marker_size")
         if isinstance(marker_size, (int, float)) and not isinstance(marker_size, bool):
             self._default_marker_size = float(marker_size)
+
+        marker_color = data.get("default_marker_color")
+        if isinstance(marker_color, list) and len(marker_color) >= 3:
+            self._default_marker_color = _list_to_qcolor(marker_color)
 
         color = data.get("default_ruler_color")
         if isinstance(color, list) and len(color) >= 3:

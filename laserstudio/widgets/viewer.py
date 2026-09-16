@@ -68,6 +68,7 @@ class Viewer(QGraphicsView):
         PIN = auto()
         OFFSET_ORIGIN = auto()
         RULER = auto()
+        MARKER = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -268,6 +269,14 @@ class Viewer(QGraphicsView):
     @default_marker_size.setter
     def default_marker_size(self, value: float) -> None:
         self.annotations.default_marker_size = float(value)
+
+    @property
+    def default_marker_color(self) -> QColor:
+        return self.annotations.default_marker_color
+
+    @default_marker_color.setter
+    def default_marker_color(self, value: QColor) -> None:
+        self.annotations.default_marker_color = value
 
     @property
     def default_ruler_color(self) -> QColor:
@@ -717,7 +726,7 @@ class Viewer(QGraphicsView):
         self.mode_changed.emit(int(new_mode))
 
     def select_mode(self, mode: Mode | int, toggle: bool = False):
-        """Selects the Viewer's mode. If toogle is set to true,
+        """Selects the Viewer's mode. If toggle is set to true,
         the function behaves as 'toggling',
         meaning that the mode is reset to NONE if it is reselected."""
 
@@ -918,6 +927,11 @@ class Viewer(QGraphicsView):
 
             if self.mode == Viewer.Mode.PIN:
                 self.pin(scene_pos.x(), scene_pos.y())
+
+            elif self.mode == Viewer.Mode.MARKER:
+                self.add_marker((scene_pos.x(), scene_pos.y()))
+                event.accept()
+                return
 
             elif self.mode == Viewer.Mode.ZONE_TILTED:
                 self.zone_poly.append(scene_pos)
@@ -1285,11 +1299,7 @@ class Viewer(QGraphicsView):
     def add_marker(
         self,
         position: None | tuple[float, float] | list[float] = None,
-        color: QColor
-        | Qt.GlobalColor
-        | int
-        | list[float]
-        | LedgerColors = QColorConstants.Red,
+        color: QColor | Qt.GlobalColor | int | list[float] | LedgerColors | None = None,
         label: str | None = None,
         visible: bool = True,
         *,
@@ -1299,7 +1309,7 @@ class Viewer(QGraphicsView):
         Add a marker at a specific position, or at current observed position.
 
         :param position: The position of the marker. If None, the position is retrieved from the stage's current position.
-        :param color: The color of the marker.
+        :param color: The color of the marker. If None, the viewer's default is used.
         :param label: The label of the marker.
         :param visible: If False, the marker is created but not displayed (setVisible(False)).
         :return: The added marker.
@@ -1341,12 +1351,7 @@ class Viewer(QGraphicsView):
         self,
         p1: tuple[float, float] | QPointF,
         p2: tuple[float, float] | QPointF,
-        color: QColor
-        | Qt.GlobalColor
-        | int
-        | list[float]
-        | LedgerColors
-        | None = None,
+        color: QColor | Qt.GlobalColor | int | list[float] | LedgerColors | None = None,
         label: str | None = None,
         graduation: float | None = None,
         graduation_count: float | None = None,
