@@ -74,8 +74,13 @@ class ScansInstrument(Instrument):
             raise KeyError(f"No scan zone with id {id}.")
         return self.zones[id]
 
-    def __next_zone_id(self) -> int:
-        """Get the next available zone id."""
+    @property
+    def next_zone_id(self) -> int:
+        """The id :meth:`add_zone` will hand out next.
+
+        Exposed so a view can preview what the zone a gesture is about to
+        create will look like (its default color is derived from its id).
+        """
         if not self.zones:
             return 1
         return max(self.zones.keys()) + 1
@@ -90,7 +95,7 @@ class ScansInstrument(Instrument):
     ) -> ScanZone:
         """Append a zone. :return: The new zone."""
         if id is None:
-            id = self.__next_zone_id()
+            id = self.next_zone_id
 
         if id in self.zones:
             raise ValueError(f"Zone with id {id} already exists.")
@@ -104,14 +109,12 @@ class ScansInstrument(Instrument):
         if geometry is not None:
             zone.set_geometry(self.__as_geometry(geometry))
         self.zones[zone.id] = zone
-        self.refresh_geometry()
-        self.zone_changed.emit(zone.id)
+        self.__refresh_geometry(zone.id)
         return zone
 
     def update_zone(self, zone: ScanZone) -> None:
         """Update a zone resulting actions."""
-        self.refresh_geometry()
-        self.zone_changed.emit(zone.id)
+        self.__refresh_geometry(zone.id)
 
     def update_zone_params(
         self,
@@ -131,8 +134,7 @@ class ScansInstrument(Instrument):
             zone.set_geometry(self.__as_geometry(geometry))
         if enabled is not None:
             zone.enabled = enabled
-        self.refresh_geometry()
-        self.zone_changed.emit(zone.id)
+        self.__refresh_geometry(zone.id)
 
     def remove_zone(self, zone: ScanZone | int) -> None:
         """Delete a zone, keeping the active selection sensible.
@@ -142,8 +144,7 @@ class ScansInstrument(Instrument):
         if isinstance(zone, int):
             zone = self.zone(zone)
         del self.zones[zone.id]
-        self.refresh_geometry()
-        self.zone_changed.emit(zone.id)
+        self.__refresh_geometry(zone.id)
         if self.active_zone is not None and zone.id == self.active_zone.id:
             self.active_zone = None
 
@@ -152,7 +153,6 @@ class ScansInstrument(Instrument):
         self.zones.clear()
         self.active_zone = None
         self.refresh_geometry()
-        self.zone_changed.emit(-1)
 
     # -- Zone active ------------------------------------------------------- #
 
@@ -222,10 +222,20 @@ class ScansInstrument(Instrument):
 
     def refresh_geometry(self) -> None:
         """Push the flattened union into the generator and notify the views."""
+        self.__refresh_geometry(-1)
+
+    def __refresh_geometry(self, zone_id: int) -> None:
+        """Same, naming the zone that changed.
+
+        A single notification per mutation: announcing the change twice
+        would make every view rebuild twice, which is not just wasted work —
+        the second rebuild throws away what the first one restored (the
+        focused name editor of a zone being renamed, say).
+        """
         for zone in self.zones.values():
             zone.invalidate()
         self.scan_path_generator.geometry = self.flattened
-        self.zone_changed.emit(-1)
+        self.zone_changed.emit(zone_id)
         self.path_changed.emit()
 
     def is_empty(self) -> bool:
@@ -299,6 +309,7 @@ class ScansInstrument(Instrument):
 
         zones_data = data.get("zones")
         new_zones: dict[int, ScanZone] | None = None
+        legacy_zone: ScanZone | None = None
         if isinstance(zones_data, list):
             new_zones = {}
             for index, item in enumerate(zones_data):
@@ -314,6 +325,10 @@ class ScansInstrument(Instrument):
                     logging.getLogger("laserstudio").warning(
                         f"Skipping malformed scan zone entry: {item=}"
                     )
+        else:
+            legacy_zone = self.__zone_from_legacy_settings(data)
+            if legacy_zone is not None:
+                new_zones = {legacy_zone.id: legacy_zone}
 
         density = data.get("density")
         if isinstance(density, int) and not isinstance(density, bool):
@@ -335,12 +350,51 @@ class ScansInstrument(Instrument):
         # zone" rather than an arbitrary fallback, which would silently send
         # the next drawing gesture into someone else's zone.
         active = data.get("active")
-        self.active_zone = (
-            self.zones.get(active)
-            if isinstance(active, int) and not isinstance(active, bool)
-            else None
-        )
+        if isinstance(active, int) and not isinstance(active, bool):
+            self.active_zone = self.zones.get(active)
+        else:
+            # A pre-zones payload carries no active zone, but the single zone
+            # it restores is the obvious target for the next drawing gesture.
+            self.active_zone = legacy_zone
         self.refresh_geometry()
+
+    @staticmethod
+    def __zone_from_legacy_settings(data: dict[str, Any]) -> ScanZone | None:
+        """Read a pre-zones payload — a bare or nested single geometry.
+
+        Settings files written before scan zones existed hold
+        ``{"density": …, "geometry": …}``, and scripts still PUT that shape;
+        both must keep restoring the area they describe, as one zone.
+
+        :return: The restored zone, or ``None`` when ``data`` holds no
+            readable geometry.
+        """
+        geometry: BaseGeometry | None = None
+        try:
+            for key in ("polygon", "multipolygon", "geometrycollection"):
+                if key in data:
+                    geometry = yaml_to_shapely(data)
+                    break
+            else:
+                nested = data.get("geometry")
+                if isinstance(nested, dict):
+                    geometry = yaml_to_shapely(nested)
+        except Exception:
+            logging.getLogger("laserstudio").warning(
+                f"Skipping malformed legacy scan geometry: {data=}"
+            )
+            return None
+
+        if geometry is None:
+            logging.getLogger("laserstudio").warning(
+                "Invalid data for scan geometry (expected a 'zones' list or a "
+                f"'geometry' key): {data=}"
+            )
+            return None
+
+        zone = ScanZone(id=1)
+        zone.set_geometry(geometry)
+        return zone
 
     @staticmethod
     def __zone_id_from_settings(

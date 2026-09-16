@@ -273,23 +273,28 @@ class ScanWorkspace(Workspace):
                 return row.zone, text
         return None
 
-    def _restore_focus(self, index: int, zone: ScanZone) -> None:
+    def _restore_focus(self, zone: ScanZone) -> None:
         """Refocus the name editor of the row that was just rebuilt for
-        ``zone`` at ``index``, cursor at the end — undoing the focus loss
-        that rebuilding rows would otherwise cause mid-rename."""
+        ``zone``, cursor at the end — undoing the focus loss that rebuilding
+        rows would otherwise cause mid-rename.
+
+        The row is located by zone identity: a zone's id says nothing about
+        where its row sits, since ids are not renumbered when a zone is
+        deleted.
+        """
         layout = self._rows_layout
         if layout is None or sip.isdeleted(layout):
             return
-        if not (0 <= index < layout.count()):
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            row = item.widget() if item is not None else None
+            if not isinstance(row, _ZoneRow) or row.zone is not zone:
+                continue
+            name_edit = row.name_edit()
+            if name_edit is not None:
+                name_edit.setFocus(Qt.FocusReason.OtherFocusReason)
+                name_edit.end(False)
             return
-        item = layout.itemAt(index)
-        row = item.widget() if item is not None else None
-        if not isinstance(row, _ZoneRow) or row.zone is not zone:
-            return
-        name_edit = row.name_edit()
-        if name_edit is not None:
-            name_edit.setFocus(Qt.FocusReason.OtherFocusReason)
-            name_edit.end(False)
 
     def _sync_rows(self) -> None:
         """Rebuild the zone rows from the model."""
@@ -307,23 +312,17 @@ class ScanWorkspace(Workspace):
         pending = self._pending_rename(layout)
         if pending is not None and zones is not None:
             zone, text = pending
-            try:
-                zone = zones.zone(zone.id)
-            except KeyError:
-                zone = None  # the zone was removed by whatever change we
-                # are reacting to; nothing sensible left to commit.
-            if zone is not None:
-                try:
-                    zones.update_zone(zone)
-                except KeyError:
-                    zone = None
-                else:
-                    # update_zone() above synchronously re-emitted `changed`,
-                    # which re-entered this method (self._syncing was still
-                    # False) and already rebuilt the rows with both the
-                    # external change and this rename applied.
-                    self._restore_focus(zone.id, zone)
-                    return
+            # A zone removed by whatever change we are reacting to leaves
+            # nothing sensible to commit.
+            if zone.id in zones.zones:
+                zone.name = text
+                # update_zone() below synchronously re-emits `zone_changed`,
+                # which re-enters this method (self._syncing is still False)
+                # and rebuilds the rows with both the external change and
+                # this rename applied.
+                zones.update_zone(zone)
+                self._restore_focus(zone)
+                return
 
         self._syncing = True
         try:

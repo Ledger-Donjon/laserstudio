@@ -65,6 +65,7 @@ class ScanToolBar(QToolBar):
         self.addWidget(w)
 
         self.zones.zone_changed.connect(self.__sync_zones)
+        self.zones.active_zone_changed.connect(self.__sync_active_zone)
         self.__sync_zones()
 
         # Go-to-next position button
@@ -165,5 +166,23 @@ class ScanToolBar(QToolBar):
                 self.zone_combobox.addItem(
                     create_color_qicon(zone.color), zone.name, zone
                 )
+        finally:
+            self.__syncing = False
+        # Refilling the combo resets its selection to the first entry, which
+        # would show a zone other than the one the drawing tools target.
+        self.__sync_active_zone()
+
+    def __sync_active_zone(self, *_):
+        """Point the combo at the zone the drawing tools target."""
+        active = self.zones.active_zone
+        index = -1
+        if active is not None:
+            for i in range(self.zone_combobox.count()):
+                if self.zone_combobox.itemData(i) is active:
+                    index = i
+                    break
+        self.__syncing = True
+        try:
+            self.zone_combobox.setCurrentIndex(index)
         finally:
             self.__syncing = False

@@ -689,12 +689,15 @@ class LaserStudio(QMainWindow):
             but unusable.
         """
         self.__check_scans_parameters(color=color, geometry=geometry)
-        zone = self.instruments.scans.add_zone(
+        scans = self.instruments.scans
+        zone = scans.add_zone(
             name=name,
             color=color,
             enabled=True if enabled is None else enabled,
             geometry=geometry,
         )
+        # As in both UIs, the zone just created becomes the drawing target.
+        scans.active_zone = zone
         return {"id": zone.id, "zone": zone.settings}
 
     def handle_update_scan_zone(

@@ -772,10 +772,14 @@ class Viewer(QGraphicsView):
             base = QColor(QColorConstants.Red)
         else:
             # Adding: draw in the color of the zone the shape will land in, so
-            # it is obvious which zone the gesture targets. With no zone yet,
-            # preview the color the about-to-be-created Zone 1 will get.
+            # it is obvious which zone the gesture targets. With no active
+            # zone, preview the color of the one the gesture will create.
             zone = self.scans.active_zone
-            base = QColor(zone.color) if zone is not None else default_zone_color(0)
+            base = (
+                QColor(zone.color)
+                if zone is not None
+                else default_zone_color(self.scans.next_zone_id)
+            )
 
         self.setStyleSheet(
             f"QGraphicsView {{ selection-background-color: {base.name()}; }}"
