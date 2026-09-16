@@ -69,6 +69,7 @@ class Viewer(QGraphicsView):
         OFFSET_ORIGIN = auto()
         RULER = auto()
         MARKER = auto()
+        PROBE_OFFSET = auto()
 
     # Signal emitted when a new mode is set
     mode_changed = pyqtSignal(int)
@@ -114,6 +115,7 @@ class Viewer(QGraphicsView):
 
         # Selection of mode
         self.__mode = Viewer.Mode.NONE
+        self._probe_offset_target: ProbeInstrument | None = None
 
         # Hide ScrollBars
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -719,6 +721,8 @@ class Viewer(QGraphicsView):
         if self._ruler_in_progress is not None and new_mode != Viewer.Mode.RULER:
             self.remove_ruler(self._ruler_in_progress)
             self._ruler_in_progress = None
+        if new_mode != Viewer.Mode.PROBE_OFFSET:
+            self._probe_offset_target = None
         self.__mode = new_mode
         self.__update_drag_mode()
         self.__update_selection_color()
@@ -737,6 +741,48 @@ class Viewer(QGraphicsView):
         self.zone_poly_item.setPolygon(self.zone_poly)
 
         self.mode = Viewer.Mode(mode)
+
+    @property
+    def probe_offset_target(self) -> ProbeInstrument | None:
+        """Probe whose visible position is currently being calibrated."""
+        return self._probe_offset_target
+
+    def select_probe_offset(self, probe: ProbeInstrument) -> bool:
+        """Wait for one click in the camera image to locate ``probe``.
+
+        Returns false when no camera view is available. Selecting the same
+        probe again cancels calibration.
+        """
+        stage_sight = self.stage_sight
+        if stage_sight is None or stage_sight.camera is None:
+            return False
+        if (
+            self.mode == Viewer.Mode.PROBE_OFFSET
+            and self._probe_offset_target is probe
+        ):
+            self.select_mode(Viewer.Mode.NONE)
+            return True
+        self._probe_offset_target = probe
+        self.select_mode(Viewer.Mode.PROBE_OFFSET)
+        return True
+
+    def _set_probe_offset_from_scene(self, scene_pos: QPointF) -> bool:
+        """Store a clicked spot position using the ProbeInstrument convention."""
+        probe = self._probe_offset_target
+        stage_sight = self.stage_sight
+        if probe is None or stage_sight is None or stage_sight.camera is None:
+            return False
+
+        # StageSight displays sample-plane micrometres (sensor size divided by
+        # objective). Probe offsets are stored in sensor-plane micrometres.
+        image_pos = stage_sight.image_group.mapFromScene(scene_pos)
+        objective = stage_sight.camera.objective
+        probe.offset_pos = (
+            image_pos.x() * objective,
+            image_pos.y() * objective,
+        )
+        self.select_mode(Viewer.Mode.NONE)
+        return True
 
     def go_next(self) -> Config:
         """Actions to perform when Laser Studio receive a Go Next command.
@@ -932,6 +978,11 @@ class Viewer(QGraphicsView):
                 self.add_marker((scene_pos.x(), scene_pos.y()))
                 event.accept()
                 return
+
+            elif self.mode == Viewer.Mode.PROBE_OFFSET:
+                if self._set_probe_offset_from_scene(scene_pos):
+                    event.accept()
+                    return
 
             elif self.mode == Viewer.Mode.ZONE_TILTED:
                 self.zone_poly.append(scene_pos)

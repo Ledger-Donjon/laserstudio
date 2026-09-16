@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 from ...instruments.camera import CameraInstrument
 from ...instruments.camera_usb import CameraUSBInstrument
 from ...instruments.light import LightInstrument
+from ...instruments.probe import ProbeInstrument
 from ...instruments.shutter import ShutterInstrument
 from ...instruments.stage import StageInstrument, Vector
 from ...instruments.stage_pi import PIStageInstrument
@@ -989,6 +990,122 @@ class _LightSection(QWidget):
             self._updating = False
 
 
+class _ProbeOffsetControl(QWidget):
+    """One-click calibration of a probe's visible position in the main viewer."""
+
+    def __init__(
+        self,
+        probe: ProbeInstrument,
+        viewer: Viewer | None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._probe = probe
+        self._viewer = viewer
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(7)
+
+        header = QHBoxLayout()
+        label = QLabel("PROBE OFFSET")
+        label.setStyleSheet(_MONO_MUTED)
+        header.addWidget(label)
+        header.addStretch()
+        self._value = QLabel()
+        self._value.setStyleSheet(_MONO_DIM)
+        header.addWidget(self._value)
+        root.addLayout(header)
+
+        self._button = QPushButton("Select spot in viewer")
+        self._button.setCheckable(True)
+        self._button.setIcon(lucide.icon("crosshair", 15, theme.TEXT))
+        self._button.setToolTip(
+            "Click, then select in the viewer where this probe or laser spot appears."
+        )
+        available = (
+            viewer is not None
+            and viewer.stage_sight is not None
+            and viewer.stage_sight.camera is not None
+        )
+        self._button.setEnabled(available)
+        if not available:
+            self._button.setToolTip("A camera view is required to set the probe offset.")
+        self._button.clicked.connect(self._select_in_viewer)
+        root.addWidget(self._button)
+
+        hint = QLabel(
+            "The selected point is measured relative to the centre of the camera image."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(
+            f"color: {theme.TEXT_DIM}; font-size: 10px; background: transparent;"
+        )
+        root.addWidget(hint)
+
+        probe.offset_pos_changed.connect(self._refresh)
+        if viewer is not None:
+            viewer.mode_changed.connect(self._on_viewer_mode_changed)
+        self._refresh()
+
+    def _select_in_viewer(self) -> None:
+        viewer = self._viewer
+        if viewer is None or not viewer.select_probe_offset(self._probe):
+            self._sync_button(False)
+
+    def _on_viewer_mode_changed(self, mode_id: int) -> None:
+        viewer = self._viewer
+        active = (
+            viewer is not None
+            and mode_id == int(Viewer.Mode.PROBE_OFFSET)
+            and viewer.probe_offset_target is self._probe
+        )
+        self._sync_button(active)
+
+    def _sync_button(self, active: bool) -> None:
+        self._button.blockSignals(True)
+        self._button.setChecked(active)
+        self._button.setText(
+            "Click the spot in the viewer…" if active else "Select spot in viewer"
+        )
+        self._button.setIcon(
+            lucide.icon("crosshair", 15, theme.PURPLE if active else theme.TEXT)
+        )
+        self._button.blockSignals(False)
+
+    def _refresh(self) -> None:
+        offset = self._probe.offset_pos
+        self._value.setText(
+            "NOT SET"
+            if offset is None
+            else f"X {offset[0]:+.2f}  Y {offset[1]:+.2f} µm"
+        )
+
+
+class _ProbeSection(QWidget):
+    """Settings section for a generic (non-laser) probe."""
+
+    def __init__(
+        self,
+        probe: ProbeInstrument,
+        index: int,
+        viewer: Viewer | None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(PANEL_SPACING)
+
+        title = QLabel(probe.label or f"Probe {index + 1}")
+        title.setStyleSheet(
+            f"color: {theme.TEXT}; font-family: 'Brut Grotesque'; font-weight: 700;"
+            " font-size: 15px; background: transparent;"
+        )
+        root.addWidget(title)
+        root.addWidget(_ProbeOffsetControl(probe, viewer))
+
+
 class _LaserSection(QWidget):
     """Controls for one laser: ARM (on/off), pulse power, offset current,
     pulse width and delay, plus read-only interlock status and temperature.
@@ -999,7 +1116,13 @@ class _LaserSection(QWidget):
     Sweep controls are intentionally omitted for now.
     """
 
-    def __init__(self, laser: Any, index: int, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        laser: Any,
+        index: int,
+        viewer: Viewer | None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._laser = laser
         self._is_pdm = PDMInstrument is not None and isinstance(laser, PDMInstrument)
@@ -1031,6 +1154,7 @@ class _LaserSection(QWidget):
         driver_lbl.setStyleSheet(_MONO_DIM)
         head.addWidget(driver_lbl)
         root.addWidget(header)
+        root.addWidget(_ProbeOffsetControl(laser, viewer))
 
         if not self._is_pdm:
             note = QLabel("This laser type is managed in the classic interface.")
@@ -1915,6 +2039,8 @@ class SettingsWorkspace(Workspace):
         root_layout.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
 
         tabs = list(self._SUB_TABS)
+        if self._window.instruments.probes:
+            tabs.append(("probes", "Probes", "crosshair"))
         if self._window.instruments.lasers:
             tabs.append(("lasers", "Lasers", "zap"))
         self._sub_keys = [t[0] for t in tabs]
@@ -1928,6 +2054,8 @@ class SettingsWorkspace(Workspace):
         self._sub_stack.addWidget(self._build_positioning_panel())
         self._sub_stack.addWidget(self._build_focus_panel())
         self._sub_stack.addWidget(self._build_reference_panel())
+        if self._window.instruments.probes:
+            self._sub_stack.addWidget(self._build_probes_panel())
         if self._window.instruments.lasers:
             self._sub_stack.addWidget(self._build_lasers_panel())
 
@@ -1962,7 +2090,10 @@ class SettingsWorkspace(Workspace):
     def on_deactivated(self) -> None:
         """Leave click-and-move mode when switching to another workspace tab."""
         viewer = self._window.viewer
-        if viewer is not None and viewer.mode == Viewer.Mode.STAGE:
+        if viewer is not None and viewer.mode in (
+            Viewer.Mode.STAGE,
+            Viewer.Mode.PROBE_OFFSET,
+        ):
             viewer.select_mode(Viewer.Mode.NONE)
 
     # ── Sub-category switching ────────────────────────────────────────────────
@@ -2361,6 +2492,20 @@ class SettingsWorkspace(Workspace):
         self._sync_reference_panel()
         return panel
 
+    def _build_probes_panel(self) -> QWidget:
+        panel = QWidget()
+        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(PANEL_SPACING)
+        probes = self._window.instruments.probes
+        for i, probe in enumerate(probes):
+            layout.addWidget(_ProbeSection(probe, i, self._window.viewer))
+            if i < len(probes) - 1:
+                layout.addWidget(theme.separator())
+        _compact_panel(layout)
+        return panel
+
     def _build_lasers_panel(self) -> QWidget:
         panel = QWidget()
         panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -2369,7 +2514,7 @@ class SettingsWorkspace(Workspace):
         layout.setSpacing(PANEL_SPACING)
         lasers = self._window.instruments.lasers
         for i, laser in enumerate(lasers):
-            layout.addWidget(_LaserSection(laser, i))
+            layout.addWidget(_LaserSection(laser, i, self._window.viewer))
             if i < len(lasers) - 1:
                 layout.addWidget(theme.separator())
         _compact_panel(layout)
