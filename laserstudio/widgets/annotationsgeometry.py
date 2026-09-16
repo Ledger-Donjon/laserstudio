@@ -230,13 +230,23 @@ class AnnotationsGeometry(QGraphicsItemGroup):
         return marker
 
     def _apply_marker_data(self, marker: IdMarker, data: MarkerAnnotation) -> None:
+        # Each setter repaints the item and rebuilds its tooltip, so applying
+        # unchanged values is not free: a full resync touches every marker.
         self._syncing = True
         try:
-            marker.setPos(QPointF(*data.pos))
-            marker.set_color(_list_to_qcolor(data.color))
-            marker.label = data.label
-            marker.setVisible(data.visible)
-            marker.size = self.annotations.default_marker_size
+            pos = QPointF(*data.pos)
+            if marker.pos() != pos:
+                marker.setPos(pos)
+            color = _list_to_qcolor(data.color)
+            if marker.qfillcolor != color:
+                marker.set_color(color)
+            if marker.label != data.label:
+                marker.label = data.label
+            if marker.isVisible() != data.visible:
+                marker.setVisible(data.visible)
+            size = self.annotations.default_marker_size
+            if marker.size != size:
+                marker.size = size
         finally:
             self._syncing = False
 
@@ -265,7 +275,8 @@ class AnnotationsGeometry(QGraphicsItemGroup):
     def _apply_marker_size(self) -> None:
         size = self.annotations.default_marker_size
         for marker in self._markers.values():
-            marker.size = size
+            if marker.size != size:
+                marker.size = size
 
     def apply_marker_size(self, size: float) -> None:
         self.annotations.default_marker_size = size

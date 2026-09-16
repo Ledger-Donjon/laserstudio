@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,6 +10,7 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QApplication
 
 from laserstudio.instruments.annotations import AnnotationsInstrument
+from laserstudio.widgets.markerslist import MarkersView
 from laserstudio.widgets.viewer import Viewer
 
 
@@ -85,3 +85,40 @@ def test_load_markers_from_json_file(app: QApplication, tmp_path: Path):
     assert viewer.markers[0].id == 3
     assert viewer.markers[0].pos().x() == pytest.approx(10.0)
     assert viewer.markers[0].label == "A"
+
+
+def test_hiding_a_selection_refreshes_the_views_once(app: QApplication):
+    annotations = AnnotationsInstrument({})
+    viewer = Viewer(annotations=annotations)
+    tree = MarkersView(viewer)
+    for i in range(200):
+        annotations.add_marker((float(i), 0.0), [1.0, 0.0, 0.0, 1.0], notify=False)
+    annotations.markers_changed.emit(-1)
+
+    refreshes: list[int] = []
+    annotations.markers_changed.connect(refreshes.append)
+    nodes = list(tree.markers_model._root.iter_marker_nodes())
+    assert len(nodes) == 200
+
+    tree.set_visible(nodes, False)
+
+    assert refreshes == [-1]
+    assert all(not marker.isVisible() for marker in viewer.markers)
+    assert all(not data.visible for data in annotations.markers.values())
+
+
+def test_load_many_markers_refreshes_the_view_once(app: QApplication, tmp_path: Path):
+    viewer = Viewer(annotations=AnnotationsInstrument({}))
+    refreshes: list[int] = []
+    viewer.markers_changed.connect(lambda: refreshes.append(1))
+
+    payload = [
+        {"pos": [float(i), 0.0], "color": [1.0, 0.0, 0.0, 1.0]} for i in range(2000)
+    ]
+    path = tmp_path / "many.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    viewer.load_markers(str(path), interactive=False)
+
+    assert len(viewer.markers) == 2000
+    assert refreshes == [1]

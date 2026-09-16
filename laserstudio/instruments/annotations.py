@@ -293,6 +293,7 @@ class AnnotationsInstrument(Instrument):
         visible: bool = True,
         *,
         marker_id: int | None = None,
+        notify: bool = True,
     ) -> MarkerAnnotation:
         if color is None:
             color = self._default_marker_color
@@ -309,20 +310,23 @@ class AnnotationsInstrument(Instrument):
         )
         self.markers[mid] = marker
         self._marker_id_seq = max(self._marker_id_seq, mid + 1)
-        self.markers_changed.emit(mid)
+        if notify:
+            self.markers_changed.emit(mid)
         return marker
 
-    def update_marker(self, marker: MarkerAnnotation) -> None:
+    def update_marker(self, marker: MarkerAnnotation, *, notify: bool = True) -> None:
         if marker.id not in self.markers:
             return
         self.markers[marker.id] = marker
-        self.markers_changed.emit(marker.id)
+        if notify:
+            self.markers_changed.emit(marker.id)
 
-    def remove_marker(self, marker_id: int) -> None:
+    def remove_marker(self, marker_id: int, *, notify: bool = True) -> None:
         if marker_id not in self.markers:
             return
         del self.markers[marker_id]
-        self.markers_changed.emit(marker_id)
+        if notify:
+            self.markers_changed.emit(marker_id)
 
     def clear_markers(self) -> None:
         if not self.markers:

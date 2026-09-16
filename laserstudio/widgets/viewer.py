@@ -1513,6 +1513,7 @@ class Viewer(QGraphicsView):
 
         self.setUpdatesEnabled(False)
         try:
+            added = False
             for marker in markers:
                 if not isinstance(marker, dict):
                     continue
@@ -1527,12 +1528,6 @@ class Viewer(QGraphicsView):
                     raw_color = [1.0, 0.0, 0.0, 1.0]
                 if len(raw_color) == 3:
                     raw_color = [*raw_color, 1.0]
-                color = QColor(
-                    int(raw_color[0] * 255),
-                    int(raw_color[1] * 255),
-                    int(raw_color[2] * 255),
-                    int(raw_color[3] * 255),
-                )
                 label = marker.get("label")
                 visible = not marker.get("hidden", False)
                 raw_id = marker.get("id")
@@ -1543,13 +1538,19 @@ class Viewer(QGraphicsView):
                 )
                 if marker_id is not None and marker_id in self.annotations.markers:
                     marker_id = None
-                self.add_marker(
-                    pos,
-                    color,
+                self.annotations.add_marker(
+                    (float(pos[0]), float(pos[1])),
+                    raw_color,
                     label=label,
                     visible=visible,
                     marker_id=marker_id,
+                    notify=False,
                 )
+                added = True
+            if added:
+                # One full view refresh instead of rebuilding the marker tree
+                # after every insertion (O(n²) with thousands of markers).
+                self.annotations.markers_changed.emit(-1)
         finally:
             self.setUpdatesEnabled(True)
 

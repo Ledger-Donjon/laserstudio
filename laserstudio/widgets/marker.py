@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 from PyQt6.QtWidgets import (
     QInputDialog,
@@ -180,9 +179,6 @@ class Marker(QGraphicsItemGroup):
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
-            logging.getLogger("laserstudio").debug(
-                f"Marker item change: {change}, value: {value}"
-            )
             self.update_tooltip()
         return super().itemChange(change, value)
 

@@ -535,13 +535,33 @@ class LaserStudio(QMainWindow):
             markers = [
                 self.viewer.add_marker(None, color=qcolor, label=label, visible=visible)
             ]
-        else:
+        elif len(positions) == 1:
+            pos = positions[0]
             markers = [
                 self.viewer.add_marker(
                     (pos[0], pos[1]), color=qcolor, label=label, visible=visible
                 )
-                for pos in positions
             ]
+        else:
+            ids: list[int] = []
+            for pos in positions:
+                data = self.viewer.annotations.add_marker(
+                    (pos[0], pos[1]),
+                    color=qcolor,
+                    label=label,
+                    visible=visible,
+                    notify=False,
+                )
+                ids.append(data.id)
+            self.viewer.annotations.markers_changed.emit(-1)
+            markers = []
+            for marker_id in ids:
+                marker = self.viewer.annotations_geometry.get_marker(marker_id)
+                if marker is None:
+                    raise RuntimeError(
+                        f"Marker #{marker_id} was not created in the view."
+                    )
+                markers.append(marker)
 
         if len(markers) == 1:
             return markers[0].to_dict()
@@ -561,11 +581,14 @@ class LaserStudio(QMainWindow):
             return {"deleted": deleted}
 
         id_set = set(ids)
-        deleted = []
-        for marker in self.viewer.markers:
-            if marker.id in id_set:
-                self.viewer.remove_marker(marker)
-                deleted.append(marker.id)
+        annotations = self.viewer.annotations
+        deleted = [marker_id for marker_id in annotations.markers if marker_id in id_set]
+        for marker_id in deleted:
+            annotations.remove_marker(marker_id, notify=False)
+        if deleted:
+            # Refresh the views once: notifying per marker rebuilds the whole
+            # marker tree every time, which is quadratic on large selections.
+            annotations.markers_changed.emit(-1)
         return {"deleted": deleted}
 
     def handle_rulers(self) -> list[Config]:

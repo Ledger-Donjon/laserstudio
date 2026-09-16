@@ -8,6 +8,7 @@ window's dock widget or in the new UI's Analyze panel. The model follows
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Iterator, Sequence
 
 from PyQt6.QtCore import (
@@ -83,12 +84,55 @@ class MarkersTreeModel(QAbstractItemModel):
         self._viewer = viewer
         self._tree_view = tree_view
         self._root = _GroupNode(None, "root")
+        self._bulk_depth = 0
         viewer.markers_changed.connect(self.reload)
         self.reload()
 
     def reload(self) -> None:
         """Rebuild the tree from the viewer's current markers."""
+        if self._bulk_depth:
+            return
         self.set_markers(self._viewer.markers)
+
+    @contextmanager
+    def bulk_update(self, *, rebuild: bool = False) -> Iterator[None]:
+        """Group several marker mutations into a single refresh.
+
+        Mutating one marker at a time makes every view rebuild its whole tree
+        on each step, which is quadratic when a large selection changes. Inside
+        this block, mutations must be applied without notifying; the views are
+        refreshed once on exit.
+
+        :param rebuild: True when rows appear or disappear, so this model has to
+            rebuild as well. Visibility changes keep their rows and only need
+            their counters updated, which preserves selection and expansion.
+        """
+        view = self._viewer
+        tree = self._tree_view
+        if not self._bulk_depth:
+            if tree is not None:
+                tree.setUpdatesEnabled(False)
+            view.setUpdatesEnabled(False)
+        self._bulk_depth += 1
+        try:
+            yield
+        finally:
+            self._bulk_depth -= 1
+            if not self._bulk_depth:
+                try:
+                    if rebuild:
+                        self.set_markers(view.markers)
+                    view.setUpdatesEnabled(True)
+                    if tree is not None:
+                        tree.setUpdatesEnabled(True)
+                finally:
+                    # Other views (second viewer, other panels) refresh once.
+                    # Suspended again so this model keeps the tree it just built.
+                    self._bulk_depth += 1
+                    try:
+                        view.annotations.markers_changed.emit(-1)
+                    finally:
+                        self._bulk_depth -= 1
 
     def _color_key(self, marker: Marker) -> str:
         if isinstance(marker.fillcolor, QColor):
@@ -341,7 +385,8 @@ class MarkersTreeModel(QAbstractItemModel):
             data = self._viewer.annotations.markers.get(marker.id)
             if data is not None and data.visible != visible:
                 data.visible = visible
-                self._viewer.annotations.update_marker(data)
+                # Always called from bulk_update(), which refreshes the views.
+                self._viewer.annotations.update_marker(data, notify=False)
 
     def _sync_marker_label(self, marker: IdMarker, label: str | None) -> None:
         data = self._viewer.annotations.markers.get(marker.id)
@@ -355,12 +400,7 @@ class MarkersTreeModel(QAbstractItemModel):
         if old_visible == new_visible:
             return
 
-        view = self._viewer
-        tree = self._tree_view
-        if tree is not None:
-            tree.setUpdatesEnabled(False)
-        view.setUpdatesEnabled(False)
-        try:
+        with self.bulk_update():
             for marker_node in group.iter_marker_nodes():
                 self._sync_marker_visible(marker_node.marker, visible)
 
@@ -376,30 +416,17 @@ class MarkersTreeModel(QAbstractItemModel):
 
             self._emit_group_updates(group)
             self._emit_descendant_check_updates(group)
-        finally:
-            view.setUpdatesEnabled(True)
-            if tree is not None:
-                tree.setUpdatesEnabled(True)
 
     def _toggle_marker_visibility(self, node: _MarkerNode, visible: bool) -> None:
         if node.marker.isVisible() == visible:
             return
-        view = self._viewer
-        tree = self._tree_view
-        if tree is not None:
-            tree.setUpdatesEnabled(False)
-        view.setUpdatesEnabled(False)
-        try:
+        with self.bulk_update():
             self._sync_marker_visible(node.marker, visible)
             delta = 1 if visible else -1
             parent = node.parent
             while parent is not None:
                 parent.visible_count += delta
                 parent = parent.parent
-        finally:
-            view.setUpdatesEnabled(True)
-            if tree is not None:
-                tree.setUpdatesEnabled(True)
 
     def setData(
         self,
@@ -502,12 +529,13 @@ class MarkersView(QTreeView):
 
     def set_visible(self, nodes: Sequence[_TreeNode], visible: bool) -> None:
         new_state = Qt.CheckState.Checked if visible else Qt.CheckState.Unchecked
-        for node in nodes:
-            index = self.markers_model.index_from_node(node, 0)
-            if index.isValid():
-                self.markers_model.setData(
-                    index, new_state, Qt.ItemDataRole.CheckStateRole
-                )
+        with self.markers_model.bulk_update():
+            for node in nodes:
+                index = self.markers_model.index_from_node(node, 0)
+                if index.isValid():
+                    self.markers_model.setData(
+                        index, new_state, Qt.ItemDataRole.CheckStateRole
+                    )
 
     def center_on(self, node: _MarkerNode) -> None:
         self.viewer.follow_stage_sight = False
@@ -521,9 +549,11 @@ class MarkersView(QTreeView):
             self.center_on(node)
 
     def _remove_marker_nodes(self, nodes: list[_MarkerNode]) -> None:
-        for node in nodes:
-            if isinstance(node.marker, IdMarker):
-                node.marker.remove()
+        annotations = self.viewer.annotations
+        with self.markers_model.bulk_update(rebuild=True):
+            for node in nodes:
+                if isinstance(node.marker, IdMarker):
+                    annotations.remove_marker(node.marker.id, notify=False)
 
     def show_context_menu(self, position: QPoint) -> None:
         index = self.indexAt(position)
