@@ -2,13 +2,25 @@
 
 from __future__ import annotations
 
+import math
+import logging
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer
-from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPen, QResizeEvent, QShowEvent
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PyQt6.QtCore import QEvent, QObject, QPoint, QSettings, QSize, Qt, QTimer
+from PyQt6.QtGui import (
+    QAction,
+    QActionGroup,
+    QColor,
+    QPainter,
+    QPaintEvent,
+    QPen,
+    QResizeEvent,
+    QShowEvent,
+)
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
 
 from laserstudio.instruments.instruments import Instruments
+from laserstudio.instruments.stage_pi import PIStageInstrument
 
 from . import lucide, theme
 
@@ -99,11 +111,19 @@ def make_hud_label(parent: QWidget, text: str = "") -> QLabel:
 
 
 def _nice_scale(um: float) -> float:
-    """Pick a round scale-bar length in µm."""
-    for val in (10, 20, 50, 100, 200, 500, 1000, 2000, 5000):
-        if val >= um:
-            return float(val)
-    return float(int(um / 1000 + 1) * 1000)
+    """Pick a round scale-bar length in µm, on the 1-2-5 sequence.
+
+    Any decade is allowed, so the bar keeps following the zoom below the
+    micrometer as well as above the millimeter.
+    """
+    if not math.isfinite(um) or um <= 0:
+        return 1.0
+    decade = 10.0 ** math.floor(math.log10(um))
+    for multiple in (1.0, 2.0, 5.0):
+        value = multiple * decade
+        if value >= um:
+            return value
+    return 10.0 * decade
 
 
 def _um_per_pixel(viewer) -> float:
@@ -217,10 +237,25 @@ class ViewerHudControls(QWidget):
     events, an attribute Qt also applies to child widgets.
     """
 
-    def __init__(self, viewer: "Viewer", parent: QWidget | None = None) -> None:
+    _ACTION_SETTING = "newui/pi_joystick_action"
+    _ACTIONS = {
+        "none": ("Nothing", "circle"),
+        "magic_focus": ("Run magic focus", "scan-eye"),
+        "toggle_laser": ("Toggle laser(s)", "zap"),
+        "toggle_joystick": ("Toggle joystick", "move-3d"),
+        "toggle_light": ("Toggle light", "lightbulb"),
+    }
+
+    def __init__(
+        self,
+        viewer: "Viewer",
+        instruments: Instruments,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setStyleSheet("background: transparent;")
         self._viewer = viewer
+        self._instruments = instruments
 
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
@@ -248,8 +283,115 @@ class ViewerHudControls(QWidget):
             icon_name="maximize", tooltip="Fit every element in the view"
         ).clicked.connect(self._fit_all)
 
+        self._add_separator()
+        self._action_btn = self._add_button(
+            icon_name="circle",
+            tooltip="Choose the PI joystick action-button behaviour",
+        )
+        self._action_btn.setEnabled(
+            isinstance(self._instruments.stage, PIStageInstrument)
+        )
+        self._build_action_menu()
+
         viewer.follow_stage_sight_changed.connect(self._follow_btn.setChecked)
+        stage = instruments.stage
+        if isinstance(stage, PIStageInstrument):
+            stage.joystick_action_button_pressed.connect(
+                self.trigger_joystick_action
+            )
         self.sync()
+
+    def _build_action_menu(self) -> None:
+        menu = QMenu(self._action_btn)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        self._action_group = group
+        self._action_menu = menu
+
+        selected = str(
+            QSettings("ledger", "laserstudio").value(
+                self._ACTION_SETTING, "none"
+            )
+        )
+        if selected not in self._ACTIONS:
+            selected = "none"
+        self._selected_action = selected
+
+        for action_id, (label, icon_name) in self._ACTIONS.items():
+            action = QAction(
+                lucide.icon(icon_name, HUD_BTN_ICON_SIZE, theme.TEXT_MUTED),
+                label,
+                menu,
+            )
+            action.setData(action_id)
+            action.setCheckable(True)
+            action.setChecked(action_id == selected)
+            if action_id == "magic_focus":
+                action.setEnabled(self._instruments.focus_helper is not None)
+            elif action_id == "toggle_laser":
+                action.setEnabled(bool(self._instruments.lasers))
+            elif action_id == "toggle_joystick":
+                action.setEnabled(
+                    isinstance(self._instruments.stage, PIStageInstrument)
+                )
+            elif action_id == "toggle_light":
+                action.setEnabled(self._instruments.light is not None)
+            group.addAction(action)
+            menu.addAction(action)
+
+        group.triggered.connect(self._on_action_selected)
+        self._action_btn.setMenu(menu)
+        self._refresh_action_button()
+
+    def _on_action_selected(self, action: QAction) -> None:
+        action_id = action.data()
+        if not isinstance(action_id, str) or action_id not in self._ACTIONS:
+            return
+        self._selected_action = action_id
+        QSettings("ledger", "laserstudio").setValue(
+            self._ACTION_SETTING, action_id
+        )
+        self._refresh_action_button()
+
+    def _refresh_action_button(self) -> None:
+        label, icon_name = self._ACTIONS[self._selected_action]
+        self._action_btn.setIcon(
+            lucide.icon(icon_name, HUD_BTN_ICON_SIZE, theme.PURPLE)
+        )
+        self._action_btn.setToolTip(
+            f"PI joystick action button: {label}. Click to choose another action."
+        )
+
+    def trigger_joystick_action(self) -> None:
+        """Execute the action selected for PI joystick button 2."""
+        try:
+            if self._selected_action == "magic_focus":
+                helper = self._instruments.focus_helper
+                if helper is not None:
+                    thread = helper.magic_focus()
+                    if not thread.isRunning():
+                        thread.start()
+            elif self._selected_action == "toggle_laser":
+                lasers = self._instruments.lasers
+                turn_on = not any(bool(laser.on_off) for laser in lasers)
+                for laser in lasers:
+                    laser.on_off = turn_on
+            elif self._selected_action == "toggle_joystick":
+                stage = self._instruments.stage
+                if isinstance(stage, PIStageInstrument):
+                    stage.pi_joystick_enabled = not any(
+                        stage.pi_joystick_enabled
+                    )
+            elif self._selected_action == "toggle_light":
+                light = self._instruments.light
+                if light is not None:
+                    light.light = not bool(light.light)
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "PI joystick action %s failed: %s",
+                self._selected_action,
+                exc,
+            )
 
     def _add_button(
         self,
@@ -282,14 +424,23 @@ class ViewerHudControls(QWidget):
     def _apply_zoom(self, factor: float) -> None:
         self._viewer.set_auto_fit(False)
         self._viewer.zoom = self._viewer.zoom * factor
+        self._refresh_scale()
 
     def _reset_zoom(self) -> None:
         self._viewer.set_auto_fit(False)
         del self._viewer.zoom
+        self._refresh_scale()
 
     def _fit_all(self) -> None:
         self._viewer.set_auto_fit(False)
         self._viewer.reset_camera_to_visible_items()
+        self._refresh_scale()
+
+    def _refresh_scale(self) -> None:
+        """Zooms done here bypass the viewport events the HUD listens to."""
+        area = self.parent()
+        if isinstance(area, ViewerArea):
+            QTimer.singleShot(0, area.update_scale_from_viewer)
 
     def sync(self) -> None:
         """Align the controls with the viewer — call once a stage sight exists."""
@@ -344,7 +495,7 @@ class ViewerArea(QWidget):
             annotations=annotations,
         )
         self.hud = ViewerHud(self)
-        self.controls = ViewerHudControls(self.viewer, self)
+        self.controls = ViewerHudControls(self.viewer, instruments, self)
         self.hud.controls = self.controls
         self._distortion_overlay = None
 

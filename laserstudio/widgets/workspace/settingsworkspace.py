@@ -550,6 +550,7 @@ class _JoystickControls(QWidget):
         self._pi = stage if isinstance(stage, PIStageInstrument) else None
         self._updating = False
         self._axis_buttons: list[QPushButton] = []
+        self._invert_buttons: list[QPushButton] = []
         self._all_button: QPushButton | None = None
 
         root = QVBoxLayout(self)
@@ -580,33 +581,45 @@ class _JoystickControls(QWidget):
             hbox.setSpacing(6)
 
             for axis in range(stage.num_axis):
-                label = (
-                    self._AXIS_LABELS[axis]
-                    if axis < len(self._AXIS_LABELS)
-                    else str(axis + 1)
-                )
-                btn = QPushButton(label)
-                btn.setObjectName("ls-joy-capsule")
-                btn.setCheckable(True)
-                btn.setStyleSheet(_JOYSTICK_CAPSULE)
-                btn.setSizePolicy(
-                    QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-                )
+                btn = self._capsule(self._axis_label(axis))
                 btn.toggled.connect(
                     lambda checked, ax=axis: self._on_axis_toggled(ax, checked)
                 )
                 self._axis_buttons.append(btn)
                 hbox.addWidget(btn)
 
-            all_btn = QPushButton("ALL")
-            all_btn.setObjectName("ls-joy-capsule")
-            all_btn.setCheckable(True)
-            all_btn.setStyleSheet(_JOYSTICK_CAPSULE)
-            all_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            all_btn = self._capsule("ALL")
             all_btn.toggled.connect(self._on_all_toggled)
             self._all_button = all_btn
             hbox.addWidget(all_btn)
             root.addWidget(row)
+
+            invert_header = QLabel("Invert direction")
+            invert_header.setStyleSheet(
+                f"color: {theme.TEXT_MUTED}; font-size: 12px; background: transparent;"
+            )
+            invert_header.setToolTip(
+                "Reverse the analog joystick travel for each axis. "
+                "Useful when pushing the stick up moves the stage down."
+            )
+            root.addWidget(invert_header)
+
+            invert_row = QWidget()
+            invert_row.setStyleSheet("background: transparent;")
+            invert_box = QHBoxLayout(invert_row)
+            invert_box.setContentsMargins(0, 0, 0, 0)
+            invert_box.setSpacing(6)
+            for axis in range(stage.num_axis):
+                btn = self._capsule(self._axis_label(axis))
+                btn.setToolTip(
+                    f"Invert joystick motion on the {self._axis_label(axis)} axis"
+                )
+                btn.toggled.connect(
+                    lambda checked, ax=axis: self._on_invert_toggled(ax, checked)
+                )
+                self._invert_buttons.append(btn)
+                invert_box.addWidget(btn)
+            root.addWidget(invert_row)
             self._refresh_pi_state()
         else:
             self._toggle = QPushButton("Enable joystick")
@@ -623,6 +636,40 @@ class _JoystickControls(QWidget):
             self._toggle.toggled.connect(self._on_corvus_toggled)
             root.addWidget(self._toggle)
 
+        # A move turns the joystick off behind the user's back, so the buttons
+        # follow the stage rather than only what was last clicked here.
+        stage.joystick_changed.connect(self._on_joystick_changed)
+
+    def _on_joystick_changed(self) -> None:
+        if self._pi is not None:
+            self._refresh_pi_state()
+            return
+        try:
+            from pystages import Corvus
+
+            if isinstance(self._stage.stage, Corvus):
+                self._updating = True
+                self._toggle.setChecked(self._stage.stage.joystick_enabled)
+                self._updating = False
+        except Exception as exc:
+            self._updating = False
+            logging.getLogger("laserstudio").warning(
+                "Could not read joystick state: %s", exc
+            )
+
+    def _axis_label(self, axis: int) -> str:
+        if axis < len(self._AXIS_LABELS):
+            return self._AXIS_LABELS[axis]
+        return str(axis + 1)
+
+    def _capsule(self, label: str) -> QPushButton:
+        btn = QPushButton(label)
+        btn.setObjectName("ls-joy-capsule")
+        btn.setCheckable(True)
+        btn.setStyleSheet(_JOYSTICK_CAPSULE)
+        btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        return btn
+
     def _refresh_pi_state(self) -> None:
         pi = self._pi
         if pi is None:
@@ -634,6 +681,13 @@ class _JoystickControls(QWidget):
                 "Could not read PI joystick state: %s", exc
             )
             return
+        inverted: list[bool] = []
+        try:
+            inverted = pi.pi_joystick_direction_inverted
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Could not read PI joystick direction: %s", exc
+            )
         self._updating = True
         try:
             for axis, btn in enumerate(self._axis_buttons):
@@ -641,6 +695,9 @@ class _JoystickControls(QWidget):
                     btn.setChecked(states[axis])
             if self._all_button is not None and states:
                 self._all_button.setChecked(all(states))
+            for axis, btn in enumerate(self._invert_buttons):
+                if axis < len(inverted):
+                    btn.setChecked(inverted[axis])
         finally:
             self._updating = False
 
@@ -677,6 +734,18 @@ class _JoystickControls(QWidget):
             self._refresh_pi_state()
             return
         self._refresh_pi_state()
+
+    def _on_invert_toggled(self, axis: int, checked: bool) -> None:
+        pi = self._pi
+        if self._updating or pi is None:
+            return
+        try:
+            pi.set_pi_joystick_invert_axis(axis, checked)
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Failed to invert PI joystick on axis %s: %s", axis, exc
+            )
+            self._refresh_pi_state()
 
     def _on_corvus_toggled(self, checked: bool) -> None:
         if self._updating:
@@ -1673,6 +1742,7 @@ class _PIMotionSection(QWidget):
         super().__init__(parent)
         self._stage = stage
         self._updating = False
+        self._velocity_sliders: list[_FloatSliderRow] = []
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -1756,9 +1826,29 @@ class _PIMotionSection(QWidget):
             root.addWidget(vel_slider)
             root.addWidget(acc_slider)
             root.addWidget(dec_slider)
+            self._velocity_sliders.append(vel_slider)
 
             if axis < stage.num_axis - 1:
                 root.addWidget(theme.separator())
+
+        # The joystick buttons change the speed for good, so the sliders have
+        # to follow the stage and not only what was last dragged here.
+        stage.velocity_changed.connect(self._refresh_velocity_sliders)
+
+    def _refresh_velocity_sliders(self) -> None:
+        try:
+            velocities = self._stage.pi_velocity_mm_s
+        except Exception as exc:
+            logging.getLogger("laserstudio").warning(
+                "Could not read PI velocity: %s", exc
+            )
+            return
+        self._updating = True
+        try:
+            for slider, velocity in zip(self._velocity_sliders, velocities):
+                slider.set_value(velocity)
+        finally:
+            self._updating = False
 
     def _on_velocity_changed(self, axis: int, value: float) -> None:
         if self._updating:

@@ -173,6 +173,8 @@ class StageInstrument(Instrument):
     soft_limits_changed = pyqtSignal()
     # Signal emitted when a move is rejected because it falls outside the limits
     soft_limit_violation = pyqtSignal(str)
+    # Signal emitted when the analog joystick activation changed
+    joystick_changed = pyqtSignal()
 
     def __init__(self, config: dict[str, Any]):
         """
@@ -671,6 +673,8 @@ class StageInstrument(Instrument):
         result[1] = y + self.shear[1] * x
         logging.getLogger("laserstudio").debug(f"Shearing transformation: {result}...")
 
+        self._release_joystick_for_move()
+
         move_ok = False
         move_error: CNCError | None = None
         self.mutex.lock()
@@ -731,11 +735,23 @@ class StageInstrument(Instrument):
         """
         if isinstance(self.stage, Corvus):
             self.stage.joystick_enabled = enabled
+            self.joystick_changed.emit()
+
+    def _release_joystick_for_move(self) -> None:
+        """Hand motion control back to the software before a commanded move.
+
+        Controllers that reject motion commands while an axis is driven by the
+        analog joystick override this to turn the joystick off. The Corvus
+        needs nothing here: it drops joystick control on its own and
+        :meth:`move_to` gives it back afterwards.
+        """
+        return
 
     def home(self, wait: bool = False):
         """
         Home the stage.
         """
+        self._release_joystick_for_move()
         self.stage.home(wait=wait)
 
     @property
