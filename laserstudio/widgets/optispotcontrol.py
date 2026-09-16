@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from ..instruments.stage import StageInstrument, Vector
 
 OPTISPOT_MIN = 0
-OPTISPOT_MAX = 1000
+OPTISPOT_MAX = 1500  # 1.5mm
 OPTISPOT_STEP = 1
 
 
@@ -62,6 +62,7 @@ class OptispotControl(QWidget):
         # Without this, typing '250' would move to 2, then 25, then 250.
         w.setKeyboardTracking(False)
         w.setToolTip("Position of the optispot")
+        w.setSuffix(" µm")
         w.valueChanged.connect(self.move_to)
         hbox.addWidget(w)
 

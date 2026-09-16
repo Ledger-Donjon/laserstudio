@@ -1,15 +1,20 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Ledger-Donjon/laserstudio/main/laserstudio/config_schema/config.schema.json
 camera:
   dev: /dev/ttySPIXCI0
-  pixel_size_in_um: [14.84375, 14.84375]
+  pixel_size_in_um:
+  - 14.84375
+  - 14.84375
   type: Raptor
   objective: 20.0
-  objectives: [5, 10, 20, 50]
+  objectives:
+  - 5
+  - 10
+  - 20
+  - 50
   refresh_interval_ms: 10
   label: Raptor
   invert_vertical: true
   index: 0
-
 focus:
   coarse:
     span: 1600
@@ -24,25 +29,46 @@ focus:
     multi_peaks: true
     best_is_highest_z: false
   autofocus_points:
-    - [-20582.34, 25125.61, -11517.5]
-    - [-18798.77, 25230.96, -11534.15]
-    - [-18823.239999999998, 23840.82, -11535.35]
-
+  - - -20582.34
+    - 25125.61
+    - -11517.5
+  - - -18798.77
+    - 25230.96
+    - -11534.15
+  - - -18823.239999999998
+    - 23840.82
+    - -11535.35
 stage:
   dev:
     sn: 11PCOA5!
   label: PI Mercury
-  adresses: [1, 2, 3]
+  adresses:
+  - 1
+  - 2
+  - 3
   type: PI
-  unit_factors: [-1000.0, 1000.0, -1000.0]
+  unit_factors:
+  - -1000.0
+  - 1000.0
+  - -1000.0
   guardrail_um: 90000.0
   refresh_interval_ms: 20
-  shear: [0.000, 0.000]
-  velocity_mm_s: [50.0, 50.0, 5.0]
-  acceleration_mm_s2: [400.0, 400.0, 40.0]
-  deceleration_mm_s2: [400.0, 400.0, 40.0]
+  shear:
+  - 0.0
+  - 0.0
+  velocity_mm_s:
+  - 50.0
+  - 50.0
+  - 5.0
+  acceleration_mm_s2:
+  - 400.0
+  - 400.0
+  - 40.0
+  deceleration_mm_s2:
+  - 400.0
+  - 400.0
+  - 40.0
   joystick_velocity_factor: 0.1
-
 lighting:
   dev:
     sn: A10R257S
@@ -50,24 +76,23 @@ lighting:
   type: LMSController
   label: LMS Lighting
   open_is_slidein: false
-
 lasers:
-  - type: PDM
-    label: PDM 980nm
-    enable: true
-    num: 2
-    refresh_interval_ms: 1000
+- type: PDM
+  label: PDM 980nm
+  enable: true
+  num: 2
+  refresh_interval_ms: 1000
+  dev:
+    sn: FTA6L8GZ
+  shutter:
     dev:
-      sn: FTA6L8GZ
-    shutter:
-      dev:
-        sn: A10R257S
-      motor: 2
-      type: LMSController
-      label: LMS Laser
-    optispot:
-      label: M3FS Optispot
-      type: M3FS
-      enable: true
-      dev:
-        sn: 29241
+      sn: A10R257S
+    motor: 2
+    type: LMSController
+    label: LMS Laser
+  optispot:
+    label: M3FS Optispot
+    type: M3FS
+    enable: true
+    dev:
+      sn: '29241'

@@ -1,6 +1,6 @@
-from .stage import Tic, TicDirection, Vector
-from .instrument import Instrument
 from ..utils.yaml_types import Config
+from .instrument import Instrument
+from .stage import Tic, TicDirection, Vector
 
 
 class ShutterInstrument(Instrument):
