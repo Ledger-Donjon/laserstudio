@@ -5,8 +5,8 @@ import scipy.signal
 from typing import Any, TYPE_CHECKING
 import numpy
 from numpy.typing import NDArray
-from pystages import Autofocus
 from PyQt6.QtCore import QThread, pyqtSignal, QCoreApplication
+from .autofocus_triangulation import DelaunayAutofocus
 from .stage import StageInstrument, Vector
 from .instrument import Instrument
 from ..utils.yaml_types import Config
@@ -262,8 +262,9 @@ class FocusInstrument(Instrument):
         self.camera = camera
         self.stage = stage
 
-        # Autofocus helper from pystage
-        self.autofocus_helper = Autofocus()
+        # Autofocus helper: registers an unbounded number of focused points
+        # and interpolates Z by Delaunay-triangulating them.
+        self.autofocus_helper = DelaunayAutofocus()
 
         # Magic Focus
         # Set when a focus search is running, then cleared.
@@ -309,12 +310,38 @@ class FocusInstrument(Instrument):
             "autofocus_points", self.autofocus_helper.registered_points
         )
 
+    def remove_point(self, index: int):
+        """
+        Remove a single registered focus point.
+
+        :param index: Index of the point to remove, in ``autofocus_helper.registered_points``.
+        """
+        self.autofocus_helper.remove(index)
+        self.parameter_changed.emit(
+            "autofocus_points", self.autofocus_helper.registered_points
+        )
+
+    def can_autofocus_at(self, x: float, y: float) -> bool:
+        """
+        :return: True if :meth:`autofocus` can produce an estimate at
+            (x, y) — at least one (non-degenerate) triangle is registered,
+            whether or not (x, y) is inside it (autofocus extrapolates from
+            the closest triangle when it is not).
+        """
+        return self.autofocus_helper.can_focus_at(x, y)
+
+    def is_autofocus_exact_at(self, x: float, y: float) -> bool:
+        """
+        :return: True if (x, y) is exactly inside a registered triangle,
+            i.e. :meth:`autofocus` would interpolate rather than extrapolate
+            there.
+        """
+        return self.autofocus_helper.is_covered(x, y)
+
     def autofocus(self, register_point: bool = False):
         pos = self.stage.position
         if register_point:
             self.register((pos.x, pos.y, pos.z))
-            return
-        if len(self.autofocus_helper.registered_points) < 3:
             return
         z = self.autofocus_helper.focus(pos.x, pos.y)
         assert abs(z - pos.z) < 500, (
@@ -405,11 +432,9 @@ class FocusInstrument(Instrument):
     def settings(self) -> Config:
         """Export settings to a dict for yaml serialization."""
         settings = super().settings
-        points = self.autofocus_helper.registered_points
-        if len(points) == 3:
-            settings["autofocus_points"] = [
-                list(p) for p in self.autofocus_helper.registered_points
-            ]
+        settings["autofocus_points"] = [
+            list(p) for p in self.autofocus_helper.registered_points
+        ]
         return settings
 
     @settings.setter
@@ -417,7 +442,7 @@ class FocusInstrument(Instrument):
         """Import settings from a dict."""
         Instrument.settings.__set__(self, data)  # type: ignore[attr-defined]
         points = data.get("autofocus_points", [])
-        if isinstance(points, list) and len(points) == 3:
+        if isinstance(points, list):
             self.autofocus_helper.clear()
             for point in points:
                 if isinstance(point, list) and len(point) == 3:
