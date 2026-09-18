@@ -1,0 +1,33 @@
+name: Type check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install laserstudio with lint extras
+        run: pip install -e ".[lint]"
+      - name: Run mypy
+        run: mypy laserstudio
+
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install laserstudio with lint extras
+        run: pip install -e ".[lint]"
+      - name: Run pyright
+        run: pyright
