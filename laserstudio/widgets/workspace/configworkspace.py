@@ -24,7 +24,6 @@ from __future__ import annotations
 import copy
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Callable
 
@@ -45,6 +44,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ... import __version__
+from ...utils.util import relaunch
 from ...utils.yaml_types import Config
 from ..newui import lucide, theme
 from ..newui.viewer_hud import (
@@ -1104,7 +1104,7 @@ class ConfigWorkspace(Workspace):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            relaunch()
 
     # ── Project folder picker ─────────────────────────────────────────────────
 
@@ -1146,4 +1146,4 @@ class ConfigWorkspace(Workspace):
             self._folder_path_lbl.setText(str(folder))
 
         os.chdir(str(folder))
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        relaunch()

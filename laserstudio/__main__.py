@@ -95,9 +95,13 @@ def main() -> int:
     if yaml_config is None:
         # No configuration file found, generate one
         config_generator = ConfigGenerator()
-        sys.argv.append("-L")  # Force to load the schema from the local files
+        # Force to load the schema from the local files. sys.argv is restored
+        # afterwards, as it is reused as-is when the application relaunches.
+        argv = sys.argv
+        sys.argv = argv + ["-L"]
         config_generator.get_flags()
         config_generator.load_schema()
+        sys.argv = argv
 
         wizard = ConfigGeneratorWizard(config_generator.schema)
         wizard.exec()

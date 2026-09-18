@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any
 import yaml
 import os
+import sys
 from PyQt6.QtGui import (
     QTransform,
     QPixmap,
@@ -30,6 +31,36 @@ def resource_path(path: str) -> str:
     if not path.startswith(":/"):
         return path
     return os.path.join(__dirname, path[2:])
+
+
+def relaunch() -> None:
+    """Replace the current process by a fresh one, started the same way.
+
+    When the application is started with ``python -m laserstudio``,
+    ``sys.argv[0]`` is the path of ``__main__.py``: re-running that file
+    directly would execute it as a top-level script and its package-relative
+    imports would fail, so the ``-m <package>`` form has to be restored.
+    """
+    spec = getattr(sys.modules.get("__main__"), "__spec__", None)
+    if spec is None or not spec.parent:
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    argv = [sys.executable, "-m", spec.parent] + sys.argv[1:]
+
+    # `-m` resolves the package through sys.path, which includes the current
+    # directory. That directory may have changed since startup (project folder
+    # switch), so the location the package was imported from is kept importable
+    # through PYTHONPATH.
+    env = dict(os.environ)
+    if spec.origin is not None:
+        root = os.path.realpath(spec.origin)
+        for _ in range(spec.parent.count(".") + 2):
+            root = os.path.dirname(root)
+        paths = env.get("PYTHONPATH", "").split(os.pathsep)
+        if root not in paths:
+            env["PYTHONPATH"] = os.pathsep.join([root] + [p for p in paths if p])
+
+    os.execve(sys.executable, argv, env)
 
 
 def expand_path(path: str) -> str:
