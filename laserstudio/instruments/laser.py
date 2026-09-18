@@ -136,7 +136,6 @@ class LaserInstrument(ProbeInstrument):
                 logging.getLogger("laserstudio").warning(
                     f"Sweep max is not a float: {sweep_max}. Skipping."
                 )
-            self.parameter_changed.emit("sweep_max", data["sweep_max"])
         if "sweep_min" in data:
             sweep_min = data["sweep_min"]
             if isinstance(sweep_min, float):
@@ -146,7 +145,6 @@ class LaserInstrument(ProbeInstrument):
                 logging.getLogger("laserstudio").warning(
                     f"Sweep min is not a float: {sweep_min}. Skipping."
                 )
-            self.parameter_changed.emit("sweep_min", data["sweep_min"])
         if "sweep_freq" in data:
             sweep_freq = data["sweep_freq"]
             if isinstance(sweep_freq, int):
@@ -156,4 +154,3 @@ class LaserInstrument(ProbeInstrument):
                 logging.getLogger("laserstudio").warning(
                     f"Sweep freq is not an integer: {sweep_freq}. Skipping."
                 )
-            self.parameter_changed.emit("sweep_freq", data["sweep_freq"])
