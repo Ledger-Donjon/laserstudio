@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from laserstudio.instruments.camera_nit import CameraNITInstrument
 from laserstudio.instruments.camera_usb import CameraUSBInstrument
 from laserstudio.instruments.stage import Vector
 from laserstudio.instruments.stage_pi import PIStageInstrument
@@ -27,6 +28,10 @@ from laserstudio.widgets.viewer import Viewer
 from laserstudio.widgets.workspace.schemaform import _INPUT_SS
 from laserstudio.widgets.workspace.workspace import Workspace
 
+from ._autofocus import _AutofocusSection
+from ._camera_generic import _CameraGenericSection
+from ._camera_image_adjustment import _CameraImageAdjustmentSection
+from ._camera_nit import _CameraNITSection
 from ._dpad import DpadWidget, SubCategoryBar, _SubPanelStack
 from ._helpers import (
     _compact_panel,
@@ -40,6 +45,7 @@ from ._helpers import (
 from ._joystick import _JoystickControls
 from ._laser import _LaserSection
 from ._light import _LightSection
+from ._magic_focus import _MagicFocusSection
 from ._optispot import _OptispotSection
 from ._pi_motion import _PIMotionSection
 from ._probe import _ProbeOffsetControl, _ProbeSection
@@ -273,6 +279,22 @@ class SettingsWorkspace(Workspace):
                 )
                 pass
 
+        # Image adjustment (histogram, black/white levels, auto-levels)
+        layout.addWidget(theme.separator())
+        layout.addWidget(_CameraImageAdjustmentSection(camera))
+
+        # Generic camera parameters (refresh interval, resolution, show/hide
+        # image, calibration wizards)
+        layout.addWidget(theme.separator())
+        layout.addWidget(
+            _CameraGenericSection(camera, self._window.viewer, self._window)
+        )
+
+        # NIT-specific controls (gain/AGC, averaging, shading correction)
+        if isinstance(camera, CameraNITInstrument):
+            layout.addWidget(theme.separator())
+            layout.addWidget(_CameraNITSection(camera))
+
         # Light
         light = self._window.instruments.light
         if light is not None:
@@ -392,11 +414,17 @@ class SettingsWorkspace(Workspace):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(PANEL_SPACING)
-        layout.addWidget(theme.section_title("Autofocus", "scan-eye"))
-        layout.addWidget(self._placeholder("Autofocus controls — coming soon"))
+
+        focus_helper = self._window.instruments.focus_helper
+        if focus_helper is None:
+            layout.addWidget(theme.section_title("Focus tools", "scan-eye"))
+            layout.addWidget(self._placeholder("No focus helper configured"))
+            _compact_panel(layout)
+            return panel
+
+        layout.addWidget(_AutofocusSection(self._window))
         layout.addWidget(theme.separator())
-        layout.addWidget(theme.section_title("Magic focus", "scan-eye"))
-        layout.addWidget(self._placeholder("Magic focus — coming soon"))
+        layout.addWidget(_MagicFocusSection(self._window))
         _compact_panel(layout)
         return panel
 
