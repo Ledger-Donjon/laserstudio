@@ -153,6 +153,10 @@ class StageSight(QGraphicsItemGroup):
     def camera_parameter_changed(self, parameter: str, value: Any):
         if parameter in ("objective", "resolution"):
             self.update_size()
+        elif parameter == "correction_matrix":
+            # The camera distortion is shared through the camera instrument, so
+            # every StageSight (all viewers / UIs) applies it when it changes.
+            self.distortion = value
 
     def update_size(self, in_pixels: bool | None = None):
         """Update the size of the StageSight according to the camera."""
@@ -397,7 +401,15 @@ class StageSight(QGraphicsItemGroup):
             mapped_origin = transform.map(QPointF(0.0, 0.0))
             dx, dy = mapped_origin.x(), mapped_origin.y()
             self.image_group.setPos(-dx, -dy)
-        self.__update_size(self.size)
+        # A distortion transform is computed by the camera wizards in raw
+        # image *pixel* space (the CameraPicker ignores the objective and the
+        # pixel-to-micrometer ratio). It therefore maps pixels to scene
+        # micrometers, so the StageSight must size its image in pixels while a
+        # transform is active -- otherwise the image is pre-scaled to
+        # micrometers and the transform is applied on top, double-applying the
+        # scale (the applied result then differs from the wizard preview).
+        # Without a transform, fall back to the micrometer sizing.
+        self.update_size(in_pixels=transform is not None)
 
     def marker(
         self,

@@ -128,11 +128,17 @@ class DistortedImagePresentationPage(CameraPresentationPage):
         self.viewer.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def apply_transform(self):
-        """Apply the transform to main application"""
-        if (s := self.wizard().laser_studio.viewer.stage_sight) is not None:
-            s.distortion = self.transform
+        """Apply the transform to the whole application.
+
+        Setting the camera's correction matrix notifies every StageSight (all
+        viewers, in both the classic and the new UI) through the camera's
+        parameter_changed signal, so the alignment is applied everywhere at
+        once. Without a camera we fall back to the main viewer directly.
+        """
         if (c := self.wizard().instruments.camera) is not None:
             c.correction_matrix = self.transform
+        elif (s := self.wizard().laser_studio.viewer.stage_sight) is not None:
+            s.distortion = self.transform
         self.wizard().laser_studio.viewer.reset_camera_to_stage_sight()
 
     def __init__(self, parent: CameraDistortionWizard):

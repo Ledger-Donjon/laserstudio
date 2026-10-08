@@ -61,8 +61,10 @@ class CameraInstrument(Instrument):
             list[float], config.get("pixel_size_in_um", [1.0, 1.0])
         )
 
-        # Correction matrix
-        self.correction_matrix: QTransform | None = None
+        # Correction matrix (camera distortion). Kept as a single source of
+        # truth: setting it notifies every StageSight (all viewers / UIs) via
+        # the parameter_changed signal, so the camera alignment is shared.
+        self._correction_matrix: QTransform | None = None
 
         # Shutter
         self.shutter: ShutterInstrument | None = None
@@ -188,6 +190,21 @@ class CameraInstrument(Instrument):
             f"Image's dimension {self.width_um}\xa0µm; {self.height_um}\xa0µm (considering the objective)"
         )
         self.parameter_changed.emit("objective", factor)
+
+    @property
+    def correction_matrix(self) -> QTransform | None:
+        """Camera distortion correction matrix (maps image pixels to scene µm).
+
+        Setting it emits ``parameter_changed`` so that every StageSight (hence
+        every viewer, in both the classic and the new UI) applies the same
+        distortion. This makes the camera alignment shared across the whole app.
+        """
+        return self._correction_matrix
+
+    @correction_matrix.setter
+    def correction_matrix(self, value: QTransform | None):
+        self._correction_matrix = value
+        self.parameter_changed.emit("correction_matrix", value)
 
     @property
     def width_um(self) -> float:

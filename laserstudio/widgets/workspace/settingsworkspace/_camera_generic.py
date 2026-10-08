@@ -208,17 +208,15 @@ class _CameraGenericSection(QWidget):
         laser_studio = self._laser_studio
         if laser_studio is None:
             return
-        if self._distortion_wizard is None:
-            self._distortion_wizard = CameraDistortionWizard(laser_studio, self)
-        self._distortion_wizard.show()
+        # Single shared instance held by the app (same wizard as the classic UI).
+        laser_studio.camera_distortion_wizard().show()
 
     def _open_probes_wizard(self) -> None:
         laser_studio = self._laser_studio
         if laser_studio is None:
             return
-        if self._probes_wizard is None:
-            self._probes_wizard = ProbesPositionWizard(laser_studio, self)
-        self._probes_wizard.show()
+        # Single shared instance held by the app (same wizard as the classic UI).
+        laser_studio.probes_position_wizard().show()
 
     def _on_param(self, parameter: str, value: Any) -> None:
         if parameter != "resolution" or self._resolution_combo is None:

@@ -303,16 +303,14 @@ class CameraDockWidget(QDockWidget):
         grid.addWidget(w, 1, 1)
         w.setHidden(laser_studio.viewer is None)
 
-        # Distortion wizard button
+        # Distortion wizard button (single shared instance held by the app)
         w = QPushButton("Distortion Wizard")
-        self.camera_distortion_wizard = CameraDistortionWizard(laser_studio, self)
-        w.clicked.connect(lambda: self.camera_distortion_wizard.show())
+        w.clicked.connect(lambda: laser_studio.camera_distortion_wizard().show())
         grid.addWidget(w, 2, 1)
 
-        # Probes wizard button
-        self.probes_distortion_wizard = ProbesPositionWizard(laser_studio, self)
+        # Probes wizard button (single shared instance held by the app)
         w = QPushButton("Probes/Spots Wizard")
-        w.clicked.connect(lambda: self.probes_distortion_wizard.show())
+        w.clicked.connect(lambda: laser_studio.probes_position_wizard().show())
         grid.addWidget(w, 2, 2)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)
