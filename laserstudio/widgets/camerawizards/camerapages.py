@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import (
     QWizardPage,
     QWizard,
     QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
     QWidget,
 )
 from PyQt6.QtCore import (
@@ -21,6 +23,7 @@ from PyQt6.QtGui import (
 from ..marker import Marker
 from ...instruments.instruments import CameraInstrument
 from ..stagesight import StageSight, StageSightViewer
+from ..keyboardbox import KeyboardBox
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -199,6 +202,7 @@ class CameraPositionPage(CameraPresentationPage):
             self.clicked_image_pixmap = self.viewer.stage_sight.image.pixmap()
 
         self.viewer.clicked_point_marker.setVisible(xy is not None)
+        self._update_clicked_label()
         self.completeChanged.emit()
 
     def __init__(self, parent: CameraWizard):
@@ -209,6 +213,61 @@ class CameraPositionPage(CameraPresentationPage):
         # The pixmap of image when the user clicked
         self.clicked_image_pixmap: QPixmap | None = None
 
+        # Stage control (D-pad) and live position information, so the stage can
+        # be moved and read directly from within the wizard page.
+        self._stage = parent.instruments.stage
+        layout = self.layout()
+        assert layout is not None
+        controls = QHBoxLayout()
+        self.keyboard_box: KeyboardBox | None = None
+        if self._stage is not None:
+            self.keyboard_box = KeyboardBox(self._stage)
+            controls.addWidget(self.keyboard_box)
+            # Keep the displacement step in sync with the other pages' D-pads.
+            parent.register_dpad(self.keyboard_box)
+            self._stage.position_changed.connect(self._update_stage_label)
+        info = QVBoxLayout()
+        self.stage_label = QLabel()
+        self.clicked_label = QLabel()
+        info.addWidget(self.stage_label)
+        info.addWidget(self.clicked_label)
+        info.addStretch(1)
+        controls.addLayout(info)
+        controls.addStretch(1)
+        container = QWidget()
+        container.setLayout(controls)
+        layout.addWidget(container)
+        self._update_stage_label()
+        self._update_clicked_label()
+
+    def _update_stage_label(self, *args: Any) -> None:
+        """Refresh the live stage position label."""
+        if self._stage is None:
+            self.stage_label.setText("Stage position: not available")
+            return
+        # The position_changed signal carries the new position as its argument.
+        # It must be used instead of reading self._stage.position, because the
+        # StageInstrument.position getter emits position_changed on every read,
+        # which would recurse infinitely when called from that signal.
+        position = args[0] if args else self._stage.position
+        x, y = position.xy
+        text = f"Stage position: X={x:.1f}\xa0µm   Y={y:.1f}\xa0µm"
+        if self._stage.stage.num_axis > 2:
+            text += f"   Z={position[2]:.1f}\xa0µm"
+        self.stage_label.setText(text)
+
+    def _update_clicked_label(self) -> None:
+        """Refresh the clicked-point information label."""
+        if self.clicked_point is None:
+            self.clicked_label.setText("Clicked point: (click on the image)")
+            return
+        cp = self.clicked_point
+        text = f"Clicked point: ({cp.x():.1f}, {cp.y():.1f})\xa0px"
+        if self._stage is not None:
+            x, y = self._stage.position.xy
+            text += f"   at stage X={x:.1f}\xa0µm Y={y:.1f}\xa0µm"
+        self.clicked_label.setText(text)
+
 
 class CameraWizard(QWizard):
     def __init__(self, laser_studio: LaserStudio, parent: QWidget | None = None):
@@ -216,3 +275,47 @@ class CameraWizard(QWizard):
 
         self.instruments = laser_studio.instruments
         self.laser_studio = laser_studio
+
+        # D-pad displacement steps shared by every position page's D-pad: the
+        # step set on one page is mirrored to all the others.
+        self._dpad_displacement_xy = 100.0
+        self._dpad_displacement_z = 10.0
+        self._dpads: list[KeyboardBox] = []
+
+    def register_dpad(self, keyboard_box: KeyboardBox) -> None:
+        """Register a page's D-pad so its displacement steps stay in sync."""
+        xy_spin = keyboard_box.displacement_xy_spinbox
+        if xy_spin is not None:
+            xy_spin.blockSignals(True)
+            xy_spin.setValue(self._dpad_displacement_xy)
+            xy_spin.blockSignals(False)
+            keyboard_box.displacement_xy = self._dpad_displacement_xy
+            xy_spin.valueChanged.connect(self._on_dpad_xy_changed)
+        z_spin = keyboard_box.displacement_z_spinbox
+        if z_spin is not None:
+            z_spin.blockSignals(True)
+            z_spin.setValue(self._dpad_displacement_z)
+            z_spin.blockSignals(False)
+            keyboard_box.displacement_z = self._dpad_displacement_z
+            z_spin.valueChanged.connect(self._on_dpad_z_changed)
+        self._dpads.append(keyboard_box)
+
+    def _on_dpad_xy_changed(self, value: float) -> None:
+        self._dpad_displacement_xy = value
+        for kb in self._dpads:
+            spin = kb.displacement_xy_spinbox
+            kb.displacement_xy = value
+            if spin is not None and spin.value() != value:
+                spin.blockSignals(True)
+                spin.setValue(value)
+                spin.blockSignals(False)
+
+    def _on_dpad_z_changed(self, value: float) -> None:
+        self._dpad_displacement_z = value
+        for kb in self._dpads:
+            spin = kb.displacement_z_spinbox
+            kb.displacement_z = value
+            if spin is not None and spin.value() != value:
+                spin.blockSignals(True)
+                spin.setValue(value)
+                spin.blockSignals(False)
