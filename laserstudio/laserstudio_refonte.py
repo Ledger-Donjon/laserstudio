@@ -60,7 +60,11 @@ class LaserStudioRefonte(QMainWindow):
         self.laser_armed = False
 
         self.setWindowTitle("Laser Studio · New UI")
-        self.setMinimumSize(1200, 720)
+        # 1024 (not 1200) so the window still fits — and can be maximized — on a
+        # portrait display whose logical width is reduced by fractional scaling
+        # (e.g. 1440 px / 1.25 = 1152). Internal minimums sum to ~620 px, so this
+        # is still comfortably above what the layout needs.
+        self.setMinimumSize(1024, 720)
 
         # Viewer must exist before workspace panels are built (Settings wires it).
         self._viewer_area = self._build_viewer_area()
