@@ -117,7 +117,15 @@ class SettingsWorkspace(Workspace):
         )
         root_layout.setSpacing(PANEL_SPACING)
 
-        root_layout.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
+        header_row = QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addWidget(theme.eyebrow("WORKSPACE · SETTINGS"))
+        header_row.addStretch(1)
+        load_btn = _sidebar_btn(QPushButton("Load settings"))
+        load_btn.setToolTip("Reload settings.yaml and apply it to the instruments.")
+        load_btn.clicked.connect(self._reload_settings)
+        header_row.addWidget(load_btn)
+        root_layout.addLayout(header_row)
 
         tabs = list(self._SUB_TABS)
         if self._window.instruments.probes:
@@ -162,6 +170,22 @@ class SettingsWorkspace(Workspace):
 
     def build_content(self) -> QWidget | None:
         return None
+
+    def _reload_settings(self) -> None:
+        """Reload settings.yaml and refresh the visible sub-panel."""
+        ok = False
+        try:
+            ok = bool(self._window.reload_settings())
+        except Exception as e:
+            logging.getLogger("laserstudio").warning(f"Load settings failed: {e}")
+        logging.getLogger("laserstudio").info(
+            "Settings reloaded from settings.yaml" if ok
+            else "No settings.yaml to load (or load failed)"
+        )
+        # Applying the settings makes the instruments emit parameter_changed,
+        # which the bound panel widgets react to; the reference panel is synced
+        # explicitly as it tracks the viewer background.
+        self._sync_reference_panel()
 
     def on_activated(self) -> None:
         viewer = self._window.viewer

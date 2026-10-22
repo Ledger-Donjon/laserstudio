@@ -59,6 +59,7 @@ from .restserver.errors import (
 )
 
 from .utils.yaml_types import Config
+from .utils import settings_io
 from .instruments.scans import ScansInstrument
 
 
@@ -874,79 +875,7 @@ class LaserStudio(QMainWindow):
         """
         Restore settings in the settings.yaml file.
         """
-        try:
-            data = yaml.load(open("settings.yaml", "r"), yaml.SafeLoader)
-        except FileNotFoundError:
-            logging.getLogger("laserstudio").warning(
-                "Settings file not found in directory " + os.getcwd()
-            )
-            return
-        # Camera settings (maybe missing from settings)
-        camera = data.get("camera")
-        if (self.instruments.camera is not None) and (camera is not None):
-            self.instruments.camera.settings = camera
-            if self.viewer.stage_sight is not None:
-                self.viewer.stage_sight.distortion = (
-                    self.instruments.camera.correction_matrix
-                )
-
-        # Lighting system settings
-        lighting = data.get("lighting")
-        if (self.instruments.light is not None) and (lighting is not None):
-            self.instruments.light.settings = lighting
-
-        # Scans geometry
-        scans = data.get("scans", data.get("scangeometry"))
-        logging.getLogger("laserstudio").debug(f"Scans settings: {scans}...")
-        if scans is not None:
-            self.instruments.scans.settings = scans
-
-        # Annotations (rulers, markers) — fall back to legacy viewer section.
-        annotations = data.get("annotations")
-        if annotations is not None:
-            self.instruments.annotations.settings = annotations
-        else:
-            viewer_legacy = data.get("viewer")
-            if isinstance(viewer_legacy, dict):
-                migrated: dict[str, Any] = {}
-                if "marker_size" in viewer_legacy:
-                    migrated["marker_size"] = viewer_legacy["marker_size"]
-                if "rulers" in viewer_legacy:
-                    migrated["rulers"] = viewer_legacy["rulers"]
-                if migrated:
-                    self.instruments.annotations.settings = migrated
-
-        # Probes
-        probes = data.get("probes", [])
-        for pdata, probe in zip(probes, self.instruments.probes):
-            probe.settings = pdata
-
-        # Lasers
-        lasers = data.get("lasers", [])
-        for pdata, laser in zip(lasers, self.instruments.lasers):
-            if "on_off" in pdata:
-                logging.getLogger("laserstudio").warning(
-                    f"Laser {laser.label} is currently on. "
-                    "To prevent any risk during settings restoration, "
-                    "the parameter 'on_off' is ignored from the settings."
-                )
-            _ = pdata.pop("on_off", None)
-            laser.settings = pdata
-
-        # Focus
-        focus = data.get("focus")
-        if self.instruments.focus_helper is not None and focus is not None:
-            self.instruments.focus_helper.settings = focus
-
-        # Viewer's configuration
-        viewer = data.get("viewer")
-        if viewer is not None:
-            self.viewer.settings = viewer
-
-        # Stage
-        stage = data.get("stage")
-        if self.instruments.stage is not None and stage is not None:
-            self.instruments.stage.settings = stage
+        settings_io.reload_settings(self)
 
     def set_log_level(self, level: int):
         """

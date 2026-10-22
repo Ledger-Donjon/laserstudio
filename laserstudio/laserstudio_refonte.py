@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from .instruments.instruments import Instruments
 from .utils.util import resource_path
 from .utils.yaml_types import Config
+from .utils import settings_io
 from .widgets.newui import lucide, theme
 from .widgets.newui.status_bar import StatusBar
 from .widgets.newui.viewer_hud import ViewerArea
@@ -150,6 +151,18 @@ class LaserStudioRefonte(QMainWindow):
     @property
     def viewer(self):
         return self._viewer_area.viewer
+
+    def reload_settings(self) -> bool:
+        """Reload settings.yaml and apply it to the shared instruments."""
+        return settings_io.reload_settings(self)
+
+    def camera_distortion_wizard(self):
+        """The single, shared camera distortion wizard (held by Instruments)."""
+        return self.instruments.camera_distortion_wizard(self)
+
+    def probes_position_wizard(self):
+        """The single, shared probes/spots position wizard (held by Instruments)."""
+        return self.instruments.probes_position_wizard(self)
 
     # ── Top bar ───────────────────────────────────────────────────────────────
 
