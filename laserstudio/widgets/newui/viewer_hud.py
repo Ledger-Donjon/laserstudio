@@ -17,9 +17,18 @@ from PyQt6.QtGui import (
     QResizeEvent,
     QShowEvent,
 )
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QPushButton, QWidget
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QWidget,
+)
 
 from laserstudio.instruments.instruments import Instruments
+from laserstudio.instruments.stage import MoveFor
 from laserstudio.instruments.stage_pi import PIStageInstrument
 
 from . import lucide, theme
@@ -60,6 +69,35 @@ QPushButton:disabled {{
     background: rgba(255,255,255,0.02);
     border: 1px solid {theme.BORDER_SUBTLE};
     color: {theme.TEXT_DIM};
+}}
+"""
+
+HUD_COMBO_SS = f"""
+QComboBox {{
+    background: rgba(10,10,10,0.55);
+    border: 1px solid {theme.BORDER};
+    border-radius: 6px;
+    color: {theme.TEXT_MUTED};
+    padding: 2px 8px;
+}}
+QComboBox:hover {{
+    background: rgba(255,255,255,0.10);
+    border: 1px solid {theme.BORDER_HOVER};
+    color: {theme.TEXT};
+}}
+QComboBox:disabled {{
+    background: rgba(255,255,255,0.02);
+    border: 1px solid {theme.BORDER_SUBTLE};
+    color: {theme.TEXT_DIM};
+}}
+QComboBox::drop-down {{ border: none; width: 16px; }}
+QComboBox QAbstractItemView {{
+    background: {theme.BG_PANEL};
+    border: 1px solid {theme.BORDER};
+    color: {theme.TEXT};
+    selection-background-color: {theme.PURPLE_BG};
+    selection-color: {theme.PURPLE};
+    outline: none;
 }}
 """
 
@@ -268,6 +306,23 @@ class ViewerHudControls(QWidget):
         )
         self._follow_btn.toggled.connect(self._on_follow_toggled)
 
+        # Offset the main stage origin (same tool as the classic UI): toggles the
+        # viewer into OFFSET_ORIGIN mode, then the user drags on the view.
+        self._offset_btn = self._add_button(
+            icon_name="circle-dot",
+            tooltip="Offset the main stage origin: click, then drag on the view "
+            "to set the new origin",
+            checkable=True,
+        )
+        self._offset_btn.setEnabled(self._instruments.stage is not None)
+        self._offset_btn.toggled.connect(self._on_offset_toggled)
+        viewer.mode_changed.connect(self._on_viewer_mode_changed)
+
+        # Focus-on selector: which item the stage moves to the target point
+        # (the stage 'move_for'). Mirrors the classic "Focused item" combo.
+        self._focus_combo = self._build_focus_combo()
+        self._layout.addWidget(self._focus_combo)
+
         self._add_separator()
 
         self._add_button(
@@ -420,6 +475,63 @@ class ViewerHudControls(QWidget):
         line.setFixedSize(1, 16)
         line.setStyleSheet(f"background: {theme.BORDER};")
         self._layout.addWidget(line, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    # ── Stage origin offset ───────────────────────────────────────────────────
+    def _on_offset_toggled(self, checked: bool) -> None:
+        from ..viewer import Viewer
+
+        self._viewer.select_mode(
+            Viewer.Mode.OFFSET_ORIGIN if checked else Viewer.Mode.NONE
+        )
+
+    def _on_viewer_mode_changed(self, mode: int) -> None:
+        from ..viewer import Viewer
+
+        want = mode == int(Viewer.Mode.OFFSET_ORIGIN)
+        if self._offset_btn.isChecked() != want:
+            self._offset_btn.blockSignals(True)
+            self._offset_btn.setChecked(want)
+            self._offset_btn.blockSignals(False)
+
+    # ── Focus-on (stage move_for) selector ────────────────────────────────────
+    def _build_focus_combo(self) -> QComboBox:
+        combo = QComboBox(self)
+        combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        combo.setStyleSheet(HUD_COMBO_SS)
+        combo.setToolTip(
+            "Focus on: the stage moves to place this item at the target point "
+            "instead of the camera center"
+        )
+        combo.addItem("Camera center", MoveFor(MoveFor.Type.CAMERA_CENTER))
+        for i in range(len(self._instruments.lasers)):
+            combo.addItem(f"Laser {i + 1}", MoveFor(MoveFor.Type.LASER, i))
+        for i in range(len(self._instruments.probes)):
+            combo.addItem(f"Probe {i + 1}", MoveFor(MoveFor.Type.PROBE, i))
+        combo.setEnabled(self._instruments.stage is not None)
+        self._sync_focus_combo(combo)
+        combo.activated.connect(self._on_focus_selected)
+        return combo
+
+    def _sync_focus_combo(self, combo: QComboBox) -> None:
+        """Select the entry matching the stage's current move_for."""
+        stage = self._instruments.stage
+        current = getattr(stage, "move_for", None)
+        if not isinstance(current, MoveFor):
+            return
+        for i in range(combo.count()):
+            mf = combo.itemData(i)
+            if (
+                isinstance(mf, MoveFor)
+                and mf.type == current.type
+                and (mf.type == MoveFor.Type.CAMERA_CENTER or mf.index == current.index)
+            ):
+                combo.setCurrentIndex(i)
+                return
+
+    def _on_focus_selected(self, index: int) -> None:
+        mf = self._focus_combo.itemData(index)
+        if isinstance(mf, MoveFor) and self._instruments.stage is not None:
+            self._instruments.stage.move_for = mf
 
     def _apply_zoom(self, factor: float) -> None:
         self._viewer.set_auto_fit(False)
