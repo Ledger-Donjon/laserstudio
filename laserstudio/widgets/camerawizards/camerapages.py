@@ -23,7 +23,7 @@ from PyQt6.QtGui import (
 from ..marker import Marker
 from ...instruments.instruments import CameraInstrument
 from ..stagesight import StageSight, StageSightViewer
-from ..keyboardbox import KeyboardBox
+from .jogpanel import WizardJogPanel
 
 if TYPE_CHECKING:
     from ...laserstudio import LaserStudio
@@ -219,11 +219,11 @@ class CameraPositionPage(CameraPresentationPage):
         layout = self.layout()
         assert layout is not None
         controls = QHBoxLayout()
-        self.keyboard_box: KeyboardBox | None = None
+        self.keyboard_box: WizardJogPanel | None = None
         if self._stage is not None:
-            self.keyboard_box = KeyboardBox(self._stage)
+            self.keyboard_box = WizardJogPanel(self._stage)
             controls.addWidget(self.keyboard_box)
-            # Keep the displacement step in sync with the other pages' D-pads.
+            # Keep the STEP values in sync with the other pages' jog pads.
             parent.register_dpad(self.keyboard_box)
             self._stage.position_changed.connect(self._update_stage_label)
         info = QVBoxLayout()
@@ -280,41 +280,52 @@ class CameraWizard(QWizard):
         # step set on one page is mirrored to all the others.
         self._dpad_displacement_xy = 100.0
         self._dpad_displacement_z = 10.0
-        self._dpads: list[KeyboardBox] = []
+        self._dpads: list[WizardJogPanel] = []
 
-    def register_dpad(self, keyboard_box: KeyboardBox) -> None:
-        """Register a page's D-pad so its displacement steps stay in sync."""
-        xy_spin = keyboard_box.displacement_xy_spinbox
-        if xy_spin is not None:
-            xy_spin.blockSignals(True)
-            xy_spin.setValue(self._dpad_displacement_xy)
-            xy_spin.blockSignals(False)
-            keyboard_box.displacement_xy = self._dpad_displacement_xy
-            xy_spin.valueChanged.connect(self._on_dpad_xy_changed)
-        z_spin = keyboard_box.displacement_z_spinbox
+    def show_with_style(self, qss: str = "") -> None:
+        """Apply a UI-specific stylesheet, then show the wizard.
+
+        The wizard is a single shared instance, so the stylesheet is set on
+        every open, letting it match the UI it is invoked from (empty string
+        falls back to the global application style).
+        """
+        self.setStyleSheet(qss)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def register_dpad(self, jog: WizardJogPanel) -> None:
+        """Register a page's jog pad so its STEP values stay in sync."""
+        xy_spin = jog.step_xy_spin
+        xy_spin.blockSignals(True)
+        xy_spin.setValue(self._dpad_displacement_xy)
+        xy_spin.blockSignals(False)
+        jog.step_xy = self._dpad_displacement_xy
+        xy_spin.valueChanged.connect(self._on_dpad_xy_changed)
+        z_spin = jog.step_z_spin
         if z_spin is not None:
             z_spin.blockSignals(True)
             z_spin.setValue(self._dpad_displacement_z)
             z_spin.blockSignals(False)
-            keyboard_box.displacement_z = self._dpad_displacement_z
+            jog.step_z = self._dpad_displacement_z
             z_spin.valueChanged.connect(self._on_dpad_z_changed)
-        self._dpads.append(keyboard_box)
+        self._dpads.append(jog)
 
     def _on_dpad_xy_changed(self, value: float) -> None:
         self._dpad_displacement_xy = value
-        for kb in self._dpads:
-            spin = kb.displacement_xy_spinbox
-            kb.displacement_xy = value
-            if spin is not None and spin.value() != value:
+        for jog in self._dpads:
+            jog.step_xy = value
+            spin = jog.step_xy_spin
+            if spin.value() != value:
                 spin.blockSignals(True)
                 spin.setValue(value)
                 spin.blockSignals(False)
 
     def _on_dpad_z_changed(self, value: float) -> None:
         self._dpad_displacement_z = value
-        for kb in self._dpads:
-            spin = kb.displacement_z_spinbox
-            kb.displacement_z = value
+        for jog in self._dpads:
+            jog.step_z = value
+            spin = jog.step_z_spin
             if spin is not None and spin.value() != value:
                 spin.blockSignals(True)
                 spin.setValue(value)

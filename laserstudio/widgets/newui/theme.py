@@ -191,6 +191,56 @@ QPushButton:disabled {{
 """
 
 
+# Stylesheet applied to a camera wizard when it is opened from the new UI, so it
+# matches the new UI theme (the classic UI opens the same wizard with no
+# stylesheet, falling back to the global Ledger style).
+WIZARD_SS = f"""
+QWizard, QWizardPage {{
+    background: {BG_ROOT};
+    color: {TEXT};
+}}
+QWizard QLabel {{
+    color: {TEXT};
+    background: transparent;
+}}
+QWizard QGroupBox {{
+    border: 1px solid {BORDER_SUBTLE};
+    border-radius: 6px;
+    margin-top: 6px;
+}}
+QWizard QPushButton {{
+    color: {TEXT};
+    background: {BG_CARD};
+    border: 1px solid {BORDER};
+    border-radius: 6px;
+    padding: 4px 12px;
+    min-height: {BTN_MIN_H}px;
+}}
+QWizard QPushButton:hover {{
+    border-color: {BORDER_HOVER};
+}}
+QWizard QPushButton:disabled {{
+    color: {TEXT_DIM};
+    background: rgba(255,255,255,0.02);
+    border-color: rgba(255,255,255,0.06);
+}}
+QWizard QDoubleSpinBox, QWizard QSpinBox {{
+    color: {TEXT};
+    background: {BG_PANEL};
+    border: 1px solid {BORDER};
+    border-radius: 4px;
+    min-height: {CONTROL_MIN_H}px;
+}}
+/* The D-pad (KeyboardBox) uses tiny fixed-width buttons: keep them compact so
+   the single-character labels are not clipped by the generic button padding. */
+QWizard KeyboardBox QPushButton {{
+    padding: 0px;
+    min-width: 0px;
+    min-height: 20px;
+}}
+"""
+
+
 # ── Parameter value formatting ────────────────────────────────────────────────
 SKIP_PROPS = {"enable", "label"}
 

@@ -137,6 +137,10 @@ class StageSight(QGraphicsItemGroup):
         self._pause_update = False
         self._new_image_connected = False
         self._in_pixels: bool = False
+        # Camera distortion stored in resolution-independent normalized [-1, 1]
+        # image coordinates (mapped to scene micrometers). The effective image
+        # transform is recomputed for the current resolution in __update_size.
+        self._distortion_norm: QTransform | None = None
         self.update_size()
         if camera is not None:
             camera.new_image.connect(self.set_image)
@@ -222,6 +226,10 @@ class StageSight(QGraphicsItemGroup):
 
         # Update the Area rectangle position
         self.__rect.setRect(-w2, -h2, width, height)
+
+        # Apply the normalized distortion composed with the current size, so it
+        # stays correct whatever the camera resolution is.
+        self.__apply_distortion(width, height)
 
         # Get the enclosing rect into main scene
         scene_rect: QRectF = self.image_group.mapRectToScene(self.__rect.rect())
@@ -386,30 +394,42 @@ class StageSight(QGraphicsItemGroup):
         return self.__object.position_changed
 
     @property
-    def distortion(self) -> QTransform:
-        return self.image_group.transform()
+    def distortion(self) -> QTransform | None:
+        """Camera distortion, in normalized [-1, 1] image coords -> scene µm."""
+        return self._distortion_norm
 
     @distortion.setter
     def distortion(self, transform: QTransform | None):
-        self.resetTransform()
+        # The transform maps normalized [-1, 1] image coordinates to scene
+        # micrometers (computed that way by the camera wizard), so it is
+        # independent of the camera resolution. The actual image transform is
+        # composed with the current sizing in __apply_distortion, which is
+        # re-run by update_size (also on every resolution change). We keep the
+        # current sizing mode (the main viewer stays in micrometers so the probe
+        # markers, stored in micrometers, remain correct; the CameraPicker sets
+        # in_pixels=True itself) instead of forcing pixel sizing here.
+        self._distortion_norm = transform
+        self.update_size()
+
+    def __apply_distortion(self, width: float, height: float) -> None:
+        """Apply the normalized distortion, composed with the current size.
+
+        The image is laid out in centered coordinates spanning
+        [-width/2, width/2] x [-height/2, height/2]; those are mapped to
+        normalized [-1, 1] before the stored normalized transform, so the
+        resulting correction does not depend on the camera resolution.
+        """
         self.image_group.resetTransform()
-        if transform is not None:
-            self.image_group.setTransform(transform)
-            # The transform may induce a final translation
-            # which can be measured by mapping the origin
-            # and corrected by setting the image_group's position.
-            mapped_origin = transform.map(QPointF(0.0, 0.0))
-            dx, dy = mapped_origin.x(), mapped_origin.y()
-            self.image_group.setPos(-dx, -dy)
-        # A distortion transform is computed by the camera wizards in raw
-        # image *pixel* space (the CameraPicker ignores the objective and the
-        # pixel-to-micrometer ratio). It therefore maps pixels to scene
-        # micrometers, so the StageSight must size its image in pixels while a
-        # transform is active -- otherwise the image is pre-scaled to
-        # micrometers and the transform is applied on top, double-applying the
-        # scale (the applied result then differs from the wizard preview).
-        # Without a transform, fall back to the micrometer sizing.
-        self.update_size(in_pixels=transform is not None)
+        self.image_group.setPos(0.0, 0.0)
+        if self._distortion_norm is None:
+            return
+        scale = QTransform()
+        if width and height:
+            scale.scale(2.0 / width, 2.0 / height)
+        effective = scale * self._distortion_norm
+        self.image_group.setTransform(effective)
+        origin = effective.map(QPointF(0.0, 0.0))
+        self.image_group.setPos(-origin.x(), -origin.y())
 
     def marker(
         self,

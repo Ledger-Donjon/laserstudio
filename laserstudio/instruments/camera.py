@@ -66,6 +66,12 @@ class CameraInstrument(Instrument):
         # the parameter_changed signal, so the camera alignment is shared.
         self._correction_matrix: QTransform | None = None
 
+        # Per-page state of the distortion wizard, persisted so the wizard can
+        # be restored across restarts. Each entry is a plain, yaml-serializable
+        # dict: {"clicked": [px, py], "stage": [sx, sy], "image": "file.png"}.
+        # The image files are saved next to settings.yaml by the wizard.
+        self.distortion_pages: list[dict[str, Any]] = []
+
         # Shutter
         self.shutter: ShutterInstrument | None = None
         shutter = config.get("shutter")
@@ -119,6 +125,19 @@ class CameraInstrument(Instrument):
         """Update the image size in pixels and notify listeners."""
         if width == self.width and height == self.height:
             return width, height
+
+        # A live resolution change is a pure scale (same field of view, more or
+        # fewer pixels), so the micrometer size of one output pixel scales
+        # inversely with the pixel count. Keeping width_um/height_um (the
+        # physical FOV) constant this way makes every micrometer mapping — the
+        # probe/laser offset marker, the distortion, the viewer scale —
+        # independent of the camera resolution. (At load time width == self.width
+        # so this is skipped and the configured pixel_size is preserved.)
+        if self.width and self.height and width and height:
+            self.pixel_size_in_um = [
+                self.pixel_size_in_um[0] * self.width / width,
+                self.pixel_size_in_um[1] * self.height / height,
+            ]
 
         self.width = width
         self.height = height
@@ -634,6 +653,8 @@ class CameraInstrument(Instrument):
         settings["objectives"] = list(self.objectives)
         settings["width"] = self.width
         settings["height"] = self.height
+        if self.distortion_pages:
+            settings["distortion_pages"] = self.distortion_pages
 
         return settings
 
@@ -643,6 +664,8 @@ class CameraInstrument(Instrument):
         Instrument.settings.__set__(self, data)  # type: ignore[attr-defined]
         if "transform" in data and isinstance(data["transform"], dict):
             self.correction_matrix = yaml_to_qtransform(data["transform"])
+        if "distortion_pages" in data and isinstance(data["distortion_pages"], list):
+            self.distortion_pages = data["distortion_pages"]
         if "white_level" in data and isinstance(data["white_level"], (float, int)):
             self.white_level = float(data["white_level"])
             self.parameter_changed.emit("white_level", data["white_level"])

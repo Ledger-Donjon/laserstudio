@@ -90,12 +90,6 @@ class LaserStudio(QMainWindow):
         # Instantiate all instruments
         self.instruments = Instruments(config)
 
-        # Single, shared camera wizards, so the classic UI and the new UI drive
-        # the same wizard instance (same pages, D-pads and state) instead of
-        # each creating its own.
-        self._camera_distortion_wizard: Any = None
-        self._probes_position_wizard: Any = None
-
         # Creation of Viewer as the central widget
         self.viewer = Viewer(
             scans=self.instruments.scans,
@@ -306,20 +300,12 @@ class LaserStudio(QMainWindow):
             self.restoreState(window_state)
 
     def camera_distortion_wizard(self):
-        """Return the single, shared camera distortion wizard (created lazily)."""
-        if self._camera_distortion_wizard is None:
-            from .widgets.camerawizards import CameraDistortionWizard
-
-            self._camera_distortion_wizard = CameraDistortionWizard(self, self)
-        return self._camera_distortion_wizard
+        """The single, shared camera distortion wizard (held by Instruments)."""
+        return self.instruments.camera_distortion_wizard(self)
 
     def probes_position_wizard(self):
-        """Return the single, shared probes/spots position wizard (lazy)."""
-        if self._probes_position_wizard is None:
-            from .widgets.camerawizards import ProbesPositionWizard
-
-            self._probes_position_wizard = ProbesPositionWizard(self, self)
-        return self._probes_position_wizard
+        """The single, shared probes/spots position wizard (held by Instruments)."""
+        return self.instruments.probes_position_wizard(self)
 
     def closeEvent(self, a0: QCloseEvent | None):
         """Saves user settings before closing the application."""

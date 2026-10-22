@@ -303,14 +303,15 @@ class CameraDockWidget(QDockWidget):
         grid.addWidget(w, 1, 1)
         w.setHidden(laser_studio.viewer is None)
 
-        # Distortion wizard button (single shared instance held by the app)
+        # Distortion wizard button (single shared instance held by the app).
+        # Classic UI: no extra stylesheet -> global Ledger style.
         w = QPushButton("Distortion Wizard")
-        w.clicked.connect(lambda: laser_studio.camera_distortion_wizard().show())
+        w.clicked.connect(lambda: laser_studio.camera_distortion_wizard().show_with_style(""))
         grid.addWidget(w, 2, 1)
 
         # Probes wizard button (single shared instance held by the app)
         w = QPushButton("Probes/Spots Wizard")
-        w.clicked.connect(lambda: laser_studio.probes_position_wizard().show())
+        w.clicked.connect(lambda: laser_studio.probes_position_wizard().show_with_style(""))
         grid.addWidget(w, 2, 2)
         w.setHidden(
             len(laser_studio.instruments.probes) + len(laser_studio.instruments.lasers)

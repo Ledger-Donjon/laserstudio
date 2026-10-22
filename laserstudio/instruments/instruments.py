@@ -32,6 +32,12 @@ class Instruments:
         """
         :param config: Configuration YAML object
         """
+        # Single, shared camera wizards. Both the classic UI and the new UI
+        # share this Instruments object, so holding the wizards here makes them
+        # the same instance across both windows.
+        self._camera_distortion_wizard: Any = None
+        self._probes_position_wizard: Any = None
+
         # Main stage
         self.stage: StageInstrument | None = None
         stage_config = config.get("stage")
@@ -167,6 +173,26 @@ class Instruments:
             self.annotations = AnnotationsInstrument(annotations_config)
         else:
             self.annotations = AnnotationsInstrument({})
+
+    def camera_distortion_wizard(self, laser_studio: Any) -> Any:
+        """Return the single, shared camera distortion wizard (created lazily).
+
+        ``laser_studio`` is the window that first opens it; the wizard applies
+        its result through the shared camera, so both UIs stay in sync.
+        """
+        if self._camera_distortion_wizard is None:
+            from ..widgets.camerawizards import CameraDistortionWizard
+
+            self._camera_distortion_wizard = CameraDistortionWizard(laser_studio)
+        return self._camera_distortion_wizard
+
+    def probes_position_wizard(self, laser_studio: Any) -> Any:
+        """Return the single, shared probes/spots position wizard (lazy)."""
+        if self._probes_position_wizard is None:
+            from ..widgets.camerawizards import ProbesPositionWizard
+
+            self._probes_position_wizard = ProbesPositionWizard(laser_studio)
+        return self._probes_position_wizard
 
     def go_next(self) -> Config:
         results: list[dict[str, Any]] = []

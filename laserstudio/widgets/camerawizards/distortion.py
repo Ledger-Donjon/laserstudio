@@ -1,7 +1,8 @@
 from __future__ import annotations
+import os
 from typing import cast, TYPE_CHECKING
 from PyQt6.QtCore import QCoreApplication, QPointF, QRectF, Qt
-from PyQt6.QtGui import QTransform, QPolygonF
+from PyQt6.QtGui import QTransform, QPolygonF, QPixmap
 from PyQt6.QtWidgets import QWidget, QPushButton, QHBoxLayout
 from .camerapages import (
     CameraWizardPage,
@@ -39,25 +40,31 @@ class CameraAlignmentPage(CameraPositionPage):
 
     def initializePage(self) -> None:
         super(CameraAlignmentPage, self).initializePage()
+        self._show_restored()
 
     def __init__(self, step: int, parent: CameraDistortionWizard):
         super().__init__(parent=parent)
 
         # The information stored when the user clicks on the image
         self.stage_point: QPointF | None = None  # The stage's position
+        # State restored from a previous session, shown on first display.
+        self._restored_pixmap: QPixmap | None = None
+        self._restored_shown = False
 
         layout = self.layout()
         assert layout is not None
-        # # A Keyboard box to control the stage
-        # self.keyboard_box = KeyboardBox(parent.instruments.stage)
-        # layout.addWidget(self.keyboard_box)
 
-        # A Button permitting to reposition the stage
+        # Buttons: clear the clicked point, and move the stage back to the
+        # position recorded for this page (restored or just clicked).
         self.reset_position = QPushButton("Reposition")
         self.reset_position.setEnabled(False)
         self.reset_position.clicked.connect(lambda: self.set_position(None))
+        self.go_to_button = QPushButton("Go to this position")
+        self.go_to_button.setEnabled(False)
+        self.go_to_button.clicked.connect(self._go_to_saved_position)
         box = QHBoxLayout()
         box.addWidget(self.reset_position)
+        box.addWidget(self.go_to_button)
         w = QWidget()
         w.setLayout(box)
         layout.addWidget(w)
@@ -71,8 +78,6 @@ class CameraAlignmentPage(CameraPositionPage):
     def set_position(self, xy: tuple[int, int] | None):
         super().set_position(xy)
 
-        # Enable/disable some UI elements
-        # self.keyboard_box.setEnabled(xy is None)
         self.reset_position.setEnabled(xy is not None)
 
         # Reset the position of stage
@@ -85,6 +90,48 @@ class CameraAlignmentPage(CameraPositionPage):
         ):
             # Retrieve position of the stage
             self.stage_point = -QPointF(*s.position.xy)
+        self.go_to_button.setEnabled(self.stage_point is not None)
+
+    def restore_state(
+        self,
+        clicked: QPointF | None,
+        stage: QPointF | None,
+        pixmap: QPixmap | None,
+    ) -> None:
+        """Restore this page from a previously saved distortion wizard state."""
+        self.clicked_point = clicked
+        self.stage_point = stage
+        self.clicked_image_pixmap = pixmap
+        self._restored_pixmap = pixmap
+        self._restored_shown = False
+        self.reset_position.setEnabled(clicked is not None)
+        self.go_to_button.setEnabled(stage is not None)
+        self._update_clicked_label()
+        self.completeChanged.emit()
+
+    def _show_restored(self) -> None:
+        """Display the restored image and clicked-point marker once, if any."""
+        if self._restored_shown or self.clicked_point is None:
+            return
+        self._restored_shown = True
+        ss = self.viewer.stage_sight
+        if self._restored_pixmap is not None and not self._restored_pixmap.isNull():
+            ss.set_pixmap(self._restored_pixmap)
+            ss.pause_image_update = True
+        scene_pos = ss.mapToScene(self.clicked_point)
+        self.viewer.clicked_point_marker.setPos(scene_pos)
+        self.viewer.clicked_point_marker.setVisible(True)
+
+    def _go_to_saved_position(self) -> None:
+        """Move the stage back to the position recorded for this page."""
+        stage = self._stage
+        if stage is None or self.stage_point is None:
+            return
+        position = stage.position
+        position[0] = -self.stage_point.x()
+        if stage.stage.num_axis > 1:
+            position[1] = -self.stage_point.y()
+        stage.move_to(position, wait=False)
 
 
 class DistortedImagePresentationPage(CameraPresentationPage):
@@ -114,18 +161,14 @@ class DistortedImagePresentationPage(CameraPresentationPage):
             self.viewer.stage_sight.distortion = self.transform
             self.apply_button.setEnabled(True)
 
-        w, h = (
-            self.viewer.stage_sight.size.width(),
-            self.viewer.stage_sight.size.height(),
-        )
-
-        # The transform may induce a translation
-        # which can be measured by mapping the origin
-        delta = self.transform.map(QPointF(0.0, 0.0))
-        rect = self.transform.mapRect(QRectF(-w / 2, -h / 2, w, h))
-        self.viewer.stage_sight.setPos(delta)
-        self.viewer.setSceneRect(rect)
-        self.viewer.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
+        # Frame the view on the (now distorted) stage sight. Its scene bounding
+        # rect already reflects the applied correction, so this works whatever
+        # the transform and the camera resolution are.
+        self.viewer.stage_sight.setPos(QPointF(0.0, 0.0))
+        rect = self.viewer.stage_sight.sceneBoundingRect()
+        if not rect.isEmpty():
+            self.viewer.setSceneRect(rect)
+            self.viewer.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def apply_transform(self):
         """Apply the transform to the whole application.
@@ -140,6 +183,9 @@ class DistortedImagePresentationPage(CameraPresentationPage):
         elif (s := self.wizard().laser_studio.viewer.stage_sight) is not None:
             s.distortion = self.transform
         self.wizard().laser_studio.viewer.reset_camera_to_stage_sight()
+        # Persist the per-page state (points, stage positions, images) so the
+        # alignment can be reviewed and restored after a restart.
+        self.wizard().save_pages()
 
     def __init__(self, parent: CameraDistortionWizard):
         super().__init__(parent=parent)
@@ -170,6 +216,57 @@ class CameraDistortionWizard(CameraWizard):
             self.setPage(PagesID.ALIGN + step, p)
         self.setPage(PagesID.ALIGN_RESULT, DistortedImagePresentationPage(parent=self))
 
+        # Restore the per-page state saved in a previous session (if any).
+        self.restore_pages()
+
+    def save_pages(self) -> None:
+        """Persist each alignment page (clicked point, stage position, image).
+
+        The clicked point and stage position go into camera.distortion_pages
+        (serialized to settings.yaml); the images are saved as PNG files next
+        to settings.yaml.
+        """
+        camera = self.instruments.camera
+        if camera is None:
+            return
+        pages: list[dict] = []
+        for i, page in enumerate(self.camera_pages):
+            if page.clicked_point is None or page.stage_point is None:
+                continue
+            entry: dict = {
+                "clicked": [page.clicked_point.x(), page.clicked_point.y()],
+                "stage": [page.stage_point.x(), page.stage_point.y()],
+            }
+            pixmap = page.clicked_image_pixmap
+            if pixmap is not None and not pixmap.isNull():
+                path = f"distortion_page_{i}.png"
+                if pixmap.save(path, "PNG"):
+                    entry["image"] = path
+            pages.append(entry)
+        camera.distortion_pages = pages
+
+    def restore_pages(self) -> None:
+        """Restore each alignment page from camera.distortion_pages."""
+        camera = self.instruments.camera
+        if camera is None:
+            return
+        for i, entry in enumerate(camera.distortion_pages):
+            if i >= len(self.camera_pages) or not isinstance(entry, dict):
+                break
+            clicked = entry.get("clicked")
+            stage = entry.get("stage")
+            pixmap: QPixmap | None = None
+            image = entry.get("image")
+            if isinstance(image, str) and os.path.exists(image):
+                candidate = QPixmap(image)
+                if not candidate.isNull():
+                    pixmap = candidate
+            self.camera_pages[i].restore_state(
+                QPointF(clicked[0], clicked[1]) if clicked else None,
+                QPointF(stage[0], stage[1]) if stage else None,
+                pixmap,
+            )
+
     @property
     def transform(self) -> QTransform | None:
         """
@@ -184,9 +281,19 @@ class CameraDistortionWizard(CameraWizard):
         # four angle's coordinates are corresponding to a mapping from one 'space' to another
         # 'space'.
 
-        # First polygon's points (view's space, in pixel)
+        # First polygon's points, in the image space. The clicked points are in
+        # centered pixel coordinates; they are normalized to [-1, 1] relative to
+        # the camera resolution so that the resulting transform (and hence the
+        # saved correction matrix) is independent of the camera resolution.
+        camera = self.instruments.camera
+        if camera is None:
+            return None
+        half_w = camera.width / 2.0
+        half_h = camera.height / 2.0
+        if not half_w or not half_h:
+            return None
         one = [
-            page.clicked_point
+            QPointF(page.clicked_point.x() / half_w, page.clicked_point.y() / half_h)
             for page in self.camera_pages
             if page.clicked_point is not None
         ]
